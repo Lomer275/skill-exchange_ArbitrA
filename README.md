@@ -4,10 +4,13 @@
 
 ## Быстрый старт
 
-1. Клонируй репо: `git clone <url>`
-2. Настрой путь установки: `python cli/skill_exchange.py config --set-path /твой/путь/к/plugins`
-3. Установи скилл: `python cli/skill_exchange.py install <name>`
-4. Перезапусти Claude Code
+1. Клонируй репо: `git clone https://github.com/Lomer275/skill-exchange_ArbitrA.git`
+2. Установи pre-commit hook: `python cli/skill_exchange.py setup-hooks`
+3. Укажи путь к плагинам: `python cli/skill_exchange.py config --set-path <путь>`
+   - Windows: `C:\Users\<имя>\.claude\plugins`
+   - Mac/Linux: `~/.claude/plugins`
+4. Установи скилл: `python cli/skill_exchange.py install <name>`
+5. Перезапусти Claude Code
 
 ## Каталог скиллов
 
