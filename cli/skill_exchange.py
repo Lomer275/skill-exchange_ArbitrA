@@ -46,7 +46,10 @@ def cmd_install(args):
 
     if args.desktop:
         readme = skill_src / "README.md"
-        text = readme.read_text(encoding="utf-8") if readme.exists() else str(skill_src / "skill.md")
+        skill_md = skill_src / "skill.md"
+        text = (readme.read_text(encoding="utf-8") if readme.exists()
+                else skill_md.read_text(encoding="utf-8") if skill_md.exists()
+                else "")
         try:
             if sys.platform == "win32":
                 subprocess.run("clip", input=text.encode("utf-16"), check=True)
