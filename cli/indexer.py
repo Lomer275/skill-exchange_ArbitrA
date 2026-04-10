@@ -5,6 +5,8 @@ SKILLS_DIR = Path(__file__).parent.parent / "skills"
 
 
 def scan_skills() -> list:
+    if not SKILLS_DIR.exists():
+        return []
     skills = []
     for skill_dir in sorted(SKILLS_DIR.iterdir()):
         if not skill_dir.is_dir():
