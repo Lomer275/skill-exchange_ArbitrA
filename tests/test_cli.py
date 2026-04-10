@@ -56,9 +56,6 @@ def test_list_empty_catalog(tmp_path):
     assert "не найдены" in output or output.strip() == "" or "пуст" in output
 
 
-import shutil
-
-
 def make_skill_in_dir(skills_dir: Path, name: str):
     skill_dir = skills_dir / name
     skill_dir.mkdir(parents=True, exist_ok=True)

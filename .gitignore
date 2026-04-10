@@ -6,3 +6,4 @@ dist/
 .skill-exchange/
 venv/
 .venv/
+=*

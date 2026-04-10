@@ -12,7 +12,6 @@ import config as cfg_module
 import indexer as idx_module
 
 REPO_ROOT = Path(__file__).parent.parent
-SKILLS_DIR = REPO_ROOT / "skills"
 
 
 # ── list ──────────────────────────────────────────────────────────────────────
@@ -71,7 +70,7 @@ def cmd_install(args):
     elif args.project:
         target_dir = Path.cwd() / ".claude" / "plugins"
     else:
-        target_dir = Path(config["default_path"])
+        target_dir = Path(config["default_path"]).expanduser()
 
     target_dir.mkdir(parents=True, exist_ok=True)
     dest = target_dir / args.name
@@ -152,7 +151,7 @@ def cmd_update(args):
         if not skill_src.exists():
             print(f"  Скилл '{name}' не найден в репо, пропускаем.")
             continue
-        target_dir = Path(config["default_path"])
+        target_dir = Path(config["default_path"]).expanduser()
         target_dir.mkdir(parents=True, exist_ok=True)
         dest = target_dir / name
         if dest.exists():
