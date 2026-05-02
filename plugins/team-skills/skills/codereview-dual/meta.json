@@ -1,0 +1,13 @@
+{
+  "name": "codereview-dual",
+  "display_name": "Code Review (Dual)",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Двойной независимый код-ревью: Claude + Codex параллельно, мерж findings в одну severity-ranked таблицу с метками [both]/[claude]/[codex].",
+  "tags": [
+    "code-review",
+    "codex",
+    "quality"
+  ],
+  "created": "2026-05-02"
+}
