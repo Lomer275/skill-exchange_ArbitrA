@@ -1,0 +1,12 @@
+{
+  "name": "codereview",
+  "display_name": "Code Review",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Многофазный придирчивый код-ревью задачи: критерии приёмки + adversarial + user walkthrough + архитектурный fit. Только анализ, без фиксов.",
+  "tags": [
+    "code-review",
+    "quality"
+  ],
+  "created": "2026-05-02"
+}

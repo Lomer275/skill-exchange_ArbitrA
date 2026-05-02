@@ -1,6 +1,80 @@
 {
   "skills": [
     {
+      "name": "accept",
+      "display_name": "Accept Task",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Закрывает задачу: помечает done в файле/спеке/HANDOFF, добавляет в CHANGELOG, переносит в Done/. Адаптируется к префиксу проекта.",
+      "tags": [
+        "workflow",
+        "documentation"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "bitrix24-developer",
+      "display_name": "Bitrix24 Developer",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Generic-набор паттернов работы с Bitrix24 REST API: CRM, smart processes, business processes, disk, batch API, n8n integration.",
+      "tags": [
+        "bitrix24",
+        "crm",
+        "api"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "codereview",
+      "display_name": "Code Review",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Многофазный придирчивый код-ревью задачи: критерии приёмки + adversarial + user walkthrough + архитектурный fit. Только анализ, без фиксов.",
+      "tags": [
+        "code-review",
+        "quality"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "codereview-dual",
+      "display_name": "Code Review (Dual)",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Двойной независимый код-ревью: Claude + Codex параллельно, мерж findings в одну severity-ranked таблицу с метками [both]/[claude]/[codex].",
+      "tags": [
+        "code-review",
+        "codex",
+        "quality"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "codex-setup",
+      "display_name": "Codex CLI Setup",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Одноразовая установка и проверка Codex CLI для связки Claude × Codex. Создаёт AGENTS.md и .claude/codex.json. Идемпотентен.",
+      "tags": [
+        "codex",
+        "bootstrap"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "codex-toggle",
+      "display_name": "Codex Toggle",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Управление kill-switch'ем связки Claude × Codex. on / off [причина] / status.",
+      "tags": [
+        "codex",
+        "config"
+      ],
+      "created": "2026-05-02"
+    },
+    {
       "name": "example-skill",
       "display_name": "Example Skill",
       "author": "team",
@@ -11,6 +85,122 @@
         "template"
       ],
       "created": "2026-04-10"
+    },
+    {
+      "name": "fix",
+      "display_name": "Fix Bugs",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Планирование и применение фиксов из код-ревью или визуальной проверки. Минимальные точечные изменения, без рефакторинга.",
+      "tags": [
+        "code-review",
+        "fix",
+        "quality"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "init_dev",
+      "display_name": "Init Project Docs",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Создаёт базовую структуру документации проекта: docs/, гайды, architecture.md, HANDOFF.md, CHANGELOG.md, CLAUDE.md.",
+      "tags": [
+        "bootstrap",
+        "documentation",
+        "workflow"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "n8n-workflow-manager",
+      "display_name": "n8n Workflow Manager",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Управление n8n workflows: search, inspect, create, edit, активация, выполнение. Шаблоны нод, паттерны интеграций.",
+      "tags": [
+        "n8n",
+        "automation",
+        "workflow"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "review-loop",
+      "display_name": "Review Loop",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Цикл codereview → fix до полной чистоты от CRITICAL и HIGH. Максимум 5 итераций.",
+      "tags": [
+        "code-review",
+        "fix",
+        "automation"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "safe-push",
+      "display_name": "Safe Commit & Push",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits. Не делает force push без явной просьбы.",
+      "tags": [
+        "git",
+        "safety"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "spec-writer",
+      "display_name": "Spec Writer",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Создаёт документы проекта: спецификации (S), задачи (T), бизнес-требования (BR). Один вызов = один файл, только скелет.",
+      "tags": [
+        "documentation",
+        "spec",
+        "workflow"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "sprint",
+      "display_name": "Sprint",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run.",
+      "tags": [
+        "workflow",
+        "automation",
+        "spec"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "sprint-codex",
+      "display_name": "Sprint (Codex)",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач.",
+      "tags": [
+        "workflow",
+        "codex",
+        "parallel"
+      ],
+      "created": "2026-05-02"
+    },
+    {
+      "name": "visualcheck",
+      "display_name": "Visual UI Check",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Визуальная проверка UI по скриншотам или коду: баги вёрстки, UX-проблемы, несоответствия дизайну. Анализ desktop+mobile.",
+      "tags": [
+        "ui",
+        "design",
+        "quality"
+      ],
+      "created": "2026-05-02"
     }
   ]
 }

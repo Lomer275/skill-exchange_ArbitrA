@@ -28,7 +28,22 @@ python cli/skill_exchange.py install <имя-скилла>
 
 | Имя | Автор | Теги | Описание |
 |-----|-------|------|----------|
+| [accept](plugins/team-skills/skills/accept/README.md) | kostya | workflow, documentation | Закрывает задачу: помечает done в файле/спеке/HANDOFF, добавляет в CHANGELOG, переносит в Done/. Адаптируется к префиксу проекта. |
+| [bitrix24-developer](plugins/team-skills/skills/bitrix24-developer/README.md) | kostya | bitrix24, crm, api | Generic-набор паттернов работы с Bitrix24 REST API: CRM, smart processes, business processes, disk, batch API, n8n integration. |
+| [codereview](plugins/team-skills/skills/codereview/README.md) | kostya | code-review, quality | Многофазный придирчивый код-ревью задачи: критерии приёмки + adversarial + user walkthrough + архитектурный fit. Только анализ, без фиксов. |
+| [codereview-dual](plugins/team-skills/skills/codereview-dual/README.md) | kostya | code-review, codex, quality | Двойной независимый код-ревью: Claude + Codex параллельно, мерж findings в одну severity-ranked таблицу с метками [both]/[claude]/[codex]. |
+| [codex-setup](plugins/team-skills/skills/codex-setup/README.md) | kostya | codex, bootstrap | Одноразовая установка и проверка Codex CLI для связки Claude × Codex. Создаёт AGENTS.md и .claude/codex.json. Идемпотентен. |
+| [codex-toggle](plugins/team-skills/skills/codex-toggle/README.md) | kostya | codex, config | Управление kill-switch'ем связки Claude × Codex. on / off [причина] / status. |
 | [example-skill](plugins/team-skills/skills/example-skill/README.md) | team | example, template | Демонстрационный скилл — шаблон для создания своих |
+| [fix](plugins/team-skills/skills/fix/README.md) | kostya | code-review, fix, quality | Планирование и применение фиксов из код-ревью или визуальной проверки. Минимальные точечные изменения, без рефакторинга. |
+| [init_dev](plugins/team-skills/skills/init_dev/README.md) | kostya | bootstrap, documentation, workflow | Создаёт базовую структуру документации проекта: docs/, гайды, architecture.md, HANDOFF.md, CHANGELOG.md, CLAUDE.md. |
+| [n8n-workflow-manager](plugins/team-skills/skills/n8n-workflow-manager/README.md) | kostya | n8n, automation, workflow | Управление n8n workflows: search, inspect, create, edit, активация, выполнение. Шаблоны нод, паттерны интеграций. |
+| [review-loop](plugins/team-skills/skills/review-loop/README.md) | kostya | code-review, fix, automation | Цикл codereview → fix до полной чистоты от CRITICAL и HIGH. Максимум 5 итераций. |
+| [safe-push](plugins/team-skills/skills/safe-push/README.md) | kostya | git, safety | Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits. Не делает force push без явной просьбы. |
+| [spec-writer](plugins/team-skills/skills/spec-writer/README.md) | kostya | documentation, spec, workflow | Создаёт документы проекта: спецификации (S), задачи (T), бизнес-требования (BR). Один вызов = один файл, только скелет. |
+| [sprint](plugins/team-skills/skills/sprint/README.md) | kostya | workflow, automation, spec | Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run. |
+| [sprint-codex](plugins/team-skills/skills/sprint-codex/README.md) | kostya | workflow, codex, parallel | Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач. |
+| [visualcheck](plugins/team-skills/skills/visualcheck/README.md) | kostya | ui, design, quality | Визуальная проверка UI по скриншотам или коду: баги вёрстки, UX-проблемы, несоответствия дизайну. Анализ desktop+mobile. |
 
 ## Добавить свой скилл
 
