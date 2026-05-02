@@ -1,0 +1,13 @@
+{
+  "name": "bitrix24-developer",
+  "display_name": "Bitrix24 Developer",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Generic-набор паттернов работы с Bitrix24 REST API: CRM, smart processes, business processes, disk, batch API, n8n integration.",
+  "tags": [
+    "bitrix24",
+    "crm",
+    "api"
+  ],
+  "created": "2026-05-02"
+}
