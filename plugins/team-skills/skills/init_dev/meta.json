@@ -1,0 +1,13 @@
+{
+  "name": "init_dev",
+  "display_name": "Init Project Docs",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Создаёт базовую структуру документации проекта: docs/, гайды, architecture.md, HANDOFF.md, CHANGELOG.md, CLAUDE.md.",
+  "tags": [
+    "bootstrap",
+    "documentation",
+    "workflow"
+  ],
+  "created": "2026-05-02"
+}
