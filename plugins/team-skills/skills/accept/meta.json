@@ -1,0 +1,12 @@
+{
+  "name": "accept",
+  "display_name": "Accept Task",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Закрывает задачу: помечает done в файле/спеке/HANDOFF, добавляет в CHANGELOG, переносит в Done/. Адаптируется к префиксу проекта.",
+  "tags": [
+    "workflow",
+    "documentation"
+  ],
+  "created": "2026-05-02"
+}
