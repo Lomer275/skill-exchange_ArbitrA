@@ -1,0 +1,13 @@
+{
+  "name": "review-loop",
+  "display_name": "Review Loop",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Цикл codereview → fix до полной чистоты от CRITICAL и HIGH. Максимум 5 итераций.",
+  "tags": [
+    "code-review",
+    "fix",
+    "automation"
+  ],
+  "created": "2026-05-02"
+}
