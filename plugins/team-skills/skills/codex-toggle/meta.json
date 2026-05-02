@@ -1,0 +1,12 @@
+{
+  "name": "codex-toggle",
+  "display_name": "Codex Toggle",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Управление kill-switch'ем связки Claude × Codex. on / off [причина] / status.",
+  "tags": [
+    "codex",
+    "config"
+  ],
+  "created": "2026-05-02"
+}
