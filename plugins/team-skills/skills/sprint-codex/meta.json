@@ -1,0 +1,13 @@
+{
+  "name": "sprint-codex",
+  "display_name": "Sprint (Codex)",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач.",
+  "tags": [
+    "workflow",
+    "codex",
+    "parallel"
+  ],
+  "created": "2026-05-02"
+}
