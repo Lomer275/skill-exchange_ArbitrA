@@ -1,0 +1,10 @@
+{
+  "name": "team-skills",
+  "description": "Коллекция Claude Code скиллов команды ArbitrA. Скиллы доступны как /team-skills:<имя>.",
+  "version": "1.0.0",
+  "author": {
+    "name": "ArbitrA team"
+  },
+  "homepage": "https://github.com/Lomer275/skill-exchange_ArbitrA",
+  "repository": "https://github.com/Lomer275/skill-exchange_ArbitrA"
+}

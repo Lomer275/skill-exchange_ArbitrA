@@ -1,19 +1,21 @@
-# Manual skill installation without CLI.
+# Manual skill installation without CLI (fallback for users without Python).
+# Copies SKILL.md + README.md to <target>\<skill-name>\.
+#
 # Usage: .\scripts\install.ps1 <skill-name> [target-dir]
 #
 # Examples:
-#   .\scripts\install.ps1 git-commit-helper
-#   .\scripts\install.ps1 git-commit-helper C:\Users\me\.claude\plugins
+#   .\scripts\install.ps1 example-skill
+#   .\scripts\install.ps1 example-skill C:\Users\me\.claude\skills
 
 param(
     [Parameter(Mandatory=$true)]
     [string]$SkillName,
 
-    [string]$TargetDir = "$env:USERPROFILE\.claude\plugins"
+    [string]$TargetDir = "$env:USERPROFILE\.claude\skills"
 )
 
-$RepoRoot = Split-Path -Parent $PSScriptRoot
-$SkillsDir = Join-Path $RepoRoot "skills"
+$RepoRoot  = Split-Path -Parent $PSScriptRoot
+$SkillsDir = Join-Path $RepoRoot "plugins\team-skills\skills"
 $SkillSrc  = Join-Path $SkillsDir $SkillName
 
 if (-not (Test-Path $SkillSrc)) {
@@ -23,10 +25,17 @@ if (-not (Test-Path $SkillSrc)) {
     exit 1
 }
 
-New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
+if (-not (Test-Path (Join-Path $SkillSrc "SKILL.md"))) {
+    Write-Error "SKILL.md not found in $SkillSrc — skill is malformed."
+    exit 1
+}
+
 $Dest = Join-Path $TargetDir $SkillName
-if (Test-Path $Dest) { Remove-Item -Recurse -Force $Dest }
-Copy-Item -Recurse $SkillSrc $Dest
+New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+
+Copy-Item (Join-Path $SkillSrc "SKILL.md") (Join-Path $Dest "SKILL.md")
+$Readme = Join-Path $SkillSrc "README.md"
+if (Test-Path $Readme) { Copy-Item $Readme (Join-Path $Dest "README.md") }
 
 Write-Host "Skill '$SkillName' installed to $Dest"
-Write-Host "Restart Claude Code to apply."
+Write-Host "Restart Claude Code to apply. The skill will be available as /$SkillName"

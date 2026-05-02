@@ -1,148 +1,140 @@
 # Contributing to Skill Exchange ArbitrA
 
-Гайд для команды по добавлению и обновлению Claude Code скиллов.
+Гайд по добавлению и обновлению Claude Code скиллов в команду.
 
 ## Требования
 
-- Python 3.8+ (`python --version` чтобы проверить)
+- Python 3.8+ (`python --version`)
 - Git
 - Claude Code (CLI или расширение VSCode/JetBrains)
 
-## Первичная настройка (один раз)
+## Как устроено распространение
+
+Этот репо — **Claude Code marketplace**. Каждый скилл лежит в `plugins/team-skills/skills/<имя>/` и распространяется через встроенный механизм плагинов Claude Code.
+
+Два пути установки:
+
+| Путь | Кому | Команда | Доступ к скиллу |
+|------|------|---------|-----------------|
+| **Marketplace** (рекомендуется) | вся команда | `/plugin marketplace add Lomer275/skill-exchange_ArbitrA` → `/plugin install team-skills@skill-exchange` | `/team-skills:<имя>` |
+| **CLI** (личная установка одного скилла) | личное использование | `python cli/skill_exchange.py install <имя>` | `/<имя>` |
+
+## Первичная настройка (для контрибьюторов)
 
 ```bash
-# 1. Клонируй репо
 git clone https://github.com/Lomer275/skill-exchange_ArbitrA.git
 cd skill-exchange_ArbitrA
 
-# 2. Установи pre-commit hook (обновляет каталог при каждом коммите)
+# Установи pre-commit hook (валидация + автообновление каталога)
 python cli/skill_exchange.py setup-hooks
-
-# 3. Укажи куда устанавливать скиллы локально
-python cli/skill_exchange.py config --set-path <путь>
 ```
 
-### Где найти путь к плагинам Claude Code
+## Установка скилла (для пользователей)
 
-Зависит от того, как ты используешь Claude Code:
+### Marketplace (рекомендуется)
 
-| Сценарий | Путь |
-|---|---|
-| **Глобально** (Windows) | `C:\Users\<имя>\.claude\plugins` |
-| **Глобально** (Mac/Linux) | `~/.claude/plugins` |
-| **Только для проекта** | `.claude/plugins` внутри папки проекта |
+В Claude Code:
 
-Если папка `.claude/plugins` не существует — CLI создаст её автоматически.
+```
+/plugin marketplace add Lomer275/skill-exchange_ArbitrA
+/plugin install team-skills@skill-exchange
+```
 
-> Не уверен где? Открой Claude Code, введи `/plugins` или посмотри в `~/.claude/` — там должна быть папка `plugins`.
+После этого все скиллы команды доступны как `/team-skills:<имя>`. Обновляются автоматически.
 
-## Установить скилл из библиотеки
+### CLI (личная установка одного скилла)
 
 ```bash
-# Посмотреть все скиллы
+# Посмотреть каталог
 python cli/skill_exchange.py list
+python cli/skill_exchange.py list --tag git    # фильтр по тегу
 
-# Фильтр по тегу
-python cli/skill_exchange.py list --tag git
+# Установить (по умолчанию в ~/.claude/skills/<имя>/)
+python cli/skill_exchange.py install <имя>
 
-# Установить скилл (в путь из конфига)
-python cli/skill_exchange.py install <skill-name>
+# В путь проекта
+python cli/skill_exchange.py install <имя> --project    # → ./.claude/skills/<имя>/
 
-# Установить глобально (все проекты)
-python cli/skill_exchange.py install <skill-name> --global
+# В произвольный путь
+python cli/skill_exchange.py install <имя> --path /custom/path
 
-# Установить только для текущего проекта
-python cli/skill_exchange.py install <skill-name> --project
+# Удалить
+python cli/skill_exchange.py uninstall <имя>
 
-# Установить в конкретную папку
-python cli/skill_exchange.py install <skill-name> --path /custom/path
-
-# Для Claude Desktop: скопировать README в буфер обмена
-python cli/skill_exchange.py install <skill-name> --desktop
+# Для Claude Desktop: README в буфер
+python cli/skill_exchange.py install <имя> --desktop
 ```
 
-После установки **перезапусти Claude Code** чтобы скилл стал доступен.
+После установки **перезапусти Claude Code** чтобы скилл подхватился.
 
 ## Добавить новый скилл
 
 ```bash
-# 1. Создать папку скилла с шаблонами
+# 1. Создать папку с шаблонами
 python cli/skill_exchange.py new my-skill-name
 
-# 2. Отредактируй три файла (см. описание ниже):
-#    skills/my-skill-name/skill.md    — инструкции для Claude
-#    skills/my-skill-name/meta.json   — метаданные (имя, теги, описание)
-#    skills/my-skill-name/README.md   — документация для команды
+# 2. Отредактировать три файла:
+#    plugins/team-skills/skills/my-skill-name/SKILL.md     — промпт для Claude (с frontmatter)
+#    plugins/team-skills/skills/my-skill-name/meta.json    — метаданные для каталога
+#    plugins/team-skills/skills/my-skill-name/README.md    — документация
 
-# 3. Запушь — каталог обновится автоматически
-git add skills/my-skill-name
+# 3. Запушить — каталог обновится автоматически (pre-commit hook)
+git add plugins/team-skills/skills/my-skill-name
 git commit -m "feat: add my-skill-name"
 git push
 ```
 
-## Что писать в `skill.md`
+## Формат `SKILL.md`
 
-`skill.md` — это инструкции, которые Claude получает при активации скилла. Пиши его как системный промпт: что должен делать Claude, в какой роли, какие правила соблюдать.
+`SKILL.md` (uppercase!) — содержимое, которое Claude получает при активации скилла. **Обязателен YAML frontmatter** — иначе Claude Code не распознает скилл и не сможет авто-активировать его по контексту.
 
-### Структура `skill.md`
+### Минимальная структура
 
 ```markdown
-# Название скилла
+---
+name: my-skill-name
+description: Что делает скилл и когда его использовать. Claude читает это поле для авто-активации.
+---
 
-Краткое описание: что делает этот скилл и когда его использовать.
+# My Skill
 
 ## Роль
 
-Ты — [описание роли]. Твоя задача — [цель].
+Ты — [роль]. Твоя задача — [цель].
 
 ## Правила
 
 - Правило 1
 - Правило 2
-
-## Как работать
-
-1. Шаг 1
-2. Шаг 2
-
-## Пример
-
-[Пример использования или диалога]
 ```
+
+### Обязательные поля frontmatter
+
+| Поле | Требование |
+|------|-----------|
+| `name` | kebab-case, должен совпадать с именем папки |
+| `description` | одна строка, что делает скилл и когда его использовать (Claude использует для роутинга) |
+
+### Опциональные поля frontmatter
+
+| Поле | Назначение |
+|------|-----------|
+| `allowed-tools` | пред-разрешить инструменты (`Bash(git *)`, `Read`, ...) |
+| `disable-model-invocation` | `true` — отключить авто-активацию (только ручной вызов) |
+| `when_to_use` | дополнительный контекст для роутинга |
+
+Полный список — в [официальной документации](https://docs.claude.com/en/docs/claude-code/skills).
 
 ### Советы
 
-- **Будь конкретным** — чем точнее инструкция, тем предсказуемее поведение Claude
-- **Указывай формат ответа** — если нужен список, таблица, код — скажи об этом явно
-- **Добавляй примеры** — Claude лучше понимает поведение из примеров, чем из абстрактных правил
-- **Короче лучше** — 200-500 строк достаточно для большинства скиллов
-
-### Пример хорошего `skill.md`
-
-```markdown
-# Code Reviewer
-
-Ты проводишь code review. Анализируй код который тебе показывают и давай конкретные замечания.
-
-## Правила
-
-- Сначала краткое резюме (1-2 предложения): что делает код и насколько он хорош
-- Затем список замечаний по категориям: Критические / Важные / Незначительные
-- Каждое замечание: что не так, почему это проблема, как исправить (с примером кода)
-- Не придирайся к стилю если он уже соответствует проекту
-
-## Формат ответа
-
-**Резюме:** ...
-
-**Критические:**
-- [ ] Описание → Почему → Как исправить
-
-**Важные:**
-- [ ] ...
-```
+- **Хороший `description`** = разница между «скилл активируется когда нужно» и «скилл лежит мёртвым грузом». Пиши не только *что* делает, но и *когда* использовать.
+- **Будь конкретным** — чем точнее инструкции в теле, тем предсказуемее поведение Claude.
+- **Указывай формат ответа** — если нужен список, таблица, код — скажи явно.
+- **Добавляй примеры** — Claude лучше понимает поведение из примеров, чем из абстрактных правил.
 
 ## Формат `meta.json`
+
+Метаданные для **каталога команды** (Claude Code их не читает — это только для нашего `README.md` и `index.json`).
 
 ```json
 {
@@ -156,26 +148,51 @@ git push
 }
 ```
 
-**Обязательные поля:** `name`, `author`, `description`.
+**Обязательные поля:** `name`, `author`, `description`. Поле `name` должно совпадать с именем папки.
 
-**Теги** — свободные, но старайся переиспользовать существующие: `git`, `code-review`, `python`, `docs`, `workflow`, `testing` и т.д.
+**Теги** — свободные, но переиспользуй существующие: `git`, `code-review`, `python`, `docs`, `workflow`, `testing`.
+
+## Валидация
+
+Pre-commit hook автоматически проверяет на каждом коммите:
+
+- `meta.json` валидный JSON, есть обязательные поля, `name` совпадает с именем папки
+- `SKILL.md` существует, имеет валидный frontmatter, `name`/`description` присутствуют, `name` совпадает с папкой
+
+Если что-то не так — коммит **отклоняется**, исправь и попробуй снова.
+
+Запустить валидацию вручную:
+
+```bash
+python cli/skill_exchange.py validate
+```
 
 ## Обновить локальные скиллы
+
+Через marketplace (если установил через `/plugin install`):
+
+```
+/plugin update team-skills@skill-exchange
+```
+
+Через CLI:
 
 ```bash
 python cli/skill_exchange.py update
 ```
 
-Выполняет `git pull` и переустанавливает все ранее установленные скиллы в `default_path`.
+`update` делает `git pull` и переустанавливает все скиллы из `installed[]` в `default_path`.
 
 ## Как работает pre-commit hook
 
 При каждом `git commit` хук автоматически:
-1. Сканирует все папки в `skills/`
-2. Читает `meta.json` каждого скилла
-3. Перегенерирует `skills/index.json`
-4. Перегенерирует `README.md` с таблицей каталога
-5. Добавляет оба файла в коммит
+
+1. **Валидирует** все скиллы (см. выше). Если есть ошибки — коммит отклоняется.
+2. Сканирует все папки в `plugins/team-skills/skills/`.
+3. Читает `meta.json` каждого скилла.
+4. Перегенерирует `plugins/team-skills/skills/index.json`.
+5. Перегенерирует корневой `README.md` с таблицей каталога.
+6. Добавляет оба файла в коммит.
 
 Тебе ничего делать не нужно — каталог всегда актуален.
 
@@ -184,34 +201,41 @@ python cli/skill_exchange.py update
 **Hook не запускается при коммите**
 
 ```bash
-# Переустанови hook
 python cli/skill_exchange.py setup-hooks
-
-# Проверь что он там есть
 ls .git/hooks/pre-commit
 ```
 
-На Windows убедись что Python есть в PATH: `python --version`
+На Windows убедись что Python в PATH: `python --version`.
 
 ---
 
-**`python` не найдена команда**
+**`python` не найдена**
 
-На некоторых системах нужно использовать `python3`:
+Используй `python3`:
+
 ```bash
 python3 cli/skill_exchange.py list
 ```
 
 ---
 
-**Скилл установлен, но не появляется в Claude Code**
+**Marketplace добавлен, но плагин не активируется**
 
-1. Убедись что путь установки правильный: `python cli/skill_exchange.py config`
-2. Полностью перезапусти Claude Code (не просто новый чат)
-3. Проверь что папка скилла скопировалась: открой путь из конфига и посмотри там
+1. Проверь, что плагин включён: `/plugin list`
+2. Ручной запуск: `/plugin update team-skills@skill-exchange`
+3. Перезапусти Claude Code (не просто новый чат — полностью перезапусти CLI/IDE)
+
+---
+
+**Скилл установлен через CLI, но не появляется в Claude Code**
+
+1. Проверь путь: `python cli/skill_exchange.py config`. По умолчанию `~/.claude/skills/`.
+2. Папка с `SKILL.md` действительно создалась? `ls ~/.claude/skills/<имя>/SKILL.md`
+3. Полностью перезапусти Claude Code.
+4. Проверь, что у `SKILL.md` есть frontmatter (`---` сверху).
 
 ---
 
 **`git push` не работает**
 
-Убедись что у тебя есть доступ к репо на GitHub. Попроси владельца добавить тебя как collaborator.
+Запроси доступ к репо у владельца — нужны collaborator-права.

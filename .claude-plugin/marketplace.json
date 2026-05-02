@@ -1,0 +1,13 @@
+{
+  "name": "skill-exchange",
+  "owner": {
+    "name": "ArbitrA team"
+  },
+  "plugins": [
+    {
+      "name": "team-skills",
+      "source": "./plugins/team-skills",
+      "description": "Внутренняя коллекция Claude Code скиллов команды ArbitrA"
+    }
+  ]
+}

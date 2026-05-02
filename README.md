@@ -1,29 +1,41 @@
 # Skill Exchange ArbitrA
 
-Внутренняя библиотека Claude Code скиллов для команды.
+Внутренняя библиотека Claude Code скиллов команды ArbitrA.
+Распространяется как Claude Code marketplace.
 
-## Быстрый старт
+## Установка (рекомендованный путь)
 
-1. Клонируй репо: `git clone https://github.com/Lomer275/skill-exchange_ArbitrA.git`
-2. Установи pre-commit hook: `python cli/skill_exchange.py setup-hooks`
-3. Укажи путь к плагинам: `python cli/skill_exchange.py config --set-path <путь>`
-   - Windows: `C:\Users\<имя>\.claude\plugins`
-   - Mac/Linux: `~/.claude/plugins`
-4. Установи скилл: `python cli/skill_exchange.py install <name>`
-5. Перезапусти Claude Code
+В Claude Code:
+
+```
+/plugin marketplace add Lomer275/skill-exchange_ArbitrA
+/plugin install team-skills@skill-exchange
+```
+
+После установки все скиллы доступны как `/team-skills:<имя-скилла>`.
+
+## Альтернатива: личная установка одного скилла через CLI
+
+```bash
+git clone https://github.com/Lomer275/skill-exchange_ArbitrA.git
+cd skill-exchange_ArbitrA
+python cli/skill_exchange.py install <имя-скилла>
+```
+
+Копирует `SKILL.md` в `~/.claude/skills/<имя>/`. Скилл доступен как `/<имя>`.
 
 ## Каталог скиллов
 
 | Имя | Автор | Теги | Описание |
 |-----|-------|------|----------|
-| [example-skill](skills/example-skill/README.md) | team | example, template | Демонстрационный скилл — шаблон для создания своих |
+| [example-skill](plugins/team-skills/skills/example-skill/README.md) | team | example, template | Демонстрационный скилл — шаблон для создания своих |
 
 ## Добавить свой скилл
 
 ```bash
 python cli/skill_exchange.py new my-skill-name
-# Отредактируй skills/my-skill-name/{skill.md,meta.json,README.md}
-git add skills/my-skill-name
+# Отредактируй plugins/team-skills/skills/my-skill-name/{SKILL.md,meta.json,README.md}
+git add plugins/team-skills/skills/my-skill-name
 git commit -m 'feat: add my-skill-name'
 git push
 ```

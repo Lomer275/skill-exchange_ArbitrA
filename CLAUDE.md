@@ -1,0 +1,80 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this repo is
+
+A team-internal **Claude Code marketplace** distributing a collection of skills. Users add the marketplace once (`/plugin marketplace add Lomer275/skill-exchange_ArbitrA`) and install the bundled `team-skills` plugin (`/plugin install team-skills@skill-exchange`) — every skill becomes available as `/team-skills:<name>`.
+
+A small Python CLI in [cli/](cli/) supports the secondary "personal install" path: copying a single skill into `~/.claude/skills/<name>/` (the standalone-skill path Claude Code reads natively).
+
+User-facing strings (CLI output, [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md)) are in Russian — match that language.
+
+## Common commands
+
+```bash
+# Run the CLI (no install step; entry point is the script directly)
+python cli/skill_exchange.py <subcommand>
+# subcommands: list | install | uninstall | new | validate | update | config | setup-hooks
+
+# Tests (pytest is the only dev dep)
+python -m pip install -r requirements-dev.txt
+python -m pytest                                            # all
+python -m pytest tests/test_cli.py::test_install_path_flag  # single
+python -m pytest -k validate                                # by pattern
+
+# Install the pre-commit hook (validates skills + regenerates catalog)
+python cli/skill_exchange.py setup-hooks
+
+# Validate all skills manually
+python cli/skill_exchange.py validate
+```
+
+There is no lint step, no build step, and no package install — files in `cli/` run directly as scripts.
+
+## Architecture
+
+### Distribution layout (marketplace + plugin)
+
+```
+.claude-plugin/marketplace.json              ← marketplace catalog (registers team-skills)
+plugins/team-skills/
+  .claude-plugin/plugin.json                 ← plugin manifest (name, version, etc.)
+  skills/
+    <skill-name>/
+      SKILL.md                               ← prompt loaded by Claude Code (frontmatter required)
+      meta.json                              ← team catalog metadata (NOT read by Claude Code)
+      README.md                              ← human docs
+    index.json                               ← auto-generated catalog (do not edit)
+```
+
+`SKILL.md` is uppercase by Claude Code convention and **must** start with YAML frontmatter (`name`, `description`). Without that frontmatter, Claude Code does not recognize the file as a skill. The validator enforces this.
+
+`meta.json` is repo-local: it holds team-only fields (`author`, `tags`, `created`, `version`) for the catalog generator. Claude Code never reads it. Source of truth for `name`/`description` for Claude Code is the `SKILL.md` frontmatter; `meta.json` duplicates them for catalog rendering.
+
+### CLI modules
+
+- [cli/skill_exchange.py](cli/skill_exchange.py) — argparse entry point; one `cmd_*` function per subcommand. Imports `config` and `indexer` as bare module names by inserting [cli/](cli/) onto `sys.path` at the top of the file.
+- [cli/indexer.py](cli/indexer.py) — three responsibilities:
+  1. `validate_all()` / `validate_skill()` / `parse_frontmatter()` — schema validation for `meta.json` and `SKILL.md` frontmatter (consumed by `cmd_validate` and the pre-commit hook).
+  2. `scan_skills()` / `write_index()` — walk `SKILLS_DIR`, collect each skill's `meta.json`, write [plugins/team-skills/skills/index.json](plugins/team-skills/skills/index.json).
+  3. `generate_readme(skills)` — render the entire root [README.md](README.md) (header + install instructions + catalog table + footer all hard-coded here).
+  - Important constants: `SKILLS_DIR = REPO_ROOT/plugins/team-skills/skills` and `INDEX_FILE = SKILLS_DIR/index.json`. Tests patch both.
+- [cli/config.py](cli/config.py) — per-user config at `~/.skill-exchange/config.json`, holding `default_path` (`~/.claude/skills/` by default) and `installed` (list of skills the user has personally installed).
+- [hooks/pre-commit](hooks/pre-commit) — copied into `.git/hooks/pre-commit` by `setup-hooks`. Resolves repo root via `git rev-parse --show-toplevel`, calls `indexer.validate_all()` (aborts the commit if any skill fails), then regenerates `index.json` + `README.md` and `git add`s both.
+
+### Install vs marketplace
+
+The CLI's `install` command does **not** participate in the marketplace flow — it copies `SKILL.md` and `README.md` (only those two files; `meta.json` is repo-private) into `~/.claude/skills/<name>/`, which is Claude Code's standalone-skill path. This is the personal/per-skill alternative to `/plugin install`.
+
+`install` precedence in [cli/skill_exchange.py](cli/skill_exchange.py) (`_resolve_target`): `--path` > `--global` (`~/.claude/skills/`) > `--project` (`./.claude/skills/`) > `config.default_path`. Install is destructive — `shutil.rmtree(dest)` before copying — without warning. `uninstall` is the inverse and also drops the skill from `config.installed`.
+
+### Key invariants
+
+- [README.md](README.md) is generated by `indexer.generate_readme()` and re-staged by the pre-commit hook. **Do not edit it by hand** — modify `generate_readme()` in [cli/indexer.py](cli/indexer.py) instead. The footer line `_Этот файл авто-генерируется pre-commit hook'ом_` is the marker.
+- Adding a skill folder under `plugins/team-skills/skills/` without `meta.json` makes the indexer skip it silently, but the validator (and thus pre-commit) will reject the commit. Always create skills via `python cli/skill_exchange.py new <name>` to get the right scaffolding.
+- The `name` field must match the directory name in three places: `SKILL.md` frontmatter, `meta.json`, and the directory itself. Validation enforces all three.
+
+## Test setup
+
+[tests/conftest.py](tests/conftest.py) prepends [cli/](cli/) to `sys.path` so tests can `import skill_exchange`, `import indexer`, `import config` as top-level names — matching how the CLI imports them. Tests heavily use `unittest.mock.patch` against bare module names (e.g. `patch("indexer.SKILLS_DIR", tmp_path)` and `patch("indexer.INDEX_FILE", tmp_path / "index.json")` together — both are patched whenever you redirect SKILLS_DIR). Tests force module reimport by deleting from `sys.modules` between runs because the CLI's path-insertion happens at import time.
