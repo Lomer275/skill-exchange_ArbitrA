@@ -1,0 +1,12 @@
+{
+  "name": "codex-setup",
+  "display_name": "Codex CLI Setup",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Одноразовая установка и проверка Codex CLI для связки Claude × Codex. Создаёт AGENTS.md и .claude/codex.json. Идемпотентен.",
+  "tags": [
+    "codex",
+    "bootstrap"
+  ],
+  "created": "2026-05-02"
+}
