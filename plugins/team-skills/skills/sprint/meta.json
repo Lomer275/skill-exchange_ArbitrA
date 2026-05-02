@@ -1,0 +1,13 @@
+{
+  "name": "sprint",
+  "display_name": "Sprint",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run.",
+  "tags": [
+    "workflow",
+    "automation",
+    "spec"
+  ],
+  "created": "2026-05-02"
+}
