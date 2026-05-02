@@ -1,0 +1,13 @@
+{
+  "name": "n8n-workflow-manager",
+  "display_name": "n8n Workflow Manager",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Управление n8n workflows: search, inspect, create, edit, активация, выполнение. Шаблоны нод, паттерны интеграций.",
+  "tags": [
+    "n8n",
+    "automation",
+    "workflow"
+  ],
+  "created": "2026-05-02"
+}
