@@ -13,6 +13,44 @@
       "created": "2026-05-02"
     },
     {
+      "name": "auto-pilot",
+      "display_name": "Auto-Pilot Orchestrator",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Continuous-mode autopilot для проектов с SUP-конвенциями: cron-headless оркестратор который сам выбирает следующее действие (Rule 1-6), self-heal на budget exhaustion, TG control plane (inline-buttons + slash-commands), git-guard на destructive ops. Включает SKILL.md, 10 helper-скриптов, JSON-schema для config и install.sh для setup.",
+      "tags": [
+        "autopilot",
+        "orchestration",
+        "cron",
+        "telegram",
+        "workflow",
+        "automation"
+      ],
+      "created": "2026-05-18",
+      "bundle_contents": {
+        "SKILL.md": "Алгоритм Phase 0-6, Decision rules, TG-template guidelines",
+        "README.md": "Bootstrap + day-to-day operations + safety mechanisms",
+        "install.sh": "Интерактивный setup: scripts/, config, .env, cron, listener",
+        "scripts/": "10 helpers: tg_listener.py, run_tick.sh, heartbeat.sh, tg_ask/wait/notify, check_authz.py, discover_chat_id.sh, git-guard.sh + path-overrides",
+        "templates/autopilot.json": "Config schema с safe defaults (enabled=false)",
+        "templates/.env.template": "TG bot creds env-vars (пустые)"
+      },
+      "requirements": {
+        "binary": [
+          "python3 >= 3.10",
+          "claude (Claude Code CLI)",
+          "git"
+        ],
+        "telegram": "@BotFather bot + private chat",
+        "system": "Linux/macOS (использует flock, cron, ps -o etime)"
+      },
+      "security_notes": [
+        "claude --print запускается с --permission-mode bypassPermissions — это explicit user-authorized для cron-headless. Smacking защищён git-guard.sh (denylist destructive ops).",
+        "Auth по numeric user_id (R2 codereview-dual fix) — username только для логов.",
+        ".env.dev должен быть в .gitignore (token + user_id никогда не коммитить)."
+      ]
+    },
+    {
       "name": "bitrix24-developer",
       "display_name": "Bitrix24 Developer",
       "author": "kostya",
@@ -165,6 +203,21 @@
       "created": "2026-05-02"
     },
     {
+      "name": "spec-brainstorm",
+      "display_name": "Spec Brainstorm",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Интерактивное со-создание новой SUP-спецификации в режиме «вопрос-ответ». Проводит через структурированную разведку (проблема → цель → фазы → архитектура → DoD), затем делегирует финальную запись файла в /spec-writer. Принципиально интерактивный — задаёт вопросы по одному через AskUserQuestion, не пишет файл пока человек не финализировал.",
+      "tags": [
+        "spec",
+        "brainstorm",
+        "workflow",
+        "interactive"
+      ],
+      "created": "2026-05-18",
+      "complements": "spec-writer (генеративный — пишет файл по готовому summary). spec-brainstorm — интерактивный фронт-энд который собирает summary."
+    },
+    {
       "name": "spec-writer",
       "display_name": "Spec Writer",
       "author": "kostya",
@@ -181,8 +234,8 @@
       "name": "sprint",
       "display_name": "Sprint",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run.",
+      "version": "1.1.0",
+      "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run и --yes (headless mode для cron-автопилота с check_authz из HANDOFF YAML, TG-ask retry-loop).",
       "tags": [
         "workflow",
         "automation",

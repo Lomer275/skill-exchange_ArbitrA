@@ -2,8 +2,8 @@
   "name": "sprint",
   "display_name": "Sprint",
   "author": "kostya",
-  "version": "1.0.0",
-  "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run.",
+  "version": "1.1.0",
+  "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run и --yes (headless mode для cron-автопилота с check_authz из HANDOFF YAML, TG-ask retry-loop).",
   "tags": [
     "workflow",
     "automation",

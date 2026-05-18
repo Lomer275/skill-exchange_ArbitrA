@@ -1,0 +1,15 @@
+{
+  "name": "spec-brainstorm",
+  "display_name": "Spec Brainstorm",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Интерактивное со-создание новой SUP-спецификации в режиме «вопрос-ответ». Проводит через структурированную разведку (проблема → цель → фазы → архитектура → DoD), затем делегирует финальную запись файла в /spec-writer. Принципиально интерактивный — задаёт вопросы по одному через AskUserQuestion, не пишет файл пока человек не финализировал.",
+  "tags": [
+    "spec",
+    "brainstorm",
+    "workflow",
+    "interactive"
+  ],
+  "created": "2026-05-18",
+  "complements": "spec-writer (генеративный — пишет файл по готовому summary). spec-brainstorm — интерактивный фронт-энд который собирает summary."
+}

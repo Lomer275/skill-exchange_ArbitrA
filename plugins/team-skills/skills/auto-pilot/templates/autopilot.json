@@ -1,0 +1,43 @@
+{
+  "enabled": false,
+  "disabled_reason": "initial install — set TG creds, then /enable via TG bot",
+  "disabled_at": null,
+  "version": 1,
+  "last_tick_at": null,
+  "ticks_today": 0,
+  "tokens_today": 0,
+  "budget": {
+    "max_ticks_per_day": 8,
+    "max_tokens_per_day": 5000000
+  },
+  "branch": {
+    "work_branch": "dev",
+    "main_branch": "main"
+  },
+  "escalation": {
+    "tg_bot_token_env": "AUTOPILOT_TG_BOT_TOKEN",
+    "tg_chat_id_env": "AUTOPILOT_TG_CHAT_ID",
+    "tg_allowed_username_env": "AUTOPILOT_TG_ALLOWED_USERNAME",
+    "tg_allowed_user_id_env": "AUTOPILOT_TG_ALLOWED_USER_ID"
+  },
+  "whitelist_paths": [
+    "**"
+  ],
+  "blacklist_paths": [],
+  "require_human_approval_paths": [
+    "**/migrations/**",
+    ".github/workflows/**",
+    "docker-compose.yml",
+    "scripts/backup/**"
+  ],
+  "destructive_git_ops_forbidden": [
+    "push --force",
+    "push -f",
+    "reset --hard",
+    "checkout --",
+    "branch -D",
+    "clean -fd",
+    "pr merge",
+    "pr close --delete-branch"
+  ]
+}
