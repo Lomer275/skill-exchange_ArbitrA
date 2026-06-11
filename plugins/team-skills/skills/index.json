@@ -127,6 +127,19 @@
       "created": "2026-05-02"
     },
     {
+      "name": "codex-worker",
+      "display_name": "Codex Worker (internal helper)",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Internal helper для запуска Codex-воркера. Вызывается из /codereview-dual и /sprint-codex. Запуск через движок плагина codex@openai-codex (app-server, без bubblewrap); fallback — legacy codex exec.",
+      "tags": [
+        "internal",
+        "codex",
+        "helper"
+      ],
+      "created": "2026-06-11"
+    },
+    {
       "name": "example-skill",
       "display_name": "Example Skill",
       "author": "team",
