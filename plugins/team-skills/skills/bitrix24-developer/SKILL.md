@@ -1,26 +1,43 @@
 ---
 name: bitrix24-developer
-description: "'Expert Bitrix24 REST API developer assistant. Use this skill whenever the user asks about Bitrix24: CRM (deals, leads, contacts, companies), smart processes, business processes (BP), disk, tasks, users, automation, batch API calls, or any REST API method. Also trigger for questions about Bitrix24 structure, field names, entity types, funnel configuration, workflow templates, webhook setup, or integration patterns. Always use when user mentions 'битрикс', 'bitrix', 'CRM', 'смарт-процесс', 'бизнес-процесс', 'воронка', 'сделки', 'лиды', 'Битрикс24'.'"
+description: >
+  Expert Bitrix24 REST API developer assistant for the express-bankrot.ru environment.
+  Use this skill whenever the user asks anything related to Bitrix24: CRM (deals, leads,
+  contacts, companies), smart processes, business processes (BP), disk, tasks, users,
+  automation, batch API calls, or any REST API method. Also trigger for questions about
+  Bitrix24 structure, field names, entity types, funnel configuration, workflow templates,
+  webhook setup, or integration patterns. This skill contains API references, proven patterns,
+  environment-specific constants, and common pitfalls. Always use this skill when the user
+  mentions "битрикс", "bitrix", "CRM", "смарт-процесс", "бизнес-процесс", "воронка",
+  "сделки", "лиды", "Битрикс24", or anything about the express-bankrot portal.
 ---
+
 # Bitrix24 Developer Skill
 
-> **Important:** этот скилл — generic-набор паттернов работы с Bitrix24 REST API. Конкретные ID воронок, entityTypeId смарт-процессов, custom-поля, webhook-токены и URL портала **специфичны для каждого проекта**. Скопируй [references/env.example.md](references/env.example.md) в свой репо и заполни своими значениями.
-
-## Environment Constants (заполняется в твоём проекте)
+## Environment Constants (express-bankrot.ru)
 
 ```
-Portal:       <YOUR_BITRIX_PORTAL>            # пример: bitrix.example.com
-Webhook base: https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/
-n8n bridge:   Workflow ID = <N8N_BRIDGE_WORKFLOW_ID>  (если используется n8n MCP-мост)
+Portal:       bitrix.express-bankrot.ru
+Webhook base: https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/
+n8n bridge:   Workflow ID = fsX-zC0M_SUTbcCUowIxY  ("Bitrix24 Explorer for Claude")
 ```
 
-### Funnel IDs (CATEGORY_ID) — узнать своими
+### Key Funnel IDs (CATEGORY_ID)
+| Funnel | CATEGORY_ID |
+|--------|-------------|
+| БФЛ (main) | 4 |
+| ВБФЛ | check via crm.category.list |
+| ПС | check via crm.category.list |
+| Расторжение | check via crm.category.list |
+| Разовые услуги | check via crm.category.list |
 
-Узнавай через `crm.category.list` — у каждого портала свои воронки. Записывай маппинг в свой проектный `BITRIX_ENV.md`.
-
-### Smart Process Entity Type IDs — узнать своими
-
-Узнавай через `crm.type.list` — entityTypeId назначаются динамически при создании смарт-процесса.
+### Key Smart Process Entity Type IDs
+| Smart Process | entityTypeId |
+|--------------|--------------|
+| КадАрбитр monitoring | 1094 |
+| ЕФРСБ / Федресурс | 1122 |
+| Конверсия сотрудников | 1104 |
+| Логи встреч / договоров | 1112 |
 
 ---
 
@@ -37,7 +54,7 @@ PARAMS: {
 
 **Direct REST call format:**
 ```
-GET/POST https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/METHOD
+GET/POST https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/METHOD
 ```
 
 ---
@@ -107,16 +124,16 @@ PARAMS: {
 }
 ```
 
-- `halt: 0` — продолжить даже при ошибке в одном запросе
-- `halt: 1` — остановить при первой ошибке
-- Ответ: `result.result.{key}` для каждого запроса
-- Макс. 50 операций на один batch
+- `halt: 0` — continue even if one request fails
+- `halt: 1` — stop on the first error
+- Response: `result.result.{key}` for each request
+- Max 50 operations per batch
 
 ---
 
 ## Pagination Pattern
 
-Bitrix24 возвращает максимум 50 записей. Для получения всех:
+Bitrix24 returns a maximum of 50 records. To fetch them all:
 
 ```javascript
 let allItems = [];
@@ -125,7 +142,7 @@ let start = 0;
 do {
   const response = await this.helpers.httpRequest({
     method: 'POST',
-    url: 'https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/crm.deal.list',
+    url: 'https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/crm.deal.list',
     body: { filter: { CATEGORY_ID: 4 }, select: ['ID', 'TITLE'], start }
   });
   allItems = allItems.concat(response.result || []);
@@ -133,7 +150,7 @@ do {
 } while (start !== null);
 ```
 
-`response.next` — следующий offset. Если нет — все записи получены.
+`response.next` — the next offset. If absent, all records have been fetched.
 
 ---
 
@@ -172,10 +189,10 @@ PARAMS: {
 ## Business Processes — CRITICAL Constraints
 
 CRITICAL LIMITATION:
-- `bizproc.workflow.template.add/update` требуют OAuth-контекст приложения
-- Webhook-токены возвращают ACCESS_DENIED
-- Шаблоны, импортированные через UI, НЕЛЬЗЯ обновить через API
-- Только шаблоны, созданные через API тем же приложением, можно обновить через API
+- `bizproc.workflow.template.add/update` require the application's OAuth context
+- Webhook tokens return ACCESS_DENIED
+- Templates imported via the UI CANNOT be updated via the API
+- Only templates created via the API by the same application can be updated via the API
 
 ```javascript
 // Document ID formats for bizproc.workflow.start:
@@ -190,25 +207,25 @@ CRITICAL LIMITATION:
 ## n8n + Bitrix Key Patterns
 
 ### SplitInBatches vs Code loops
-ВСЕГДА используй SplitInBatches для обработки >100 записей.
-Code node loops вызывают timeout (300 сек лимит task runner).
+ALWAYS use SplitInBatches to process >100 records.
+Code node loops cause a timeout (300 sec task runner limit).
 
 ### DNS issues in Docker
-При `EAI_AGAIN` ошибках:
-- Добавь dns: [8.8.8.8, 1.1.1.1] в docker-compose.yml
-- Используй extra_hosts для статического маппинга bitrix домена
-- Включи Retry on Fail (5 retries, 3000ms) на HTTP nodes
+On `EAI_AGAIN` errors:
+- Add dns: [8.8.8.8, 1.1.1.1] to docker-compose.yml
+- Use extra_hosts for static mapping of the bitrix domain
+- Enable Retry on Fail (5 retries, 3000ms) on HTTP nodes
 
 ### Rate Limiting
-- Disk API: 500ms между чтениями папок, 3s между записями
-- CRM batch: 200-500ms между пакетами при массовых обновлениях
-- Webhook: ~2 запроса/сек
+- Disk API: 500ms between folder reads, 3s between writes
+- CRM batch: 200-500ms between batches during bulk updates
+- Webhook: ~2 requests/sec
 
 ### Code node HTTP
 ```javascript
 const response = await this.helpers.httpRequest({
   method: 'POST',
-  url: 'https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/METHOD',
+  url: 'https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/METHOD',
   body: { ...params }
 });
 ```
@@ -218,9 +235,9 @@ const response = await this.helpers.httpRequest({
 ## Deal Stage ID Format
 
 `C{CATEGORY_ID}:{STAGE_CODE}`
-- `C4:1` — первая стадия воронки Main pipeline (example)
-- `C4:WON` — успешно завершена
-- `C4:LOSE` — провалена
+- `C4:1` — first stage of the БФЛ funnel
+- `C4:WON` — successfully completed
+- `C4:LOSE` — failed
 
 ---
 

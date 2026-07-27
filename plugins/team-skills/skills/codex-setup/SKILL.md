@@ -1,20 +1,27 @@
 ---
 name: codex-setup
-description: "Одноразовая установка и проверка Codex CLI для связки Claude × Codex. Создаёт AGENTS.md в корне репо и .claude/codex.json со всеми обязательными полями. Используй когда пользователь говорит '/codex-setup', 'поставь codex', 'установи codex cli', 'настрой codex', 'init codex', 'включи кодекс'. Скилл идемпотентен — повторный запуск обновляет cli_version с warning при расхождении."
+description: >
+  One-time installation and verification of the Codex CLI for the Claude × Codex
+  pairing. Creates AGENTS.md in the repo root and .claude/codex.json with all
+  required fields. Use when the user says "/codex-setup", "поставь codex",
+  "установи codex cli", "настрой codex", "init codex", "включи кодекс". The skill
+  is idempotent — a repeat run updates cli_version with a warning on mismatch.
+  Part of spec S11 (docs/2. SUP-specifications/S11_claude_codex_orchestration_done.md), Phase 1.
 ---
-# /codex-setup — Установка и проверка Codex CLI
 
-Готовит окружение для связки Claude × Codex: ставит Codex CLI, создаёт `AGENTS.md` и `.claude/codex.json`, прогоняет smoke-тест.
+# /codex-setup — Install and verify the Codex CLI
 
-**Идемпотентность:** повторный запуск не ломает state — обновляет `cli_version` с warning при расхождении, перезаписывает только AUTO-SYNCED блок в `AGENTS.md`.
+Prepares the environment for the Claude × Codex pairing: installs the Codex CLI, creates `AGENTS.md` and `.claude/codex.json`, runs a smoke test.
+
+**Idempotency:** a repeat run does not break state — it updates `cli_version` with a warning on mismatch and overwrites only the AUTO-SYNCED block in `AGENTS.md`.
 
 ---
 
-## Алгоритм
+## Algorithm
 
-### Шаг 1 — Старт-сообщение
+### Step 1 — Start message
 
-В чат:
+To chat:
 
 ```
 ## /codex-setup — Старт
@@ -25,28 +32,28 @@ Phase 1 имплементация связки Claude × Codex (S11).
 
 ---
 
-### Шаг 2 — Проверка существующей установки
+### Step 2 — Check for an existing installation
 
 ```bash
 command -v codex && codex --version
 ```
 
-- **Если установлен** — Зафиксируй `EXISTING=true` и **переходи к Шагу 4** (пропустить только Шаг 3 «установка», верификацию флагов и auth НЕ пропускать — иначе идемпотентность ломается при переименовании флагов или удалении auth).
-- **Если не установлен** — Шаг 3.
+- **If installed** — set `EXISTING=true` and **go to Step 4** (skip only Step 3 "installation"; do NOT skip flag verification and auth — otherwise idempotency breaks when flags are renamed or auth is removed).
+- **If not installed** — Step 3.
 
 ---
 
-### Шаг 3 — Установка Codex CLI
+### Step 3 — Install the Codex CLI
 
-**Перед установкой** — проверь актуальное имя пакета через `context7` MCP:
+**Before installing** — check the current package name via the `context7` MCP:
 
 ```
 mcp__plugin_context7_context7__resolve-library-id "openai codex cli"
 ```
 
-Если context7 недоступен или не дал ясного имени — fallback на `@openai/codex` (npm).
+If context7 is unavailable or did not give a clear name — fall back to `@openai/codex` (npm).
 
-**Основной путь (npm):**
+**Primary path (npm):**
 ```bash
 npm install -g @openai/codex
 ```
@@ -56,23 +63,23 @@ npm install -g @openai/codex
 pipx install openai-codex
 ```
 
-Если оба упали — STOP, сообщи пользователю причину (нет npm/pipx, no internet, no permissions).
+If both failed — STOP, tell the user the reason (no npm/pipx, no internet, no permissions).
 
-**Логирование:**
+**Logging:**
 ```bash
-mkdir -p /tmp/codex-orch
-echo "$(date -Iseconds) install: <команда>" >> /tmp/codex-orch/setup.log
+mkdir -p /tmp/sup-codex
+echo "$(date -Iseconds) install: <команда>" >> /tmp/sup-codex/setup.log
 ```
 
 ---
 
-### Шаг 4 — Верификация флагов
+### Step 4 — Flag verification
 
 ```bash
 # Sanitize: одна строка, без переносов, экранирование кавычек для безопасной записи в JSON.
 CLI_VERSION=$(codex --version 2>&1 | head -n1 | tr -d '\n\r' | sed 's/"/\\"/g')
 [ -z "$CLI_VERSION" ] && CLI_VERSION="unknown"
-echo "$(date -Iseconds) version: ${CLI_VERSION}" >> /tmp/codex-orch/setup.log
+echo "$(date -Iseconds) version: ${CLI_VERSION}" >> /tmp/sup-codex/setup.log
 
 # Извлекаем фактические имена флагов из help — не хардкодим.
 HELP=$(codex exec --help 2>&1)
@@ -84,14 +91,14 @@ OUTPUT_FLAG=$(echo "$HELP" | grep -oE '\-\-output-last-message' | head -1)
 [ -z "$OUTPUT_FLAG" ] && OUTPUT_FLAG="--output-last-message"
 ```
 
-- Переменные `$SKIP_FLAG` и `$OUTPUT_FLAG` **используются во всех последующих шагах** (smoke-тест, codex.json, фактические запуски). Не хардкодить имена.
-- Если флаги не нашлись в help (Codex CLI поменял имена) — fallback оставит дефолты, но в чат идёт warning «WARN: <flag> не найден в codex exec --help — проверь актуальное имя».
+- The variables `$SKIP_FLAG` and `$OUTPUT_FLAG` are **used in all subsequent steps** (smoke test, codex.json, the actual runs). Do not hardcode the names.
+- If the flags were not found in help (the Codex CLI changed the names) — the fallback keeps the defaults, but a warning goes to chat: "WARN: <flag> not found in codex exec --help — check the current name".
 
 ---
 
-### Шаг 4.4 — Проверка project trust в `~/.codex/config.toml`
+### Step 4.4 — Check project trust in `~/.codex/config.toml`
 
-Закрывает AC 3 (config.toml валиден, проект помечен `trusted`).
+Closes AC 3 (config.toml is valid, the project is marked `trusted`).
 
 ```bash
 REPO_ROOT="$(pwd)"
@@ -122,21 +129,21 @@ else
 fi
 ```
 
-**Edge case:** если в config.toml уже есть блок `[projects."$REPO_ROOT"]` **без** `trust_level=trusted`, скрипт допишет ещё один блок ниже. TOML-валидаторы трактуют это как ошибку (duplicate table). Если на руках старый невалидный state — пользователю надо вручную мержить блоки. Этот edge case считаем редким (обычно user либо сам не правит config.toml, либо знает что делает); полноценный TOML-merge вынесен в follow-up.
+**Edge case:** if config.toml already has a `[projects."$REPO_ROOT"]` block **without** `trust_level=trusted`, the script will append another block below. TOML validators treat this as an error (duplicate table). If you have an old invalid state on hand, the user must merge the blocks manually. We consider this edge case rare (usually the user either does not edit config.toml themselves, or knows what they are doing); a full TOML merge is deferred to a follow-up.
 
-В чат — короткое сообщение: «✅ Project trust: trusted».
+To chat — a short message: "✅ Project trust: trusted".
 
 ---
 
-### Шаг 4.5 — Верификация auth
+### Step 4.5 — Auth verification
 
-Codex требует либо OpenAI API ключ, либо ChatGPT-аккаунт. Проверь:
+Codex requires either an OpenAI API key or a ChatGPT account. Check:
 
 ```bash
 ls -la ~/.codex/auth.json 2>/dev/null
 ```
 
-**Если файл не существует** — нет auth. STOP с инструкцией:
+**If the file does not exist** — no auth. STOP with the instruction:
 
 ```
 ❌ Auth не настроен. Codex CLI установлен, но не сможет работать без авторизации.
@@ -155,7 +162,7 @@ ls -la ~/.codex/auth.json 2>/dev/null
 После настройки auth — повторно запусти /codex-setup.
 ```
 
-**Если файл существует** — определи auth_mode и валидность:
+**If the file exists** — determine auth_mode and validity:
 
 ```bash
 AUTH_MODE=$(jq -r '.auth_mode // "unknown"' ~/.codex/auth.json 2>/dev/null)
@@ -184,31 +191,31 @@ case "$AUTH_MODE" in
 esac
 ```
 
-В чат — короткое сообщение:
-- `✅ Auth: <auth_mode>` (apikey/chatgpt) — без значения ключа.
-- При warning — предложи `codex auth login` для перенастройки.
+To chat — a short message:
+- `✅ Auth: <auth_mode>` (apikey/chatgpt) — without the key value.
+- On a warning — suggest `codex auth login` to reconfigure.
 
-Лог:
+Log:
 ```bash
-echo "$(date -Iseconds) auth: ${AUTH_MODE}" >> /tmp/codex-orch/setup.log
+echo "$(date -Iseconds) auth: ${AUTH_MODE}" >> /tmp/sup-codex/setup.log
 ```
 
-**Не показывай ключ в чате** — даже фрагмент. Это secret.
+**Do not show the key in chat** — not even a fragment. It is a secret.
 
 ---
 
-### Шаг 5 — Создание/обновление `.claude/codex.json`
+### Step 5 — Create/update `.claude/codex.json`
 
-Прочитай существующий файл (если есть). Сравни `cli_version` со свежим `codex --version` — при расхождении предупреди.
+Read the existing file (if any). Compare `cli_version` with the fresh `codex --version` — warn on a mismatch.
 
-Запиши/обнови:
+Write/update:
 
 ```json
 {
   "enabled": true,
   "disabled_reason": null,
   "disabled_at": null,
-  "cli_version": "<вывод codex --version>",
+  "cli_version": "<output of codex --version>",
   "cli_flags": {
     "output_last_message": "--output-last-message",
     "skip_git_repo_check": "--skip-git-repo-check"
@@ -221,17 +228,17 @@ echo "$(date -Iseconds) auth: ${AUTH_MODE}" >> /tmp/codex-orch/setup.log
 }
 ```
 
-Если файл существовал с `enabled: false` или `disabled_reason` — **сохрани** их (не сбрасывай на дефолты). Меняй только `cli_version` и `cli_flags`.
+If the file already existed with `enabled: false` or `disabled_reason` — **preserve** them (do not reset to defaults). Change only `cli_version` and `cli_flags`.
 
-`availability_cache.checked_at: null` — форсируем перепроверку при первом routing-триггере. `sandbox_works` будет проставлен `codex-worker` после probe (T83 three-state probe: `true` / `false` / `null` если ещё не проверяли).
+`availability_cache.checked_at: null` — forces a re-check on the first routing trigger. `sandbox_works` will be set by `codex-worker` after the probe (T83 three-state probe: `true` / `false` / `null` if not yet checked).
 
-**Замечание (T83):** поле `session_id` удалено из схемы. Кэширование теперь TTL-only (1 час) — было обнаружено что `${CLAUDE_SESSION_ID}` env-переменной не существует в Claude Code, и привязка к session делала кэш одноразовым.
+**Note (T83):** the `session_id` field was removed from the schema. Caching is now TTL-only (1 hour) — it was found that the `${CLAUDE_SESSION_ID}` env variable does not exist in Claude Code, and binding to the session made the cache single-use.
 
 ---
 
-### Шаг 6 — Создание/обновление `AGENTS.md` в корне репо
+### Step 6 — Create/update `AGENTS.md` in the repo root
 
-Если `AGENTS.md` существует — найди блок между маркерами:
+If `AGENTS.md` exists — find the block between the markers:
 
 ```
 <!-- AUTO-SYNCED: BEGIN -->
@@ -239,37 +246,37 @@ echo "$(date -Iseconds) auth: ${AUTH_MODE}" >> /tmp/codex-orch/setup.log
 <!-- AUTO-SYNCED: END -->
 ```
 
-Перезапиши **только** этот блок. Если файла нет — создай с шаблоном ниже.
+Overwrite **only** this block. If the file does not exist — create it with the template below.
 
-**Шаблон `AGENTS.md`:**
+**`AGENTS.md` template:**
 
 ```markdown
 # AGENTS.md — инструкции для Codex CLI воркеров
 
-> Этот файл читается автоматически каждым `codex exec` запуском в проекте.
+> Этот файл читается автоматически каждым `codex exec` запуском в проекте Arbitra_support (SUP).
 > Оркестратор — Claude Code; Codex выступает как узкоспециализированный воркер.
 
 ## Контекст проекта
 
-- **Проект:** <название и краткое описание — заполни из CLAUDE.md>.
-- **Стек:** <язык, фреймворк, БД, очереди, внешние интеграции>.
+- **Проект:** SupportBots (SUP) — AI-боты сопровождения клиентов по банкротству физических лиц.
+- **Стек:** Python/Django, Aiogram 3.x (Telegram), MAX Platform SDK, PostgreSQL, Redis, Supabase, OpenAI API, Bitrix24.
 - **Главный документ:** [CLAUDE.md](CLAUDE.md) — читай его в первую очередь.
 
-## Гайды (если в проекте есть)
+## Гайды (читай по необходимости)
 
-- `docs/guides/doc_conventions.md` — правила именования файлов.
-- `docs/guides/specifications_guide.md` — структура спек.
-- `docs/guides/task_decomposition_guide.md` — структура задач.
-- `docs/guides/versioning_guidelines.md` — SemVer + Conventional Commits.
+- [docs/4. SUP-guides/doc_conventions.md](docs/4.%20SUP-guides/doc_conventions.md) — правила именования файлов.
+- [docs/4. SUP-guides/specifications_guide.md](docs/4.%20SUP-guides/specifications_guide.md) — структура спек.
+- [docs/4. SUP-guides/task_decomposition_guide.md](docs/4.%20SUP-guides/task_decomposition_guide.md) — структура задач.
+- [docs/4. SUP-guides/versioning_guidelines.md](docs/4.%20SUP-guides/versioning_guidelines.md) — SemVer + Conventional Commits.
 
 ## Запреты
 
 Эти правила обязательны для всех Codex-воркеров:
 
-1. **Не делать `git commit` или `git push`** — коммиты делает оркестратор Claude через `/safe-push`.
+1. **Не делать `git commit` или `git push`** — коммиты делает оркестратор Claude через `/sup-push`.
 2. **Не трогать секреты:** `.env*`, `.servers`, любые токены/ключи.
-3. **Не править `CHANGELOG.md` и `HANDOFF.md`** — это шаги `/accept` (оркестратор).
-4. **Не лезть в `docs/tasks/Done/`** — там завершённые задачи, их трогать нельзя.
+3. **Не править `SUP-CHANGELOG.md` и `SUP-HANDOFF.md`** — это шаги `/accept` (оркестратор).
+4. **Не лезть в `docs/3. SUP-tasks/Done/`** — там завершённые задачи, их трогать нельзя.
 5. **Не спавнить других Codex-воркеров** — оркестрацию ведёт только Claude.
 6. Использовать `python` из `$VIRTUAL_ENV/bin/python` для всех запусков (если работаешь в worktree).
 
@@ -289,9 +296,9 @@ echo "$(date -Iseconds) auth: ${AUTH_MODE}" >> /tmp/codex-orch/setup.log
 <!-- AUTO-SYNCED: END -->
 ```
 
-**Перезапись AUTO-SYNCED блока в существующем `AGENTS.md`:**
+**Overwriting the AUTO-SYNCED block in an existing `AGENTS.md`:**
 
-Используется Python — sed/awk на многострочном regex'е ненадёжны (закрывает L3 из ревью):
+Python is used — sed/awk on a multi-line regex are unreliable (closes L3 from the review):
 
 ```python
 python3 - <<'PY'
@@ -322,9 +329,9 @@ else:
 PY
 ```
 
-**Сборка AUTO-SYNCED блока:**
+**Building the AUTO-SYNCED block:**
 
-1. **Динамически найди memory-каталог** для текущего проекта:
+1. **Dynamically find the memory directory** for the current project:
    ```bash
    REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
    REPO_NAME="$(basename "$REPO_ROOT")"
@@ -340,42 +347,42 @@ PY
      # placeholder в AGENTS.md
    fi
    ```
-2. Прочитай `$MEMORY_DIR/MEMORY.md` (это **индекс**, контент в отдельных .md файлах рядом).
-3. Для каждой записи в индексе — открой соответствующий `.md` файл в **той же директории** `$MEMORY_DIR/`, прочитай его frontmatter (поле `type:`).
-4. Если `type: feedback` — извлеки `name`, `description`, тело документа.
-5. Сформируй markdown-список в AUTO-SYNCED блоке:
+2. Read `$MEMORY_DIR/MEMORY.md` (this is the **index**; the content is in separate .md files nearby).
+3. For each entry in the index — open the corresponding `.md` file in the **same directory** `$MEMORY_DIR/`, read its frontmatter (the `type:` field).
+4. If `type: feedback` — extract `name`, `description`, the document body.
+5. Build a markdown list in the AUTO-SYNCED block:
    ```markdown
-   - **<name>:** <первая строка тела или description>
+   - **<name>:** <first line of the body or description>
    ```
-6. Если feedback-записей нет (или memory-каталог не найден) — оставь placeholder «Пока нет сохранённых feedback-предпочтений пользователя.»
+6. If there are no feedback entries (or the memory directory was not found) — leave the placeholder "Пока нет сохранённых feedback-предпочтений пользователя."
 
 ---
 
-### Шаг 7 — Smoke-тест
+### Step 7 — Smoke test
 
-Использует `$SKIP_FLAG` из Шага 4 (а не хардкод — иначе при rename CLI-флага скилл сломается, см. C7 из ревью):
+Uses `$SKIP_FLAG` from Step 4 (not a hardcode — otherwise the skill breaks when the CLI flag is renamed, see C7 from the review):
 
 ```bash
 timeout 30 codex exec "$SKIP_FLAG" "echo ok"
 ```
 
-- Прошёл за <30s — ✅ smoke ok.
-- Не прошёл — диагностика (БЕЗ показа значений ключа):
-  - `codex --version` — есть бинарь?
-  - `jq -r '.auth_mode' ~/.codex/auth.json 2>/dev/null` — какой режим? (НЕ выводи `OPENAI_API_KEY` или токены — это секрет)
-  - `jq -r 'has("OPENAI_API_KEY") or has("tokens")' ~/.codex/auth.json` — есть ли поле с креденшелами вообще?
-  - Есть интернет (для API)?
+- Passed in <30s — ✅ smoke ok.
+- Did not pass — diagnostics (WITHOUT showing the key values):
+  - `codex --version` — is there a binary?
+  - `jq -r '.auth_mode' ~/.codex/auth.json 2>/dev/null` — which mode? (do NOT print `OPENAI_API_KEY` or tokens — it is a secret)
+  - `jq -r 'has("OPENAI_API_KEY") or has("tokens")' ~/.codex/auth.json` — is there a credentials field at all?
+  - Is there internet (for the API)?
 
-Запиши в лог:
+Write to the log:
 ```bash
-echo "$(date -Iseconds) smoke: <ok|fail: причина>" >> /tmp/codex-orch/setup.log
+echo "$(date -Iseconds) smoke: <ok|fail: причина>" >> /tmp/sup-codex/setup.log
 ```
 
 ---
 
-### Шаг 8 — Финальный отчёт
+### Step 8 — Final report
 
-Выведи в чат:
+Output to chat:
 
 ```markdown
 ## /codex-setup — Готово
@@ -386,7 +393,7 @@ echo "$(date -Iseconds) smoke: <ok|fail: причина>" >> /tmp/codex-orch/set
 ✅ **Файлы созданы/обновлены:**
   - `.claude/codex.json` — все 6 полей
   - `AGENTS.md` (корень репо) — запреты + AUTO-SYNCED блок
-  - `/tmp/codex-orch/setup.log` — лог установки
+  - `/tmp/sup-codex/setup.log` — лог установки
 ✅ **Smoke:** echo ok прошёл за <X>s
 ⚠️ **Предупреждения:** <если есть — расхождение версий, fallback на pipx, итд>
 
@@ -395,11 +402,11 @@ echo "$(date -Iseconds) smoke: <ok|fail: причина>" >> /tmp/codex-orch/set
 
 ---
 
-## Правила
+## Rules
 
-- **Идемпотентность обязательна:** повторный запуск не ломает state, не сбрасывает kill-switch.
-- **AUTO-SYNCED блок** в AGENTS.md перезаписывается полностью при каждом запуске; остальной текст AGENTS.md сохраняется (пользователь мог дополнить).
-- **При ошибке установки** — STOP с понятным сообщением, не оставляй полу-установленное состояние.
-- **Имена флагов** в `cli_flags` — фактические из `codex exec --help`, не хардкод.
-- **Версия Codex CLI меняется быстро** — при расхождении со старой `cli_version` warning, не блокировать.
-- Логи — в `/tmp/codex-orch/setup.log` для дебага.
+- **Idempotency is mandatory:** a repeat run does not break state and does not reset the kill-switch.
+- **The AUTO-SYNCED block** in AGENTS.md is fully overwritten on every run; the rest of the AGENTS.md text is preserved (the user may have added to it).
+- **On an installation error** — STOP with a clear message; do not leave a half-installed state.
+- **The flag names** in `cli_flags` — the actual ones from `codex exec --help`, not a hardcode.
+- **The Codex CLI version changes quickly** — on a mismatch with the old `cli_version`, warn, do not block.
+- Logs — in `/tmp/sup-codex/setup.log` for debugging.

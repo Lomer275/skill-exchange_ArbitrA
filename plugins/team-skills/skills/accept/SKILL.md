@@ -1,143 +1,148 @@
 ---
 name: accept
-description: "Закрывает текущую задачу: помечает как выполненную в файле задачи, спецификации и HANDOFF.md, добавляет запись в CHANGELOG.md, переносит файл в папку Done. Используй когда пользователь говорит '/accept', '/accept T07', 'закрой задачу',"
+description: >
+  Closes the current task: marks it as done in the task file, the specification,
+  and HANDOFF.md, adds an entry to CHANGELOG.md, and moves the file into the Done folder.
+  Use when the user says "/accept", "/accept T07", "закрой задачу",
+  "таска выполнена", "помечай как done", "принять задачу".
 ---
+
 # Accept Skill
 
-Документирует завершение задачи. Только документирование — без проверки DoD (это делает пользователь).
-Никаких вопросов — выполняй всё за один проход.
+Documents the completion of a task. Documentation only — no DoD verification (the user does that).
+No questions — do everything in a single pass.
 
 ---
 
-## Входные данные
+## Inputs
 
-- `/accept` — задача определяется автоматически из `*HANDOFF.md` (первая со статусом 🟡)
-- `/accept T07` — явный номер задачи
+- `/accept` — the task is detected automatically from `*HANDOFF.md` (the first one with status 🟡)
+- `/accept T07` — explicit task number
 
 ---
 
-## Алгоритм
+## Algorithm
 
-### Шаг 1 — Определить задачу
+### Step 1 — Determine the task
 
-**Если номер передан явно** (например, `T07`):
-- Ищи файл: `glob docs/3. *tasks/T07_*.md`
+**If the number is passed explicitly** (e.g. `T07`):
+- Find the file: `glob docs/3. *tasks/T07_*.md`
 
-**Если номер не передан**:
-- Прочитай `*HANDOFF.md` (адаптируйся к префиксу проекта: SUP-, CLB-, ARP- и т.д.)
-- Найди первую задачу со статусом 🟡 в любой таблице
-- Используй её — без уточнений
+**If no number is passed**:
+- Read `*HANDOFF.md` (adapt to the project prefix: SUP-, CLB-, ARP-, etc.)
+- Find the first task with status 🟡 in any table
+- Use it — no clarification
 
-### Шаг 2 — Прочитать файл задачи
+### Step 2 — Read the task file
 
-Прочитай файл задачи. Извлеки:
-- **Название задачи** (из заголовка `# TNN_...` или `**Задача:**`)
-- **Спецификацию** (из строки `**Спецификация:** docs/2. *specifications/SNN_*.md`)
-- **SNN** — номер спеки (например, `S02`)
-- **Имя спека** в snake_case (например, `hypothesis_prototyping`)
+Read the task file. Extract:
+- **Task title** (from the heading `# TNN_...` or `**Задача:**`)
+- **Specification** (from the line `**Спецификация:** docs/2. *specifications/SNN_*.md`)
+- **SNN** — the spec number (e.g. `S02`)
+- **Spec name** in snake_case (e.g. `hypothesis_prototyping`)
 
-### Шаг 3 — Определить путь в Done
+### Step 3 — Determine the Done path
 
 ```
-Done-папка:  docs/tasks/Done/SNN_<spec_name>_done/
-Новый файл:  docs/tasks/Done/SNN_<spec_name>_done/TNN_<task_name>_done.md
+Done-папка:  docs/3. SUP-tasks/Done/SNN_<spec_name>_done/
+Новый файл:  docs/3. SUP-tasks/Done/SNN_<spec_name>_done/TNN_<task_name>_done.md
 ```
 
-Если Done-папка не существует — создать.
+If the Done folder does not exist — create it.
 
-### Шаг 4 — Обновить файл задачи
+### Step 4 — Update the task file
 
-Добавь в начало файла задачи (после заголовка `# ...`):
+Add to the top of the task file (after the `# ...` heading):
 
 ```markdown
 **Статус:** ✅ Выполнено
 **Дата закрытия:** YYYY-MM-DD
 ```
 
-### Шаг 5 — Переместить файл задачи
+### Step 5 — Move the task file
 
-1. Запиши обновлённое содержимое в новый путь: `Done/SNN_<spec_name>_done/TNN_<task_name>_done.md`
-2. Удали исходный файл: `docs/tasks/TNN_<task_name>.md`
-3. Если исходная папка задачи стала пустой — удали её
+1. Write the updated content to the new path: `Done/SNN_<spec_name>_done/TNN_<task_name>_done.md`
+2. Delete the source file: `docs/3. SUP-tasks/TNN_<task_name>.md`
+3. If the source task folder has become empty — delete it
 
-### Шаг 6 — Обновить спецификацию
+### Step 6 — Update the specification
 
-Прочитай файл спецификации из `**Спецификация:**` строки задачи.
+Read the specification file from the `**Спецификация:**` line of the task.
 
-Найди строку таблицы с этим TNN. Замени статус в последней колонке на `✅ YYYY-MM-DD`.
+Find the table row with this TNN. Replace the status in the last column with `✅ YYYY-MM-DD`.
 
-Пример:
+Example:
 ```
 | T07 | Инфраструктура... | Костя | 🟡 в работе |
 →
 | T07 | Инфраструктура... | Костя | ✅ 2026-03-24 |
 ```
 
-**Если все задачи спецификации теперь имеют статус ✅** — добавь суффикс `_done` к имени файла спеки:
+**If all tasks of the specification now have status ✅** — add the suffix `_done` to the spec file name:
 ```
-docs/specifications/S02_hypothesis_prototyping.md
-→ docs/specifications/S02_hypothesis_prototyping_done.md
+docs/2. SUP-specifications/S02_hypothesis_prototyping.md
+→ docs/2. SUP-specifications/S02_hypothesis_prototyping_done.md
 ```
 
-### Шаг 7 — Обновить HANDOFF.md
+### Step 7 — Update HANDOFF.md
 
-Найди строку с этим TNN в любой таблице `*HANDOFF.md`. Замени статус на `✅ YYYY-MM-DD`.
+Find the row with this TNN in any table of `*HANDOFF.md`. Replace the status with `✅ YYYY-MM-DD`.
 
-Если задача была текущим блокером — удали или обнови строку `**Текущий блокер TNN:**`.
+If the task was the current blocker — remove or update the `**Текущий блокер TNN:**` line.
 
-**Если ВСЕ задачи фазы/блока выполнены** — компактифицируй блок: сверни детальную таблицу задач в одну итоговую строку.
+**If ALL tasks of the phase/block are done** — compactify the block: collapse the detailed task table into a single summary row.
 
-### Шаг 8 — Обновить CHANGELOG.md
+### Step 8 — Update CHANGELOG.md
 
-В секции `## [Не выпущено]` → `### Added` добавь строку:
+In the `## [Не выпущено]` → `### Added` section, add a line:
 
 ```markdown
 - YYYY-MM-DD — TNN: <краткое описание что сделано>
 ```
 
-Краткое описание — первые 1–2 предложения из описания задачи.
+The short description is the first 1–2 sentences from the task description.
 
-### Шаг 9 — Обновить ссылки
+### Step 9 — Update references
 
-Выполни поиск старого пути задачи по всем `.md` файлам:
+Search for the old task path across all `.md` files:
 ```
-grep -r "docs/tasks/TNN_<task_name>.md"
-```
-
-Для каждого найденного файла — замени старый путь на новый:
-```
-docs/tasks/Done/SNN_<spec_name>_done/TNN_<task_name>_done.md
+grep -r "docs/3. SUP-tasks/TNN_<task_name>.md"
 ```
 
-Если спека была переименована в шаге 6 — аналогично обнови все ссылки на неё.
+For each file found — replace the old path with the new one:
+```
+docs/3. SUP-tasks/Done/SNN_<spec_name>_done/TNN_<task_name>_done.md
+```
 
-### Шаг 10 — Отчёт
+If the spec was renamed in step 6 — likewise update all references to it.
 
-Выведи итог:
+### Step 10 — Report
+
+Output a summary:
 
 ```
 ✅ Задача T07 закрыта (2026-03-24)
 
 Файл перенесён:
-  docs/tasks/T07_s02_test_instance_setup.md
-  → docs/tasks/Done/S02_hypothesis_prototyping_done/T07_s02_test_instance_setup_done.md
+  docs/3. SUP-tasks/T07_s02_test_instance_setup.md
+  → docs/3. SUP-tasks/Done/S02_hypothesis_prototyping_done/T07_s02_test_instance_setup_done.md
 
 Обновлено:
-  ✅ docs/specifications/S02_hypothesis_prototyping.md — статус T07
+  ✅ docs/2. SUP-specifications/S02_hypothesis_prototyping.md — статус T07
   ✅ *HANDOFF.md — статус T07
   ✅ *CHANGELOG.md — добавлена запись
 
 Ссылки обновлены в: N файлах
 ```
 
-Если спека переименована или HANDOFF компактифицирован — добавь отдельную строку в отчёт.
+If the spec was renamed or HANDOFF was compactified — add a separate line to the report.
 
 ---
 
-## Правила
+## Rules
 
-- Дата закрытия — всегда сегодня (`currentDate` из системного контекста)
-- Никогда не удаляй задачу без записи в CHANGELOG
-- Если файл задачи не найден — сообщи об ошибке, не продолжай
-- Если Done-папка для этой спеки уже существует — просто используй её
-- Адаптируйся к префиксам проекта (SUP-, CLB-, ARP- и т.д.) — бери из HANDOFF/файлов задач
+- The closing date is always today (`currentDate` from the system context)
+- Never delete a task without an entry in CHANGELOG
+- If the task file is not found — report an error, do not proceed
+- If the Done folder for this spec already exists — just use it
+- Adapt to the project prefixes (SUP-, CLB-, ARP-, etc.) — take them from HANDOFF/task files

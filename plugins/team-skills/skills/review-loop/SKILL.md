@@ -1,34 +1,40 @@
 ---
 name: review-loop
-description: "Оркестрирует цикл codereview → fix до полной чистоты (только MEDIUM и LOW остаются). Используй этот скилл когда пользователь говорит '/review-loop', 'гони ревью до чистоты', 'прогони цикл ревью', 'review until clean', 'доведи до MEDIUM/LOW', 'цикл ревью'. Скилл автоматически повторяет ревью и фиксы до тех пор пока не останется ни одного"
+description: >
+  Orchestrates a codereview → fix loop until fully clean (only MEDIUM and LOW remain).
+  Use this skill when the user says "/review-loop", "гони ревью до чистоты",
+  "прогони цикл ревью", "review until clean", "доведи до MEDIUM/LOW", "цикл ревью".
+  The skill automatically repeats review and fixes until there are no
+  CRITICAL and no HIGH findings left. Maximum 5 iterations.
 ---
+
 # Review Loop Skill
 
-Цикл `codereview → fix`, который повторяется до тех пор, пока не останется
-ни одного CRITICAL и ни одного HIGH. Фиксы в быстром режиме (без ожидания подтверждения).
+A `codereview → fix` loop that repeats until there are no
+CRITICAL and no HIGH findings left. Fixes run in fast mode (without waiting for confirmation).
 
 ---
 
-## Критерий остановки
+## Stop criterion
 
-**Стоп:** `CRITICAL == 0 AND HIGH == 0`
+**Stop:** `CRITICAL == 0 AND HIGH == 0`
 
-Все остальные находки (MEDIUM, LOW) — ожидаемы и не блокируют завершение.
-
----
-
-## Лимит безопасности
-
-Максимум **5 итераций**. Если после 5-й итерации CRITICAL или HIGH остаются —
-цикл прерывается с предупреждением.
+All other findings (MEDIUM, LOW) are expected and do not block completion.
 
 ---
 
-## Алгоритм выполнения
+## Safety limit
 
-### Шаг 1 — Старт
+Maximum **5 iterations**. If CRITICAL or HIGH findings remain after the 5th iteration,
+the loop aborts with a warning.
 
-Сообщи пользователю:
+---
+
+## Execution algorithm
+
+### Step 1 — Start
+
+Tell the user:
 
 ```
 ## Review Loop — Старт
@@ -41,47 +47,47 @@ description: "Оркестрирует цикл codereview → fix до полн
 
 ---
 
-### Шаг 2 — Итерация (повторять до стоп-критерия или лимита)
+### Step 2 — Iteration (repeat until stop criterion or limit)
 
-#### 2.1 — Запустить `/codereview`
+#### 2.1 — Run `/codereview`
 
-Выполни полный многофазный ревью (фазы A, B, C, D) согласно скиллу `codereview`.
-Получи таблицу находок с severity.
+Perform the full multi-phase review (phases A, B, C, D) according to the `codereview` skill.
+Obtain the findings table with severity.
 
-#### 2.2 — Подсчитать CRITICAL и HIGH
+#### 2.2 — Count CRITICAL and HIGH
 
-Из таблицы находок:
-- Подсчитай количество находок с `CRITICAL`
-- Подсчитай количество находок с `HIGH`
+From the findings table:
+- Count the number of `CRITICAL` findings
+- Count the number of `HIGH` findings
 
-Выведи промежуточный статус:
+Output the interim status:
 
 ```
 ### Итерация N — Результат ревью
 CRITICAL: X | HIGH: Y | MEDIUM: Z | LOW: W
 ```
 
-#### 2.3 — Проверить критерий остановки
+#### 2.3 — Check the stop criterion
 
-**Если `CRITICAL == 0 AND HIGH == 0`** → перейти к Шагу 3 (финальный отчёт).
+**If `CRITICAL == 0 AND HIGH == 0`** → go to Step 3 (final report).
 
-**Если достигнут лимит (итерация == 5) и ещё есть CRITICAL/HIGH** → перейти к Шагу 4 (лимит).
+**If the limit is reached (iteration == 5) and CRITICAL/HIGH still remain** → go to Step 4 (limit).
 
-**Иначе** → перейти к 2.4.
+**Otherwise** → go to 2.4.
 
-#### 2.4 — Запустить `/fix` в быстром режиме (только CRITICAL и HIGH)
+#### 2.4 — Run `/fix` in fast mode (CRITICAL and HIGH only)
 
-Применяй фиксы согласно скиллу `fix` со следующими ограничениями:
+Apply fixes according to the `fix` skill with the following constraints:
 
-- **Только CRITICAL и HIGH** — MEDIUM и LOW пропускать
-- **Быстрый режим** — показать план фиксов, но не ждать подтверждения пользователя, сразу выполнять
-- **Порядок:** CRITICAL → HIGH
+- **CRITICAL and HIGH only** — skip MEDIUM and LOW
+- **Fast mode** — show the fix plan, but do not wait for user confirmation, execute right away
+- **Order:** CRITICAL → HIGH
 
-После завершения фиксов — вернуться к Шагу 2 (следующая итерация).
+After the fixes are complete, return to Step 2 (next iteration).
 
 ---
 
-### Шаг 3 — Финальный отчёт (успех)
+### Step 3 — Final report (success)
 
 ```
 ## Review Loop — Итог
@@ -100,7 +106,7 @@ CRITICAL: X | HIGH: Y | MEDIUM: Z | LOW: W
 
 ---
 
-### Шаг 4 — Финальный отчёт (лимит исчерпан)
+### Step 4 — Final report (limit exhausted)
 
 ```
 ## Review Loop — Итог
@@ -125,11 +131,11 @@ CRITICAL: X | HIGH: Y | MEDIUM: Z | LOW: W
 
 ---
 
-## Правила
+## Rules
 
-- **Фиксить только CRITICAL и HIGH** в каждой итерации — MEDIUM и LOW не трогать
-- **Быстрый режим обязателен** — план показать, подтверждения не ждать
-- **Считать итерации строго** — итерация = один полный цикл ревью + фикс
-- **Не останавливаться после ревью** без проверки критерия остановки
-- **Если после ревью CRITICAL/HIGH == 0** — сразу финальный отчёт, без лишнего фикс-прогона
-- **Лимит 5 итераций** — жёсткое ограничение, не превышать даже если пользователь просит
+- **Fix only CRITICAL and HIGH** in each iteration — do not touch MEDIUM and LOW
+- **Fast mode is mandatory** — show the plan, do not wait for confirmation
+- **Count iterations strictly** — one iteration = one full review + fix cycle
+- **Do not stop after review** without checking the stop criterion
+- **If CRITICAL/HIGH == 0 after review** — go straight to the final report, without an extra fix run
+- **5-iteration limit** — a hard constraint, do not exceed even if the user asks

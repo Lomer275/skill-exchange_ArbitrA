@@ -10,7 +10,7 @@
 |------|-------------|
 | USER | Personal storage of a user |
 | GROUP | Workgroup/project storage |
-| SHARED | Shared drive (общий диск) |
+| SHARED | Shared drive |
 | COMPANY | Company drive |
 
 ## Get storages
@@ -118,7 +118,7 @@ PARAMS: {
 
 const children = await this.helpers.httpRequest({
   method: 'POST',
-  url: 'https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/disk.folder.getchildren',
+  url: 'https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/disk.folder.getchildren',
   body: { id: folderId },
   json: true
 });

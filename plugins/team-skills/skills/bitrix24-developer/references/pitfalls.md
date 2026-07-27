@@ -78,7 +78,7 @@ if (errors && Object.keys(errors).length > 0) {
 **Also:** Enable "Always Output Data" on IF nodes.
 
 ### 4. EAI_AGAIN DNS errors
-**Problem:** Docker n8n intermittently fails to resolve `<YOUR_BITRIX_PORTAL>`.
+**Problem:** Docker n8n intermittently fails to resolve `bitrix.express-bankrot.ru`.
 **Fix:** Add `dns: [8.8.8.8, 1.1.1.1]` and `extra_hosts` to docker-compose.yml.
 
 ### 5. Webhook trigger URL changes after workflow clone

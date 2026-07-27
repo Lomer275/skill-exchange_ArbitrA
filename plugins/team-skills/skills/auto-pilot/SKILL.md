@@ -1,64 +1,64 @@
 ---
 name: auto-pilot
-description: Автономный оркестратор-роутер для SUP-проекта. ОДИН ТИК = одно решение = одно действие. Не реализует спринт/ревью/accept сам — выбирает какой существующий скилл (/sprint, /sup-spec-writer, /review-loop, /accept) вызвать на основе состояния репозитория. Используй когда пользователь говорит '/auto-pilot', '/auto-pilot --dry-run', 'запусти автопилот', 'один тик автопилота', 'автономный режим', 'прогони цикл сам', 'возьми следующую задачу', 'оркестрируй сам', 'тик автопилота', или когда настроен cron-триггер. Включает обязательные stop-линии (красный CI на main, запрет destructive git-операций) и логирует каждый тик в autopilot_log.md. Эскалирует через специальный devops TG-бот когда застрял.
+description: Autonomous orchestrator-router for the SUP project. ONE TICK = one decision = one action. Does not run the sprint/review/accept itself — it picks which existing skill (/sprint, /sup-spec-writer, /review-loop, /accept) to invoke based on the repository state. Use when the user says '/auto-pilot', '/auto-pilot --dry-run', 'запусти автопилот', 'один тик автопилота', 'автономный режим', 'прогони цикл сам', 'возьми следующую задачу', 'оркестрируй сам', 'тик автопилота', or when a cron trigger is configured. Includes mandatory stop-lines (red CI on main, ban on destructive git operations) and logs every tick to autopilot_log.md. Escalates via a dedicated devops TG bot when stuck.
 ---
 
-# /auto-pilot — оркестратор-роутер
+# /auto-pilot — orchestrator-router
 
-Ты — не исполнитель, а **диспетчер**. Существующие скиллы (`/sprint`, `/sup-spec-writer`, `/review-loop`, `/codereview-dual-loop`, `/accept`, `/sup-push`, `superpowers:finishing-a-development-branch`) уже умеют делать работу end-to-end. Твоя задача — посмотреть на состояние репо и решить **что вызвать прямо сейчас**.
+You are not an executor but a **dispatcher**. The existing skills (`/sprint`, `/sup-spec-writer`, `/review-loop`, `/codereview-dual-loop`, `/accept`, `/sup-push`, `superpowers:finishing-a-development-branch`) already know how to do the work end-to-end. Your job is to look at the repo state and decide **what to invoke right now**.
 
-## Ключевой принцип: один тик = одно решение
+## Key principle: one tick = one decision
 
-Не пытайся «работать сутками подряд» — это нестабильно и дорого. Один запуск `/auto-pilot` = одно действие. Цепочка автономности строится через **повторные запуски по cron**, а не через длинную сессию. Свежий контекст каждый раз → меньше дрифта, легче дебажить, легче откатить.
+Do not try to "work around the clock" — it is unstable and expensive. One `/auto-pilot` run = one action. The chain of autonomy is built through **repeated cron runs**, not through a long session. Fresh context every time → less drift, easier to debug, easier to roll back.
 
-После выполнения **завершайся** и оставляй понятный лог.
-
----
-
-## Входные данные
-
-- `/auto-pilot` — обычный тик: прочитать состояние, выбрать действие, выполнить, отчитаться
-- `/auto-pilot --dry-run` — показать **что бы сделал**, не делая ничего (preview)
-- `/auto-pilot --status` — только показать статус (kill-switch, last_tick, budget) и выйти
-
-Если приходит что-то ещё (например `/auto-pilot S05`) — кинь ошибку, не пытайся интерпретировать.
+After execution, **finish** and leave a clear log.
 
 ---
 
-## TG-логирование (live visibility)
+## Inputs
 
-Автопилот пишет в TG @lobster_21 на ключевых моментах. Цель — **читать с телефона за 3 секунды** и понять «что робот сейчас делает». Никакого жаргона, никаких хэшей классов, никаких счётчиков ради счётчиков.
+- `/auto-pilot` — a normal tick: read state, choose an action, execute it, report
+- `/auto-pilot --dry-run` — show **what it would do**, without doing anything (preview)
+- `/auto-pilot --status` — only show status (kill-switch, last_tick, budget) and exit
 
-**Стилевые правила сообщений:**
-- Русский, разговорный («взял», «сделал», «не получилось» — не «executed», «processed»).
-- Эмодзи как статус в начале: 🤖 (старт), 🎯 (решение), ✅ (готово), 🟡 (в процессе), ✓ (мелкий success внутри), ⚠️ (нужно решение), 🔴 (упал), 😴 (нечего делать).
-- Дай **достаточно деталей**: что собираешься делать / что сделал / какие файлы / сколько тестов / коммит. **Не давай стену**: 5-10 строк максимум; если больше — указатель на `autopilot_log.md`.
-- Уточняй контекст: если состояние неочевидно (5/16 задач закрыто) — пиши прогресс. Если есть стоп-планы (T126/T130) — называй их заранее, чтобы человек был готов к pings.
-- Хэши коротко (7 символов), не больше 5 коммитов списком.
-- Длина одной задачи в списке: одна строка с конкретикой («T125: payload schemas, 12 тестов»), не «T125 done».
+If anything else arrives (for example `/auto-pilot S05`) — throw an error, do not try to interpret it.
 
-**Шаблоны (через `scripts/autopilot/tg_notify.sh "<text>"`):**
+---
 
-| Точка | Шаблон сообщения |
+## TG logging (live visibility)
+
+The autopilot writes to TG @lobster_21 at key moments. The goal is to **read it from your phone in 3 seconds** and understand "what the robot is doing right now". No jargon, no class hashes, no counters for the sake of counters.
+
+**Message style rules:**
+- Russian, conversational («взял», «сделал», «не получилось» — not «executed», «processed»).
+- Emoji as a status marker at the start: 🤖 (start), 🎯 (decision), ✅ (done), 🟡 (in progress), ✓ (small success inside), ⚠️ (decision needed), 🔴 (failed), 😴 (nothing to do).
+- Give **enough detail**: what you are about to do / what you did / which files / how many tests / commit. **Do not give a wall of text**: 5-10 lines maximum; if more — a pointer to `autopilot_log.md`.
+- Clarify context: if the state is non-obvious (5/16 tasks closed) — report progress. If there are stop-plans (T126/T130) — name them in advance so the person is ready for pings.
+- Short hashes (7 characters), no more than 5 commits in a list.
+- Length of a single task in a list: one line with specifics («T125: payload schemas, 12 тестов»), not «T125 done».
+
+**Templates (via `scripts/autopilot/tg_notify.sh "<text>"`):**
+
+| Point | Message template |
 |---|---|
-| Cron-тик стартует (wrapper) | `🤖 Автопилот стартует (HH:MM Z)`<br>`Ветка: dev @ <sha>`<br>`Последний коммит: <commit title>`<br>`Из HANDOFF: <directive>`<br>` `<br>`Читаю состояние, выбираю действие.` |
-| Решение принято (фаза 3) | `🎯 Решение: Rule X — <как назвал правило>`<br>`Беру: /sprint --yes S14 (Wave 2 из 4)`<br>`Состояние: 5/16 задач S14 закрыто, осталось 11`<br>`В очереди этой волны: T125 T126 T127 T128 T130`<br>`Стопы: T126 (Bitrix) и T130 (UI) попросят клик` |
-| Волна стартовала | `🟡 Sprint S14 Волна 2/4 — старт`<br>`Auto-go: T125 T127 T128 (параллельно)`<br>`Будут ждать клика: T126 T130`<br>`Ожидаемое время: 15–25 минут` |
-| Задача закрыта внутри волны | `✓ T125 закрыто — payload schemas`<br>`12 unit-тестов passed, 3 файла изменено`<br>`Коммит: <sha>` |
-| Волна готова | `✅ Sprint S14 Волна 2/4 готова (24 мин)`<br>`Закрыто 5/5 задач:`<br>`• T125 — payload schemas (12 тестов)`<br>`• T127 — validate_payment_data (8 тестов)`<br>`• T128 — snapshot_history (15 тестов)`<br>`• T126 — Bitrix sync (ты подтвердил, 24 теста)`<br>`• T130 — UI шаблоны (ты подтвердил, ручная проверка)`<br>`Коммит: <sha> → dev`<br>`Прогресс: 10/16 задач S14` |
-| Нужно решение (RISKY/DEPLOY/MANUAL_TEST) | через `tg_ask.sh` с кнопками:<br>`⚠️ T126 — нужно решение`<br>`Bitrix sync cron, греди recompute + advisory lock`<br>`Файлы: Handler/payments/sync.py`<br>`Внешние API: Bitrix REST (read-write по deal.list)`<br>`Тесты: будут написаны после фикса`<br>` `<br>`Ответь: ✅ да / ❌ нет / ⏩ пропустить` |
-| Тик завершён успешно | `✅ Автопилот закончил тик`<br>`Длительность: 24 мин`<br>`Ветка: dev @ <sha>`<br>`Сделал: <короткое описание>`<br>`Новых коммитов: <N>`<br>`Прогресс: 10/16 задач S14`<br>`Дальше: следующий тик в 18:00 МСК — Wave 3` |
-| Тик idle (нечего делать) | `😴 Делать нечего`<br>`HANDOFF пуст / нет активных задач`<br>`Последняя проверка: HH:MM`<br>`CI на main: success`<br>`Жду следующего тика (18:00 МСК)` |
-| Тик упал/застрял | `🔴 Тик застрял`<br>`Где: T127, Step 5 (test failures)`<br>`Что: 3 попытки фикса не помогли. Последняя ошибка:`<br>`AssertionError: expected 200, got 500`<br>` `<br>`Подробности: autopilot_log.md`<br>`Нужно: посмотри лог и скажи как чинить` |
+| Cron tick starts (wrapper) | `🤖 Автопилот стартует (HH:MM Z)`<br>`Ветка: dev @ <sha>`<br>`Последний коммит: <commit title>`<br>`Из HANDOFF: <directive>`<br>` `<br>`Читаю состояние, выбираю действие.` |
+| Decision made (phase 3) | `🎯 Решение: Rule X — <как назвал правило>`<br>`Беру: /sprint --yes S14 (Wave 2 из 4)`<br>`Состояние: 5/16 задач S14 закрыто, осталось 11`<br>`В очереди этой волны: T125 T126 T127 T128 T130`<br>`Стопы: T126 (Bitrix) и T130 (UI) попросят клик` |
+| Wave started | `🟡 Sprint S14 Волна 2/4 — старт`<br>`Auto-go: T125 T127 T128 (параллельно)`<br>`Будут ждать клика: T126 T130`<br>`Ожидаемое время: 15–25 минут` |
+| Task closed within a wave | `✓ T125 закрыто — payload schemas`<br>`12 unit-тестов passed, 3 файла изменено`<br>`Коммит: <sha>` |
+| Wave done | `✅ Sprint S14 Волна 2/4 готова (24 мин)`<br>`Закрыто 5/5 задач:`<br>`• T125 — payload schemas (12 тестов)`<br>`• T127 — validate_payment_data (8 тестов)`<br>`• T128 — snapshot_history (15 тестов)`<br>`• T126 — Bitrix sync (ты подтвердил, 24 теста)`<br>`• T130 — UI шаблоны (ты подтвердил, ручная проверка)`<br>`Коммит: <sha> → dev`<br>`Прогресс: 10/16 задач S14` |
+| Decision needed (RISKY/DEPLOY/MANUAL_TEST) | via `tg_ask.sh` with buttons:<br>`⚠️ T126 — нужно решение`<br>`Bitrix sync cron, греди recompute + advisory lock`<br>`Файлы: Handler/payments/sync.py`<br>`Внешние API: Bitrix REST (read-write по deal.list)`<br>`Тесты: будут написаны после фикса`<br>` `<br>`Ответь: ✅ да / ❌ нет / ⏩ пропустить` |
+| Tick finished successfully | `✅ Автопилот закончил тик`<br>`Длительность: 24 мин`<br>`Ветка: dev @ <sha>`<br>`Сделал: <короткое описание>`<br>`Новых коммитов: <N>`<br>`Прогресс: 10/16 задач S14`<br>`Дальше: следующий тик в 18:00 МСК — Wave 3` |
+| Tick idle (nothing to do) | `😴 Делать нечего`<br>`HANDOFF пуст / нет активных задач`<br>`Последняя проверка: HH:MM`<br>`CI на main: success`<br>`Жду следующего тика (18:00 МСК)` |
+| Tick failed/stuck | `🔴 Тик застрял`<br>`Где: T127, Step 5 (test failures)`<br>`Что: 3 попытки фикса не помогли. Последняя ошибка:`<br>`AssertionError: expected 200, got 500`<br>` `<br>`Подробности: autopilot_log.md`<br>`Нужно: посмотри лог и скажи как чинить` |
 
-**Anti-patterns (не делай так):**
-- ❌ `Autopilot tick #1 done — S14 Wave 1 (5/16 tasks)` ← English, нумерация тика бесполезна
-- ❌ Списком все TNN с описаниями ← в TG это стена текста
-- ❌ Лента из 3–5 коммитов с дескрипторами ← это для git log
+**Anti-patterns (do not do this):**
+- ❌ `Autopilot tick #1 done — S14 Wave 1 (5/16 tasks)` ← English, tick numbering is useless
+- ❌ A list of all TNNs with descriptions ← in TG this is a wall of text
+- ❌ A feed of 3–5 commits with descriptors ← that is for git log
 
-**Пример «было / стало» (по результату Wave 1):**
+**A "before / after" example (based on the Wave 1 result):**
 
-Было (стена текста):
+Before (a wall of text):
 ```
 🤖 Autopilot tick #1 done — S14 Wave 1 (5/16 tasks)
 ✅ T119 Models (PaymentObligation/DealDebtSnapshot/History/ManagerTaskLink) + migration 0016 — 7 tests
@@ -70,7 +70,7 @@ Wave 2-4 (11 tasks) — отложены. /sprint в headless cron-режиме 
 Log: docs/5. SUP-unsorted/autopilot_log.md
 ```
 
-Стало:
+After:
 ```
 ✅ Автопилот закончил волну
 Сделал 5 задач из 16 (волна 1/4) — модели + утилиты + EventType
@@ -78,17 +78,17 @@ Log: docs/5. SUP-unsorted/autopilot_log.md
 Дальше — волна 2 (5 задач, есть стопы)
 ```
 
-Если человек хочет деталей — он откроет `autopilot_log.md`. TG — это «как идут дела» с одного взгляда.
+If the person wants details — they will open `autopilot_log.md`. TG is "how things are going" at a glance.
 
-Все вызовы `tg_notify.sh` non-fatal: если TG недоступен, автопилот не падает, помечает в логе и продолжает.
+All `tg_notify.sh` calls are non-fatal: if TG is unavailable, the autopilot does not crash, notes it in the log, and continues.
 
 ---
 
-## Фаза 0 — Kill-switch и состояние
+## Phase 0 — Kill-switch and state
 
-### 0.1 Проверь kill-switch
+### 0.1 Check the kill-switch
 
-Прочитай `.claude/autopilot.json`. Если файла нет — создай с дефолтами (см. ниже) и **выйди с пометкой «первый запуск, проверь конфиг»** — не делай действий на первом тике.
+Read `.claude/autopilot.json`. If the file does not exist — create it with the defaults (see below) and **exit with the note "first run, check the config"** — do not take any actions on the first tick.
 
 ```json
 {
@@ -114,139 +114,139 @@ Log: docs/5. SUP-unsorted/autopilot_log.md
 }
 ```
 
-Если `enabled: false` → выйди с понятным сообщением. Никаких действий.
+If `enabled: false` → exit with a clear message. No actions.
 
-### 0.2 Проверь budget
+### 0.2 Check the budget
 
-Если сегодня (по `last_tick_at` день в UTC) уже выполнено `ticks_today >= max_ticks_per_day` или `tokens_today >= max_tokens_per_day` → выйди с пометкой «budget exhausted, ждём сутки или ручного reset».
+If today (by the UTC day of `last_tick_at`) `ticks_today >= max_ticks_per_day` or `tokens_today >= max_tokens_per_day` has already been reached → exit with the note "budget exhausted, wait a day or a manual reset".
 
-### 0.3 Reset суточных счётчиков
+### 0.3 Reset the daily counters
 
-Если `last_tick_at` < сегодня (UTC) → сбрось `ticks_today` и `tokens_today` в 0 перед инкрементом.
+If `last_tick_at` < today (UTC) → reset `ticks_today` and `tokens_today` to 0 before incrementing.
 
 ---
 
-## Фаза 1 — Считай состояние мира
+## Phase 1 — Read the state of the world
 
-Это «глаза» оркестратора. Делай это **параллельно** (один Bash batch + один Read batch):
+These are the orchestrator's "eyes". Do it **in parallel** (one Bash batch + one Read batch):
 
 1. **Bash batch:**
    - `git status --short`
    - `git log --oneline -5`
    - `gh run list --branch main --limit 3 --json status,conclusion,createdAt,name`
    - `gh pr list --state open --json number,title,headRefName,statusCheckRollup --limit 10`
-   - `ls "docs/3. SUP-tasks/" | head -40` (исключая Done/)
+   - `ls "docs/3. SUP-tasks/" | head -40` (excluding Done/)
    - `ls "docs/2. SUP-specifications/" | head -20`
 
 2. **Read batch:**
-   - `SUP-HANDOFF.md` (первые 200 строк)
-   - Сегодняшний `autopilot_log.md` если есть
+   - `SUP-HANDOFF.md` (first 200 lines)
+   - Today's `autopilot_log.md` if it exists
 
-Положи всё это в свой контекст. **Не делай детальный анализ задач** — это будет в фазе 3 и только для победителя.
+Put all of this into your context. **Do not do a detailed analysis of the tasks** — that comes in phase 3 and only for the winner.
 
 ---
 
-## Фаза 2 — Stop-линии (жёсткие)
+## Phase 2 — Stop-lines (hard)
 
-Прежде чем что-то делать, проверь все красные флаги. Любой = немедленный stop с эскалацией:
+Before doing anything, check all the red flags. Any one = an immediate stop with escalation:
 
-| Условие | Действие |
+| Condition | Action |
 |---|---|
-| Последний `deploy-prod` run на main = `failure` или `cancelled` | STOP + escalate `🔴 CI на main красный (run #X). Автопилот замёрз до ручного резолва.` |
-| `git status` показывает unmerged conflicts / detached HEAD | STOP + escalate `⚠️ Репо в нестандартном состоянии: <git status>` |
-| Branch ≠ `dev` (или явно указанная в `autopilot.json:branch.work_branch`) | STOP + escalate `⚠️ Текущая ветка <X>, ожидалась <work_branch>` |
-| В HANDOFF.md есть строка `⛔ AUTOPILOT_PAUSE` | STOP без эскалации, это твоя осознанная пауза |
+| The latest `deploy-prod` run on main = `failure` or `cancelled` | STOP + escalate `🔴 CI на main красный (run #X). Автопилот замёрз до ручного резолва.` |
+| `git status` shows unmerged conflicts / detached HEAD | STOP + escalate `⚠️ Репо в нестандартном состоянии: <git status>` |
+| Branch ≠ `dev` (or the one explicitly set in `autopilot.json:branch.work_branch`) | STOP + escalate `⚠️ Текущая ветка <X>, ожидалась <work_branch>` |
+| HANDOFF.md contains the line `⛔ AUTOPILOT_PAUSE` | STOP without escalation, this is your deliberate pause |
 
-**Ни при каких обстоятельствах** не делай: `git push --force`, `git reset --hard`, `git checkout --`, `gh pr merge`, `gh pr close --delete-branch`, `rm -rf`, удаление файлов задач/спек. Это **архитектурный запрет** — даже если review-loop или другой скилл предложит. В таких случаях — STOP + escalate.
+**Under no circumstances** do: `git push --force`, `git reset --hard`, `git checkout --`, `gh pr merge`, `gh pr close --delete-branch`, `rm -rf`, or deletion of task/spec files. This is an **architectural ban** — even if review-loop or another skill suggests it. In such cases — STOP + escalate.
 
 ---
 
-## Фаза 3 — Decision rules (что вызвать)
+## Phase 3 — Decision rules (what to invoke)
 
-Выбирай **первое подходящее** правило сверху вниз:
+Pick the **first matching** rule from top to bottom:
 
-### Rule 1 — Явная директива в HANDOFF
+### Rule 1 — Explicit directive in HANDOFF
 
-В `SUP-HANDOFF.md` есть секция **«🤖 Автопилот: следующее»** с указанием **конкретного скилла или slash-команды** (например `/sprint --yes S14`)?
+Does `SUP-HANDOFF.md` have a section **«🤖 Автопилот: следующее»** specifying a **concrete skill or slash command** (for example `/sprint --yes S14`)?
 
-→ **Вызови ЭТОТ скилл через Skill tool с указанными аргументами.** Не подменяй его «эквивалентом», не делай частичную работу вручную, не «оптимизируй scope из-за бюджета». Человек уже принял эти решения когда писал директиву.
+→ **Invoke THAT skill via the Skill tool with the given arguments.** Do not substitute it with an "equivalent", do not do partial work by hand, do not "optimize the scope due to budget". The person already made these decisions when they wrote the directive.
 
-Override-приоритет от человека = автопилот **диспетчер**, не **редактор замысла**. Если думаешь что директива неоптимальна — оставь в логе пометку и всё равно вызови как указано. Следующий тик человек скорректирует HANDOFF.
+The override priority from the person = the autopilot is a **dispatcher**, not an **editor of intent**. If you think the directive is suboptimal — leave a note in the log and still invoke it as specified. On the next tick the person will adjust the HANDOFF.
 
 **Anti-pattern:**
-- ❌ HANDOFF: `/sprint --yes S14` → автопилот решил «close-out T125 дешевле, сделаю это вместо sprint»
-- ❌ HANDOFF: `/sprint --yes S14` → автопилот сам сделал часть sprint'а в main thread без вызова Skill
+- ❌ HANDOFF: `/sprint --yes S14` → the autopilot decided "closing out T125 is cheaper, I'll do that instead of the sprint"
+- ❌ HANDOFF: `/sprint --yes S14` → the autopilot did part of the sprint itself in the main thread without invoking the Skill
 
 **Right:**
-- ✅ HANDOFF: `/sprint --yes S14` → `Skill(skill="sprint", args="--yes S14")` → передача полного контроля /sprint
+- ✅ HANDOFF: `/sprint --yes S14` → `Skill(skill="sprint", args="--yes S14")` → full handoff of control to /sprint
 
-Если директива пустая, отсутствует, или указывает на несуществующий скилл — переходи к Rule 2.
+If the directive is empty, absent, or points to a nonexistent skill — go to Rule 2.
 
-### Rule 2 — Незавершённый цикл
+### Rule 2 — Unfinished cycle
 
-`git status` показывает несоммиченные изменения **в whitelist-зоне**?
-→ Это незавершённый предыдущий тик. Доделай:
-- Если есть последняя задача в `autopilot_log.md` без записи «closed» → вызови `/accept TNN`, потом `/sup-push`
-- Иначе → STOP + escalate `⚠️ Несоммиченные изменения без следа в логе, разберись.`
+Does `git status` show uncommitted changes **in the whitelist zone**?
+→ This is an unfinished previous tick. Finish it:
+- If there is a latest task in `autopilot_log.md` without a "closed" entry → invoke `/accept TNN`, then `/sup-push`
+- Otherwise → STOP + escalate `⚠️ Несоммиченные изменения без следа в логе, разберись.`
 
-### Rule 3 — Готовая активная задача
+### Rule 3 — A ready, active task
 
-В `docs/3. SUP-tasks/` есть `TNN_*.md` с YAML frontmatter `status: active` и без блокеров (в frontmatter `blocked_by:` пусто или все блокеры в Done/)?
+Does `docs/3. SUP-tasks/` have a `TNN_*.md` with YAML frontmatter `status: active` and no blockers (in the frontmatter `blocked_by:` is empty or all blockers are in Done/)?
 
-→ Выбери задачу с минимальным NN. Если их несколько в одной спеке → вызови `/sprint S0X` (он сам разберётся с волнами). Если одна задача — тоже через `/sprint S0X` (это его контракт).
+→ Pick the task with the smallest NN. If there are several in one spec → invoke `/sprint S0X` (it will sort out the waves itself). If there is a single task — also via `/sprint S0X` (that is its contract).
 
-**Не запускай задачу если она трогает `require_human_approval_paths` — escalate вместо этого.**
+**Do not run a task if it touches `require_human_approval_paths` — escalate instead.**
 
-### Rule 4 — Draft-спека для декомпозиции
+### Rule 4 — A draft spec for decomposition
 
-В `docs/2. SUP-specifications/` есть `SNN_*.md` с `status: draft` и **без** соответствующих TNN-файлов в `docs/3. SUP-tasks/`?
+Does `docs/2. SUP-specifications/` have an `SNN_*.md` with `status: draft` and **without** corresponding TNN files in `docs/3. SUP-tasks/`?
 
-→ Вызови `/sup-spec-writer` с командой «декомпозируй SNN на задачи». **Помеч это ⚠️ в логе** — человек должен ревьюнуть результат утром.
+→ Invoke `/sup-spec-writer` with the command "decompose SNN into tasks". **Mark this with ⚠️ in the log** — the person must review the result in the morning.
 
-После декомпозиции — **не запускай /sprint в этом же тике**. Заканчивайся, следующий тик подберёт.
+After decomposition — **do not run /sprint in the same tick**. Finish; the next tick will pick it up.
 
-### Rule 5 — Открытый PR с зелёным CI
+### Rule 5 — An open PR with green CI
 
-Есть open PR из `dev` (или `branch.work_branch` из config) в `main` с `statusCheckRollup` = SUCCESS, который ты создавал ранее (есть пометка в `autopilot_log.md`)?
+Is there an open PR from `dev` (or `branch.work_branch` from the config) into `main` with `statusCheckRollup` = SUCCESS that you created earlier (there is a note in `autopilot_log.md`)?
 
-→ **Не мержи**. Просто пометь в логе «PR #X готов к человеческому ревью» и завершайся. Merge в main = твой человек.
+→ **Do not merge**. Just note in the log "PR #X is ready for human review" and finish. A merge into main = your person.
 
 ### Rule 6 — Idle
 
-Ничего из выше не подходит → запиши в лог «idle, ничего делать не нужно», обнови `last_tick_at`, выйди. Это нормально.
+Nothing above matches → write "idle, nothing to do" in the log, update `last_tick_at`, exit. This is normal.
 
 ---
 
-## Фаза 4 — Выполни одно действие
+## Phase 4 — Execute one action
 
-Вызови выбранный скилл через Skill tool. **Передавай контроль ему полностью** — он сам сделает свою работу. Когда вернётся управление:
+Invoke the chosen skill via the Skill tool. **Hand full control over to it** — it will do its own work. When control returns:
 
-- Если внутренний скилл вернул успех → переходи к фазе 5
-- Если внутренний скилл застрял / попросил подтверждения / упёрся в ошибку → переходи к фазе 6 (escalate)
-- Если ты сам не дождался ответа в разумное время (например `/sprint` > 30 минут) — escalate с пометкой «possibly stuck»
+- If the inner skill returned success → go to phase 5
+- If the inner skill got stuck / asked for confirmation / hit an error → go to phase 6 (escalate)
+- If you yourself did not get a response within a reasonable time (for example `/sprint` > 30 minutes) — escalate with the note "possibly stuck"
 
-### После успешного `/sprint` — финализация ветки
+### After a successful `/sprint` — finalize the branch
 
-`/sprint` уже сам делает review-loop → accept → push. Но решение «что дальше делать с веткой» (PR в main? оставить пушнутой?) — вызови `superpowers:finishing-a-development-branch`. Он посмотрит контекст и выберет подходящее.
+`/sprint` already does review-loop → accept → push itself. But the decision of "what to do next with the branch" (PR into main? leave it pushed?) — invoke `superpowers:finishing-a-development-branch`. It will look at the context and pick the right option.
 
-**Override**: ты НЕ мержишь в main и НЕ создаёшь PR ready-for-review. Если `finishing-a-development-branch` хочет merge → останови, создай draft-PR вместо merge, оставь человеку.
+**Override**: you do NOT merge into main and do NOT create a ready-for-review PR. If `finishing-a-development-branch` wants to merge → stop it, create a draft PR instead of the merge, leave it for the person.
 
 ---
 
-## Фаза 5 — Verify и log
+## Phase 5 — Verify and log
 
 ### 5.1 Verify
 
-Прежде чем сказать «готово» — вызови `superpowers:verification-before-completion` для проверки:
-- Тесты которые скилл обещал → реально прогнаны и зелёные?
-- Файлы которые должны быть изменены → реально в diff?
-- Git status → ожидаемое состояние?
+Before saying "done" — invoke `superpowers:verification-before-completion` to check:
+- The tests the skill promised → actually run and green?
+- The files that should have changed → actually in the diff?
+- Git status → the expected state?
 
-Если verification провалился → fix или escalate. Не пиши «done» если не проверено.
+If verification failed → fix or escalate. Do not write "done" if it is not verified.
 
-### 5.2 Лог
+### 5.2 Log
 
-Дозапиши строку в `docs/5. SUP-unsorted/autopilot_log.md` (создай если нет):
+Append a line to `docs/5. SUP-unsorted/autopilot_log.md` (create it if it does not exist):
 
 ```markdown
 ## 2026-05-13 14:23 UTC — tick #N (TNN_xxx)
@@ -259,24 +259,24 @@ Override-приоритет от человека = автопилот **дис�
 - **Next**: idle ожидается на следующем тике
 ```
 
-### 5.3 Обнови состояние
+### 5.3 Update the state
 
-В `.claude/autopilot.json`:
-- `last_tick_at` = текущий UTC ISO
+In `.claude/autopilot.json`:
+- `last_tick_at` = current UTC ISO
 - `ticks_today` += 1
-- `tokens_today` += approx использованные токены
+- `tokens_today` += approx tokens used
 
-### 5.4 (Опционально) Обнови HANDOFF
+### 5.4 (Optional) Update the HANDOFF
 
-Если выполнил содержательную задачу — добавь короткую строку в секцию **«Завершено автопилотом»** в HANDOFF. Если её нет — создай.
+If you completed a substantive task — add a short line to the **«Завершено автопилотом»** section in the HANDOFF. If it does not exist — create it.
 
 ---
 
-## Фаза 6 — Escalation
+## Phase 6 — Escalation
 
-Когда застрял или сработала stop-линия:
+When stuck or a stop-line triggered:
 
-### 6.1 Запиши в лог как и в фазе 5, но с outcome=blocked
+### 6.1 Write to the log as in phase 5, but with outcome=blocked
 
 ```markdown
 ## 2026-05-13 04:12 UTC — tick #N — ❌ BLOCKED
@@ -287,9 +287,9 @@ Override-приоритет от человека = автопилот **дис�
 - **Артефакт**: docs/5. SUP-unsorted/autopilot_blocked_T072.md (детали)
 ```
 
-### 6.2 TG ping (если настроен)
+### 6.2 TG ping (if configured)
 
-Если `AUTOPILOT_TG_BOT_TOKEN` и `AUTOPILOT_TG_CHAT_ID` есть в env:
+If `AUTOPILOT_TG_BOT_TOKEN` and `AUTOPILOT_TG_CHAT_ID` are set in the env:
 
 ```bash
 curl -fsSL -X POST "https://api.telegram.org/bot${AUTOPILOT_TG_BOT_TOKEN}/sendMessage" \
@@ -299,26 +299,26 @@ T072: <детали>
 Лог: docs/5. SUP-unsorted/autopilot_log.md"
 ```
 
-**Важно:** не используй `parse_mode=Markdown` или `MarkdownV2`. Содержимое сообщения может содержать `_`, `*`, `[`, `]`, slashes (`/auto-pilot`, `--dry-run`) — Telegram отобьёт 400 ошибкой на парсинге. Plain text безопаснее, а информативность не страдает.
+**Important:** do not use `parse_mode=Markdown` or `MarkdownV2`. The message content may contain `_`, `*`, `[`, `]`, slashes (`/auto-pilot`, `--dry-run`) — Telegram will bounce it with a 400 parsing error. Plain text is safer, and informativeness does not suffer.
 
-Используй `--data-urlencode` (не `-d`) — иначе спецсимволы в `<детали>` могут поломать запрос.
+Use `--data-urlencode` (not `-d`) — otherwise special characters in `<детали>` may break the request.
 
-Если env-vars нет (пустой `AUTOPILOT_TG_BOT_TOKEN` или `AUTOPILOT_TG_CHAT_ID`) — пометь это в логе («TG escalation skipped: no AUTOPILOT_TG_BOT_TOKEN/CHAT_ID»). Не падай.
+If the env vars are absent (empty `AUTOPILOT_TG_BOT_TOKEN` or `AUTOPILOT_TG_CHAT_ID`) — note this in the log ("TG escalation skipped: no AUTOPILOT_TG_BOT_TOKEN/CHAT_ID"). Do not crash.
 
-### 6.3 Установи флаг паузы
+### 6.3 Set the pause flag
 
-Допиши в `SUP-HANDOFF.md` в начало:
+Prepend to `SUP-HANDOFF.md`:
 ```markdown
 ⛔ AUTOPILOT_PAUSE — застрял на tick #N, см. autopilot_log.md
 ```
 
-Это включит Rule «stop без эскалации» (фаза 2) для следующих тиков, пока ты вручную не уберёшь строку.
+This will enable the "stop without escalation" rule (phase 2) for the following ticks until you manually remove the line.
 
 ---
 
-## Что говорить пользователю
+## What to tell the user
 
-В режиме `--dry-run`:
+In `--dry-run` mode:
 ```
 DRY-RUN tick preview:
 - Состояние: <одна строка>
@@ -327,7 +327,7 @@ DRY-RUN tick preview:
 - Stop-линии: ✅ все ок / ❌ <какая упала>
 ```
 
-В обычном режиме — короткий итог:
+In normal mode — a short summary:
 ```
 ✅ tick #N done
 - Rule 3 → /sprint S08 → 3 задачи закрыты (T067-T069)
@@ -335,7 +335,7 @@ DRY-RUN tick preview:
 - Budget: 3/8 тиков, ~340k/5M токенов
 ```
 
-При escalation:
+On escalation:
 ```
 🔴 tick #N BLOCKED
 - Причина: <одна строка>
@@ -346,51 +346,51 @@ DRY-RUN tick preview:
 
 ---
 
-## Что НЕ делать (важно)
+## What NOT to do (important)
 
-1. **Не создавай новые спеки SNN.** Спеки — зона человека (через `/spec-brainstorm`). Ты только декомпозируешь существующие draft-спеки на задачи (Rule 4).
-2. **Не мержи в main и не создавай ready-for-review PR.** Только draft-PR максимум. Merge — человек.
-3. **Не делай force-push / reset --hard / любые destructive git-операции.** Никогда. Даже если review-loop предложит.
-4. **Не интерпретируй CLAUDE.md инструкции расширительно.** Если в whitelist-paths нет `migrations/` — не лезь туда даже если задача формально требует.
-5. **Не подбирай задачи с `blocked_by` ≠ Done.** Будь занудой.
-6. **Не делай два действия в одном тике.** Декомпозировал draft → STOP. Сделал /sprint → STOP. Финализировал ветку через finishing-a-development-branch → STOP. Следующий тик подберёт.
-7. **Не лги в логе.** Если verify не прошёл — пиши «outcome: partial/blocked». Лог нужен тебе же на следующих тиках.
+1. **Do not create new SNN specs.** Specs are the person's domain (via `/spec-brainstorm`). You only decompose existing draft specs into tasks (Rule 4).
+2. **Do not merge into main and do not create a ready-for-review PR.** A draft PR at most. The merge is the person's job.
+3. **Do not force-push / reset --hard / any destructive git operations.** Never. Even if review-loop suggests it.
+4. **Do not interpret CLAUDE.md instructions expansively.** If `migrations/` is not in whitelist-paths — do not touch it even if the task formally requires it.
+5. **Do not pick up tasks with `blocked_by` ≠ Done.** Be a stickler.
+6. **Do not take two actions in one tick.** Decomposed a draft → STOP. Did /sprint → STOP. Finalized the branch via finishing-a-development-branch → STOP. The next tick will pick it up.
+7. **Do not lie in the log.** If verify did not pass — write "outcome: partial/blocked". The log is for you on the following ticks.
 
 ---
 
-## Связи с другими скиллами
+## Links to other skills
 
-| Скилл | Когда автопилот его дёргает |
+| Skill | When the autopilot calls it |
 |---|---|
-| `/sprint S0X` | Rule 3 — основной рабочий вызов |
-| `/sup-spec-writer` | Rule 4 — декомпозиция draft-спеки |
-| `/accept TNN` | Rule 2 — добить незакрытый цикл (редко, обычно внутри /sprint) |
-| `/sup-push` | Rule 2 — после accept |
-| `superpowers:verification-before-completion` | Фаза 5.1 — всегда после действия |
-| `superpowers:finishing-a-development-branch` | После /sprint — решить что делать с веткой (с override на «не merge в main») |
-| `superpowers:systematic-debugging` | Если в фазе 4 что-то странное упало и хочется триажить перед escalation |
+| `/sprint S0X` | Rule 3 — the main working call |
+| `/sup-spec-writer` | Rule 4 — decomposition of a draft spec |
+| `/accept TNN` | Rule 2 — finish off an unclosed cycle (rarely, usually inside /sprint) |
+| `/sup-push` | Rule 2 — after accept |
+| `superpowers:verification-before-completion` | Phase 5.1 — always after an action |
+| `superpowers:finishing-a-development-branch` | After /sprint — decide what to do with the branch (with an override of "do not merge into main") |
+| `superpowers:systematic-debugging` | If something strange failed in phase 4 and you want to triage before escalation |
 
-**Никогда не вызывай напрямую:** `/codereview`, `/codereview-dual` (это уже внутри loop-скиллов), `/codex-setup`, `/codex-toggle`, `/init_dev`, `skill-creator`.
-
----
-
-## Cron-режим
-
-Когда вызван из `CronCreate`-job (а не интерактивно):
-- Не задавай вопросы человеку (используй `AskUserQuestion` только в --dry-run)
-- Если нашёл ситуацию которая требует human judgment → escalate, не блокируйся
-- Молчи на success-случаях (не нужно push-уведомлений «всё ок»)
-
-Рекомендованное расписание (UTC): `0 6,10,14,18 * * 1-5` — 4 тика в рабочие дни по МСК утром/обедом/после-обедом/вечером.
+**Never invoke directly:** `/codereview`, `/codereview-dual` (these are already inside the loop skills), `/codex-setup`, `/codex-toggle`, `/init_dev`, `skill-creator`.
 
 ---
 
-## Будущие расширения (НЕ для v1)
+## Cron mode
 
-Не реализовывай, просто помни:
-- Параллельные тики через worktrees
-- Auto-merge в main при определённых условиях (рефакторинги без логики)
-- Самообучение из autopilot_log.md (анализ что часто блокирует)
-- Интеграция с `/sprint-codex` для волн ≥2 задач
+When invoked from a `CronCreate` job (not interactively):
+- Do not ask the person questions (use `AskUserQuestion` only in --dry-run)
+- If you find a situation that requires human judgment → escalate, do not block
+- Stay silent on success cases (no push notifications for "all good")
 
-Для v1 — только последовательные тики и draft-PR максимум.
+Recommended schedule (UTC): `0 6,10,14,18 * * 1-5` — 4 ticks on weekdays, in MSK morning/midday/afternoon/evening.
+
+---
+
+## Future extensions (NOT for v1)
+
+Do not implement, just keep in mind:
+- Parallel ticks via worktrees
+- Auto-merge into main under certain conditions (refactorings without logic)
+- Self-learning from autopilot_log.md (analysis of what blocks often)
+- Integration with `/sprint-codex` for waves of ≥2 tasks
+
+For v1 — only sequential ticks and a draft PR at most.

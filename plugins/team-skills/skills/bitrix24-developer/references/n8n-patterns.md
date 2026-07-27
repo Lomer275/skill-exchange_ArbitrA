@@ -2,8 +2,8 @@
 
 ## Environment
 - n8n: `n8n.arbitra.online` (self-hosted, Docker)
-- Bitrix webhook: `https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/`
-- Explorer workflow: `<N8N_BRIDGE_WORKFLOW_ID>`
+- Bitrix webhook: `https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/`
+- Explorer workflow: `fsX-zC0M_SUTbcCUowIxY`
 - Orchestrator/MCP workflow: `ZQ5vm2rASsrCzXUTk3oIw`
 
 ---
@@ -12,7 +12,7 @@
 
 ```
 Method: POST
-URL: https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/crm.deal.list
+URL: https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/crm.deal.list
 Authentication: None (webhook has auth built in)
 Body Content Type: JSON
 Body: {
@@ -101,7 +101,7 @@ async function bitrixRequest(method, params, retries = 5) {
     try {
       const response = await this.helpers.httpRequest({
         method: 'POST',
-        url: `https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/${method}`,
+        url: `https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/${method}`,
         body: params,
         json: true,
       });
@@ -127,7 +127,7 @@ return result.result.map(deal => ({json: deal}));
 
 ## Daily/Weekly Report Pattern
 
-Used in "Ежедневный отчёт" workflow:
+Used in the "Daily Report" workflow:
 
 ```javascript
 // section() with try/catch — REQUIRED pattern
@@ -161,7 +161,7 @@ Bitrix sends POST with form-encoded body:
 event=ONCRMDEALUPDATE
 data[FIELDS_AFTER][ID]=456
 data[FIELDS_AFTER][STAGE_ID]=C4:3
-auth[domain]=<YOUR_BITRIX_PORTAL>
+auth[domain]=bitrix.express-bankrot.ru
 ```
 
 Parse in n8n:
@@ -195,7 +195,7 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     extra_hosts:
-      - "<YOUR_BITRIX_PORTAL>:SERVER_IP"
+      - "bitrix.express-bankrot.ru:SERVER_IP"
 ```
 
 All HTTP nodes to Bitrix: enable Retry on Fail, 5 retries, 3000ms delay.
@@ -211,7 +211,7 @@ function esc(text) {
 }
 
 // Or use HTML parse mode (easier)
-const message = `<b>Отчёт за ${date}</b>\n\n<b>Main pipeline (example)</b>\n• Новые: ${newCount}`;
+const message = `<b>Отчёт за ${date}</b>\n\n<b>БФЛ</b>\n• Новые: ${newCount}`;
 // Send with parse_mode: HTML
 ```
 
@@ -219,14 +219,14 @@ const message = `<b>Отчёт за ${date}</b>\n\n<b>Main pipeline (example)</b
 
 ## Common Workflow Structures in Portal
 
-1. **Web-scraper (example)** — `<EXAMPLE_WORKFLOW_ID>` (DDoS-Guard bypass)
-2. **Ежедневный отчёт** — smart process meetings → Telegram grouped by stage
-3. **Bitrix увольнение** — employee termination: transfer activities, tasks, deals
-4. **Explorer** — `<N8N_BRIDGE_WORKFLOW_ID>` — single API call bridge for Claude
+1. **KadArbitr scraper** — `bMN2iJsefpw3DCyi` (DDoS-Guard bypass)
+2. **Daily Report** — smart process meetings → Telegram grouped by stage
+3. **Bitrix termination** — employee termination: transfer activities, tasks, deals
+4. **Explorer** — `fsX-zC0M_SUTbcCUowIxY` — single API call bridge for Claude
 
 ---
 
-## Увольнение (Termination) Workflow Pattern
+## Termination Workflow Pattern
 
 Transfer checklist for fired employee:
 1. Activities (`crm.activity.list` → `crm.activity.update` RESPONSIBLE_ID)

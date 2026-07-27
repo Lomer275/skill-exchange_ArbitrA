@@ -124,6 +124,70 @@ def test_parse_frontmatter_strips_quotes():
     assert fm == {"name": "my-skill", "description": "Quoted"}
 
 
+def test_parse_frontmatter_folded_scalar():
+    import indexer
+    text = (
+        "---\n"
+        "name: my-skill\n"
+        "description: >\n"
+        "  Multi-phase review of a task.\n"
+        "  Use when the user says \"/codereview\".\n"
+        "---\n\nbody\n"
+    )
+    fm = indexer.parse_frontmatter(text)
+    assert fm == {
+        "name": "my-skill",
+        "description": 'Multi-phase review of a task. Use when the user says "/codereview".',
+    }
+
+
+def test_parse_frontmatter_literal_scalar_keeps_newlines():
+    import indexer
+    text = "---\nname: my-skill\ndescription: |\n  line one\n  line two\n---\n\nbody\n"
+    fm = indexer.parse_frontmatter(text)
+    assert fm["description"] == "line one\nline two"
+
+
+def test_parse_frontmatter_accepts_chomping_indicators():
+    import indexer
+    for head in (">-", ">+", "|-", "|+"):
+        text = f"---\nname: my-skill\ndescription: {head}\n  text here\n---\n\nbody\n"
+        fm = indexer.parse_frontmatter(text)
+        assert fm is not None, f"{head} rejected"
+        assert fm["description"] == "text here"
+
+
+def test_parse_frontmatter_block_scalar_ends_at_next_key():
+    import indexer
+    text = (
+        "---\n"
+        "description: >\n"
+        "  folded text\n"
+        "name: my-skill\n"
+        "---\n\nbody\n"
+    )
+    fm = indexer.parse_frontmatter(text)
+    assert fm == {"description": "folded text", "name": "my-skill"}
+
+
+def test_parse_frontmatter_empty_block_scalar():
+    import indexer
+    fm = indexer.parse_frontmatter("---\nname: my-skill\ndescription: >\n---\n\nbody\n")
+    assert fm == {"name": "my-skill", "description": ""}
+
+
+def test_parse_frontmatter_hash_inside_block_is_text():
+    import indexer
+    text = "---\nname: my-skill\ndescription: |\n  # not a comment\n---\n\nbody\n"
+    fm = indexer.parse_frontmatter(text)
+    assert fm["description"] == "# not a comment"
+
+
+def test_parse_frontmatter_rejects_line_without_colon():
+    import indexer
+    assert indexer.parse_frontmatter("---\nname: my-skill\nbroken line\n---\n\nbody\n") is None
+
+
 # ── validate_skill ───────────────────────────────────────────────────────────
 
 def test_validate_skill_passes_for_valid_skill(tmp_path):

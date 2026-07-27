@@ -1,36 +1,37 @@
 ---
 name: codex-worker
-description: "Internal helper для запуска Codex-воркера. НЕ зовётся пользователем напрямую — вызывается из /codereview-dual и /sprint-codex через Skill tool. Формирует prompt-файл и запускает Codex через движок плагина codex@openai-codex (app-server, без bubblewrap); fallback — legacy codex exec. Проверяет kill-switch (.claude/codex.json + SUP_CODEX_ENABLED), watchdog через TaskStop. Возвращает {status, output_file, task_id, duration_s}. Часть спеки S11, Phase 2."
+description: "Internal helper for launching a Codex worker. NOT invoked by the user directly — called from /impl, /fix, /codereview-dual and /sprint-codex via the Skill tool. Accepts either a TNN task file (spec-driven path) or an ad-hoc brief_file (the /impl path). Builds a prompt file and runs Codex through the codex@openai-codex plugin engine (app-server, no bubblewrap); fallback — legacy codex exec. Checks the kill-switch (.claude/codex.json + SUP_CODEX_ENABLED), watchdog via TaskStop. Returns {status, output_file, task_id, duration_s}. Part of spec S11, Phase 2."
 ---
 
-# codex-worker — Internal helper для запуска Codex-воркера
+# codex-worker — Internal helper for launching a Codex worker
 
-**Это internal helper.** Не запускайся как ответ на сообщение пользователя. Триггер — только вызов через `Skill(skill="codex-worker", args="...")` из другого скилла.
+**This is an internal helper.** Do not run in response to a user message. The only trigger is a call via `Skill(skill="codex-worker", args="...")` from another skill.
 
-С 2026-06-11 воркер запускает Codex **через движок плагина `codex@openai-codex`** (`codex-companion.mjs task`, app-server protocol). Это убирает зависимость от bubblewrap-песочницы и весь inline-fallback. Если движок не найден — graceful fallback на legacy `codex exec` (см. Приложение A).
+As of 2026-06-11 the worker launches Codex **through the `codex@openai-codex` plugin engine** (`codex-companion.mjs task`, app-server protocol). This removes the dependency on the bubblewrap sandbox and the entire inline fallback. If the engine is not found — graceful fallback to legacy `codex exec` (see Appendix A).
 
 ---
 
-## Контракт вызова
+## Call contract
 
-**Args** (передаются как строка `key1=value1 key2=value2 ...`):
+**Args** (passed as the string `key1=value1 key2=value2 ...`):
 
-| Параметр | Обязателен | Default | Описание |
+| Parameter | Required | Default | Description |
 |----------|-----------|---------|----------|
-| `role` | да | — | `reviewer` или `implementer` |
-| `task_file` | да | — | путь к файлу задачи (TNN_*.md) |
-| `spec_file` | нет | — | путь к спецификации (SNN_*.md) |
-| `worktree` | нет | `current` | abs путь worktree или `current` |
-| `scope` | да | — | `read-only` для reviewer, `edit:<paths>` для implementer |
-| `lens` | для reviewer | `correctness` | линза ревью: `correctness,edge-cases,risks,security,style,...` |
-| `timeout_min` | нет | `10` | таймаут watchdog в минутах |
-| `task_id` | нет | имя файла | префикс для prompt/output файлов (например `T17`) |
-| `model` | нет | — | переопределение модели Codex (`spark` → `gpt-5.3-codex-spark`); пусто = дефолт |
-| `effort` | нет | — | reasoning effort: `none\|minimal\|low\|medium\|high\|xhigh`; пусто = дефолт |
-| `inline` | нет | `auto` | **только для legacy-режима** (Приложение A). В companion-режиме игнорируется |
-| `inline_files` | нет | — | **только для legacy-режима**. В companion-режиме игнорируется |
+| `role` | yes | — | `reviewer` or `implementer` |
+| `task_file` | one of | — | path to the task file (TNN_*.md) — the spec-driven path (`/sprint-codex`, `/codereview-dual`) |
+| `brief_file` | one of | — | path to an ad-hoc brief (`/tmp/sup-codex/impl-*-brief.md`) — the `/impl` path, no TNN file involved |
+| `spec_file` | no | — | path to the specification (SNN_*.md) |
+| `worktree` | no | `current` | abs path to the worktree or `current` |
+| `scope` | yes | — | `read-only` for reviewer, `edit:<paths>` for implementer |
+| `lens` | for reviewer | `correctness` | review lens: `correctness,edge-cases,risks,security,style,...` |
+| `timeout_min` | no | `10` | watchdog timeout in minutes |
+| `task_id` | no | file name | prefix for prompt/output files (e.g. `T17`) |
+| `model` | no | — | Codex model override (`spark` → `gpt-5.3-codex-spark`); empty = default |
+| `effort` | no | — | reasoning effort: `none\|minimal\|low\|medium\|high\|xhigh`; empty = default |
+| `inline` | no | `auto` | **legacy mode only** (Appendix A). Ignored in companion mode |
+| `inline_files` | no | — | **legacy mode only**. Ignored in companion mode |
 
-**Return** (как структурированный текст — контракт неизменен):
+**Return** (as structured text — the contract is unchanged):
 
 ```
 status: ok | timeout | disabled | error
@@ -40,27 +41,29 @@ duration_s: <число>
 notes: <если есть проблемы>
 ```
 
-`output_file` всегда содержит **финальное сообщение Codex** (в companion-режиме — поле `rawOutput`, извлечённое из `--json`). Вызывающий скилл читает именно этот файл.
+`output_file` always contains **Codex's final message** (in companion mode — the `rawOutput` field extracted from `--json`). The calling skill reads exactly this file.
 
 ---
 
-## Алгоритм
+## Algorithm
 
-### Шаг 1 — Парсинг args
+### Step 1 — Parsing args
 
-Извлеки переменные из args. Валидация:
+Extract the variables from args. Validation:
 - `role` ∈ {reviewer, implementer}
-- `task_file` существует (`Read` для проверки)
-- `scope` непуст
+- **exactly one** of `task_file` / `brief_file` is given, and it exists (`Read` to check). Both given → prefer `task_file`, note it. Neither → `status: error`.
+- `scope` is non-empty
 - `timeout_min` > 0
 
-При невалидных — return `status: error, notes: <причина>`.
+> `brief_file` is the ad-hoc path introduced for `/impl`: the source of truth for the worker is a brief written by Claude, not a TNN task file. Everything downstream (engine, watchdog, return contract) is identical — only the prompt's source document differs.
+
+If invalid — return `status: error, notes: <reason>`.
 
 ---
 
-### Шаг 2 — Kill-switch check
+### Step 2 — Kill-switch check
 
-Прочитай `.claude/codex.json` и применить precedence matrix (env > file):
+Read `.claude/codex.json` and apply the precedence matrix (env > file):
 
 ```bash
 ENV_VAL="${SUP_CODEX_ENABLED:-}"
@@ -74,24 +77,24 @@ case "$ENV_VAL" in
 esac
 ```
 
-Если `FINAL=false` — return `status: disabled, notes: kill-switch active`.
+If `FINAL=false` — return `status: disabled, notes: kill-switch active`.
 
 ---
 
-### Шаг 3 — Резолв движка (companion vs legacy)
+### Step 3 — Engine resolution (companion vs legacy)
 
 ```bash
 COMPANION=$(ls -d "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1)
 ```
 
-- `COMPANION` непуст и файл существует → **companion-режим** (Шаги 4–7 ниже).
-- Иначе → **legacy-режим** (Приложение A). Залогируй `notes: companion not found, legacy codex exec`.
+- `COMPANION` is non-empty and the file exists → **companion mode** (Steps 4–7 below).
+- Otherwise → **legacy mode** (Appendix A). Log `notes: companion not found, legacy codex exec`.
 
-> Companion — это движок плагина `codex@openai-codex`. Он сопровождается OpenAI и использует app-server protocol, а не `codex exec` + bubblewrap. Путь резолвится по glob (версия в пути не хардкодится — переживает обновление плагина).
+> Companion is the `codex@openai-codex` plugin engine. It is maintained by OpenAI and uses the app-server protocol rather than `codex exec` + bubblewrap. The path is resolved by glob (the version in the path is not hardcoded — it survives plugin updates).
 
 ---
 
-### Шаг 4 — Сборка prompt-файла
+### Step 4 — Building the prompt file
 
 ```bash
 mkdir -p /tmp/sup-codex
@@ -108,22 +111,26 @@ if [ -e "$OUTPUT_FILE" ]; then
 fi
 ```
 
-**Содержимое prompt-файла** (адаптируй под role). В companion-режиме Codex читает файлы через свои shell-tools штатно — **inline-вкладывание не нужно**:
+**Prompt file content** (adapt to the role). In companion mode Codex reads files through its shell tools as usual — **inline embedding is not needed**:
 
 ```text
 CONTEXT: WORKER
 ROLE: <role>
 ORCHESTRATOR: Claude Code в проекте Arbitra_support (SUP).
 
-TASK_FILE: <task_file>
+TASK_FILE: <task_file>            # либо
+BRIEF_FILE: <brief_file>          # одно из двух — что передано
 SPEC_FILE: <spec_file (или "не указан")>
 WORKTREE: <worktree>
 SCOPE: <scope>
 LENS (для reviewer): <lens>
 
 DO:
-- Прочитай TASK_FILE, SPEC_FILE и AGENTS.md в корне.
+- Прочитай TASK_FILE (или BRIEF_FILE), SPEC_FILE и AGENTS.md в корне.
 - Выполни задачу строго в SCOPE.
+- BRIEF_FILE — это готовый бриф от оркестратора: подход уже выбран, твоя работа —
+  реализовать его, а не проектировать заново. Расходишься с брифом — так и напиши
+  в финальном сообщении, но сначала сделай как написано.
 <если role=implementer>:
 - Малые точечные правки, без рефакторинга вне задачи.
 - Используй `python` из $VIRTUAL_ENV/bin/python для всех запусков (если работаешь в worktree).
@@ -143,11 +150,11 @@ DO NOT:
 - Трогать .env*, CHANGELOG.md, HANDOFF.md.
 ```
 
-Запиши через `Write` в `$PROMPT_FILE`.
+Write it via `Write` to `$PROMPT_FILE`.
 
 ---
 
-### Шаг 5 — Сборка команды companion
+### Step 5 — Building the companion command
 
 ```bash
 # worktree → --cwd; current → текущий каталог
@@ -176,8 +183,8 @@ EFFORT_FLAG=""; [ -n "$EFFORT" ] && EFFORT_FLAG="--effort $EFFORT"
 ERR_FILE="/tmp/sup-codex/${TASK_ID}-${ROLE}.err"
 ```
 
-**Env-проброс (venv в worktree, R3) — через реальную команду `env`, НЕ префикс-переменную.**
-В bash `$PRE cmd` из раскрытия переменной **не** распознаёт `VAR=val` как assignment (проверено эмпирически) — поэтому собираем аргументы для `env`, а команду зовём напрямую (без строки `CMD` с фейковыми кавычками):
+**Env passthrough (venv in worktree, R3) — via the real `env` command, NOT a prefix variable.**
+In bash, `$PRE cmd` from a variable expansion does **not** recognize `VAR=val` as an assignment (verified empirically) — so we build the arguments for `env` and invoke the command directly (without a `CMD` string with fake quotes):
 
 ```bash
 ENV_ARGS=""
@@ -188,16 +195,16 @@ ENV_ARGS=""
 
 ---
 
-### Шаг 6 — Запуск в фоне + watchdog
+### Step 6 — Background launch + watchdog
 
-Запусти через `Bash(run_in_background=true)`, перенаправив stdout в `$RAW_JSON`, stderr в `$ERR_FILE`:
+Launch via `Bash(run_in_background=true)`, redirecting stdout to `$RAW_JSON` and stderr to `$ERR_FILE`:
 
 ```bash
 env $ENV_ARGS node "$COMPANION" task --json $WT_FLAG $WRITE_FLAG $MODEL_FLAG $EFFORT_FLAG \
   --prompt-file "$PROMPT_FILE" > "$RAW_JSON" 2> "$ERR_FILE"
 ```
 
-Получи `task_id` (claude-code bash task id). Запиши время старта. Затем watchdog poll loop:
+Get the `task_id` (claude-code bash task id). Record the start time. Then the watchdog poll loop:
 
 ```python
 # псевдокод алгоритма Claude:
@@ -226,48 +233,49 @@ TaskStop(task_id=task_id)
 return {status:"timeout", output_file:OUTPUT_FILE, task_id, duration_s:timeout_min*60, notes:"watchdog killed"}
 ```
 
-В Claude Code: `Bash(run_in_background=true)` для старта, затем периодически `Read(RAW_JSON)` (проверка существования + непустоты + валидности JSON) **и** `BashOutput(task_id)` для детекта раннего завершения процесса, параллельно следи за временем. По дедлайну — `TaskStop(task_id)`. Завершился сам с пустым `RAW_JSON` → `status:error` (см. H1), не `timeout`.
+In Claude Code: `Bash(run_in_background=true)` to start, then periodically `Read(RAW_JSON)` (check existence + non-emptiness + JSON validity) **and** `BashOutput(task_id)` to detect early process termination, while watching the time in parallel. At the deadline — `TaskStop(task_id)`. If it finished on its own with an empty `RAW_JSON` → `status:error` (see H1), not `timeout`.
 
-> **Почему `rawOutput` → `OUTPUT_FILE`:** вызывающие скиллы читают `output_file` как финальное сообщение Codex. Companion отдаёт его в JSON-поле `rawOutput`; мы извлекаем и кладём в файл, сохраняя контракт.
-> **`touchedFiles`** из companion ненадёжен (может быть пуст при реальной записи) — `sprint-codex` определяет изменённые файлы через `git`, не доверяй этому полю.
+> **Why `rawOutput` → `OUTPUT_FILE`:** calling skills read `output_file` as Codex's final message. Companion returns it in the `rawOutput` JSON field; we extract it and put it into the file, preserving the contract.
+> **`touchedFiles`** from companion is unreliable (may be empty even on a real write) — `sprint-codex` determines the changed files via `git`, do not trust this field.
 
 ---
 
-### Шаг 7 — Финальный лог + Return
+### Step 7 — Final log + Return
 
 ```bash
 echo "$(date -Iseconds) ${ROLE} ${TASK_ID} engine=companion status=${STATUS} duration=${DURATION}s output=${OUTPUT_FILE}" >> /tmp/sup-codex/last-run.log
 ```
 
-Верни структурированный результат (контракт из раздела «Контракт вызова»). Вызывающий скилл читает результат и решает что делать дальше (обработать output, fallback, retry).
+Return the structured result (the contract from the "Call contract" section). The calling skill reads the result and decides what to do next (process the output, fallback, retry).
 
 ---
 
-## Правила
+## Rules
 
-- **НЕ запускайся напрямую как ответ на user message.** Только через Skill tool из других скиллов.
-- **НЕ спавни других воркеров.** Worker — терминальный.
-- **Один вызов = один Codex-воркер.** Параллелизм — N-кратным вызовом из родительского скилла.
-- **Naming convention:** `<task_id>-<role>[-<uuid8>]-prompt.txt`, `.txt` (output), `.json` (raw). UUID-суффикс при коллизии (R15, R18).
-- **При ошибке запуска** (нет companion И нет codex-бинаря, auth fail) — return `status: error, notes: <причина>` с понятным сообщением.
-- **Логи** в `/tmp/sup-codex/last-run.log` и `<task_id>-<role>.err` для дебага.
-- **Companion-режим — основной**, legacy — fallback при отсутствии плагина. Не зови команды плагина `/codex:*` напрямую — только `codex-companion.mjs task` как подпроцесс.
+- **Do NOT run directly in response to a user message.** Only via the Skill tool from other skills.
+- **Do NOT spawn other workers.** A worker is terminal.
+- **One call = one Codex worker.** Parallelism is achieved by calling N times from the parent skill.
+- **Concurrency & shared `CODEX_HOME` (auth-race safety).** All parallel workers MUST share **one** `CODEX_HOME` (default `~/.codex`). Do **NOT** set a per-worker or per-worktree `CODEX_HOME`: each home spins up its own app-server daemon with a separate `auth.json` copy that still holds the **same single-use** refresh_token — concurrent workers then race the OAuth refresh and fail intermittently with `refresh_token_reused (401)` ([openai/codex#10332](https://github.com/openai/codex/issues/10332)). A shared home serializes refresh via the daemon + `refresh.lock`. **Requires Codex CLI ≥ 0.143.0** (the release that added the cross-process refresh lock). On older CLIs parallel waves are unstable — upgrade per user: `npm i -g @openai/codex@latest`. File isolation for worktrees is fine (that's `--cwd`); it must never extend to `CODEX_HOME`.
+- **Naming convention:** `<task_id>-<role>[-<uuid8>]-prompt.txt`, `.txt` (output), `.json` (raw). UUID suffix on collision (R15, R18).
+- **On a launch error** (no companion AND no codex binary, auth fail) — return `status: error, notes: <reason>` with a clear message.
+- **Logs** in `/tmp/sup-codex/last-run.log` and `<task_id>-<role>.err` for debugging.
+- **Companion mode is primary**, legacy is the fallback when the plugin is absent. Do not call the plugin's `/codex:*` commands directly — only `codex-companion.mjs task` as a subprocess.
 
 ---
 
-## Приложение A — Legacy-режим (`codex exec`, fallback)
+## Appendix A — Legacy mode (`codex exec`, fallback)
 
-Используется **только** когда движок плагина не найден (Шаг 3). Сохранён для сред без установленного `codex@openai-codex`.
+Used **only** when the plugin engine is not found (Step 3). Kept for environments without `codex@openai-codex` installed.
 
-Отличия от companion-режима:
-1. **Sandbox capability detection (T82/T83).** Codex CLI требует `bubblewrap` для shell-tools; на dev его нет. Probe `codex exec --skip-git-repo-check "pwd"`, three-state результат (`true/false/unknown`), TTL-cache 1ч в `.claude/codex.json:availability_cache.sandbox_works`. При `false`/`unknown` → inline-режим.
-2. **Inline-prompt assembly.** При `INLINE_MODE=true` содержимое `inline_files` (или TASK_FILE+SPEC_FILE) вкладывается в конец prompt'а (лимит ~100KB, приоритет TASK > SPEC > ARTEFACTS), с пометкой «DO NOT use shell tools». Параметры `inline`/`inline_files` из контракта действуют только здесь.
-3. **Запуск:** `cli_flags` из codex.json (`output_last_message`, `skip_git_repo_check`):
+Differences from companion mode:
+1. **Sandbox capability detection (T82/T83).** The Codex CLI requires `bubblewrap` for shell tools; it is not present on dev. Probe `codex exec --skip-git-repo-check "pwd"`, a three-state result (`true/false/unknown`), TTL cache of 1h in `.claude/codex.json:availability_cache.sandbox_works`. On `false`/`unknown` → inline mode.
+2. **Inline prompt assembly.** When `INLINE_MODE=true`, the content of `inline_files` (or TASK_FILE+SPEC_FILE) is embedded at the end of the prompt (limit ~100KB, priority TASK > SPEC > ARTEFACTS), with a "DO NOT use shell tools" note. The `inline`/`inline_files` parameters from the contract apply only here.
+3. **Launch:** `cli_flags` from codex.json (`output_last_message`, `skip_git_repo_check`):
    ```bash
    cd <worktree-or-cwd>
    $ENV_PREFIX codex exec $SKIP_GIT_FLAG $OUTPUT_FLAG "$OUTPUT_FILE" "$(cat $PROMPT_FILE)"
    ```
-   Здесь Codex сам пишет финал в `$OUTPUT_FILE` через `--output-last-message` (JSON-парсинг не нужен).
-4. **Watchdog** — тот же: `Bash(run_in_background)` → poll `OUTPUT_FILE` на непустоту → `TaskStop` по дедлайну.
+   Here Codex itself writes the final message to `$OUTPUT_FILE` via `--output-last-message` (no JSON parsing needed).
+4. **Watchdog** — the same: `Bash(run_in_background)` → poll `OUTPUT_FILE` for non-emptiness → `TaskStop` at the deadline.
 
-Return-контракт идентичен. В `notes` указывай `engine=legacy`.
+The return contract is identical. In `notes` specify `engine=legacy`.

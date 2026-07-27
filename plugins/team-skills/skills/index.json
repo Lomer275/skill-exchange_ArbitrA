@@ -64,6 +64,19 @@
       "created": "2026-05-02"
     },
     {
+      "name": "close",
+      "display_name": "Close — завершение рабочего дня",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Завершает рабочую сессию одной командой: харвест повторов в навыки, фиксация контекста (хендофф + память агента + статусы задач ПО ФАКТУ), карточка эффективности ярусов AI, секрет-скан и подготовка коммита дня, уборка временного мусора. Парный к /intro. Источник — кокпит Алексея, версия адаптирована под конвенции SUP.",
+      "tags": [
+        "workflow",
+        "context",
+        "housekeeping"
+      ],
+      "created": "2026-07-27"
+    },
+    {
       "name": "codereview",
       "display_name": "Code Review",
       "author": "kostya",
@@ -130,8 +143,8 @@
       "name": "codex-worker",
       "display_name": "Codex Worker (internal helper)",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Internal helper для запуска Codex-воркера. Вызывается из /codereview-dual и /sprint-codex. Запуск через движок плагина codex@openai-codex (app-server, без bubblewrap); fallback — legacy codex exec.",
+      "version": "1.1.0",
+      "description": "Internal helper для запуска Codex-воркера. Вызывается из /impl, /fix, /codereview-dual и /sprint-codex. Принимает либо файл задачи (путь «по спеке»), либо разовый brief_file (путь /impl). Запуск через движок плагина codex@openai-codex (app-server, без bubblewrap); fallback — legacy codex exec.",
       "tags": [
         "internal",
         "codex",
@@ -155,14 +168,28 @@
       "name": "fix",
       "display_name": "Fix Bugs",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Планирование и применение фиксов из код-ревью или визуальной проверки. Минимальные точечные изменения, без рефакторинга.",
+      "version": "1.1.0",
+      "description": "Планирование и применение фиксов по findings из ревью или визуальной проверки. План строит Claude и ждёт подтверждения; правки исполняемого кода делегируются Codex-воркеру, дифф Claude сверяет с планом. CRITICAL → HIGH → MEDIUM, минимальные точечные изменения.",
       "tags": [
         "code-review",
         "fix",
         "quality"
       ],
       "created": "2026-05-02"
+    },
+    {
+      "name": "impl",
+      "display_name": "Impl — Claude решает, Codex реализует",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Точка входа режима «Claude думает — Codex программирует». Делегирует написание кода Codex-имплементеру для ЛЮБОЙ правки, файл задачи не нужен: Claude находит код и пишет бриф, Codex реализует, Claude читает дифф и гоняет тесты. Без него делегирование существует только внутри /sprint-codex и /codereview-dual.",
+      "tags": [
+        "codex",
+        "workflow",
+        "delegation",
+        "core"
+      ],
+      "created": "2026-07-27"
     },
     {
       "name": "init_dev",
@@ -176,6 +203,18 @@
         "workflow"
       ],
       "created": "2026-05-02"
+    },
+    {
+      "name": "intro",
+      "display_name": "Intro — возврат в контекст",
+      "author": "kostya",
+      "version": "1.0.0",
+      "description": "Загружает контекст проекта в начале сессии — парный к /close. Читает хендофф (RESUME-PROMPT), открытые задачи и состояние git, выводит: где остановились, следующий шаг, открытые блокеры. Ловит расхождение хендоффа с репо и говорит о нём прямо. Ничего не меняет — только читает.",
+      "tags": [
+        "workflow",
+        "context"
+      ],
+      "created": "2026-07-27"
     },
     {
       "name": "n8n-workflow-manager",

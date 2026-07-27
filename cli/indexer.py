@@ -34,24 +34,71 @@ def validate_name(name: str) -> None:
         )
 
 
+BLOCK_SCALAR_HEADS = (">", "|", ">-", "|-", ">+", "|+")
+
+
+def _indent_width(line: str) -> int:
+    """Leading-whitespace width of a line (a tab counts as one position)."""
+    return len(line) - len(line.lstrip(" \t"))
+
+
+def _join_block(body: list[str], folded: bool) -> str:
+    """Dedent a block-scalar body and join it: folded (`>`) or literal (`|`)."""
+    filled = [ln for ln in body if ln.strip()]
+    if not filled:
+        return ""
+    pad = min(_indent_width(ln) for ln in filled)
+    body = [ln[pad:] if ln.strip() else "" for ln in body]
+    if not folded:
+        return "\n".join(body).strip()
+    # Folded: consecutive non-blank lines collapse to spaces, a blank line is a break.
+    out, run = [], []
+    for ln in body:
+        if ln.strip():
+            run.append(ln.strip())
+        elif run:
+            out.append(" ".join(run))
+            run = []
+    if run:
+        out.append(" ".join(run))
+    return "\n".join(out).strip()
+
+
 def parse_frontmatter(text: str) -> dict | None:
     """Return parsed YAML frontmatter as dict, or None if missing/invalid.
 
-    Minimal parser supporting `key: value` lines — no nested structures.
+    Supports `key: value` lines and YAML block scalars — folded (`>`) and literal
+    (`|`), with optional chomping indicators (`-`, `+`). A block's body is the run
+    of following lines indented deeper than its key. No other nested structures.
     Sufficient for SKILL.md frontmatter (name, description).
     """
     m = FRONTMATTER_RE.match(text)
     if not m:
         return None
+    lines = m.group(1).splitlines()
     result = {}
-    for line in m.group(1).splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        i += 1
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
             continue
-        if ":" not in line:
+        if ":" not in stripped:
             return None
-        key, _, value = line.partition(":")
-        result[key.strip()] = value.strip().strip('"').strip("'")
+        key, _, value = stripped.partition(":")
+        value = value.strip()
+        if value in BLOCK_SCALAR_HEADS:
+            key_indent = _indent_width(raw)
+            body = []
+            while i < len(lines) and not (
+                lines[i].strip() and _indent_width(lines[i]) <= key_indent
+            ):
+                body.append(lines[i])
+                i += 1
+            result[key.strip()] = _join_block(body, folded=value[0] == ">")
+        else:
+            result[key.strip()] = value.strip('"').strip("'")
     return result
 
 

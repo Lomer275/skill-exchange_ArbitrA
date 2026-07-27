@@ -1,7 +1,16 @@
 ---
 name: n8n-workflow-manager
-description: "Manage n8n workflows: search, inspect, create, edit, update nodes/connections, activate/deactivate, and execute workflows. Use this skill whenever the user asks to create a new workflow, edit an existing workflow, add or modify nodes, change connections, update credentials, fix a workflow, activate or deactivate a workflow, or do anything that involves reading or writing n8n workflow JSON. Also trigger when the user says 'сделай воркфлоу', 'измени воркфлоу', 'добавь ноду', 'отредактируй', 'создай workflow', 'поправь n8n', or any similar phrase in Russian"
+description: >
+  Manage n8n workflows: search, inspect, create, edit, update nodes/connections,
+  activate/deactivate, and execute workflows. Use this skill whenever the user asks
+  to create a new workflow, edit an existing workflow, add or modify nodes, change
+  connections, update credentials, fix a workflow, activate or deactivate a workflow,
+  or do anything that involves reading or writing n8n workflow JSON. Also trigger
+  when the user says "сделай воркфлоу", "измени воркфлоу", "добавь ноду",
+  "отредактируй", "создай workflow", "поправь n8n", or any similar phrase in Russian
+  or English about automations in n8n.
 ---
+
 # n8n Workflow Manager
 
 Skill for reading and modifying n8n workflows at `n8n.arbitra.online`.
@@ -138,7 +147,7 @@ n8n:execute_workflow(
 ## Environment-Specific Knowledge
 
 ### Bitrix24 HTTP calls
-- Webhook base: `https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/`
+- Webhook base: `https://bitrix.express-bankrot.ru/rest/30351/rzoev7lscjxgq9i6/`
 - Batch API: `METHOD: batch` + `PARAMS: {"halt":0,"cmd":{...}}` — up to 50 ops
 - Add Retry on Fail (5 retries, 3000ms) on all Bitrix HTTP nodes (DNS flapping)
 
@@ -177,8 +186,8 @@ n8n:execute_workflow(
 | Workflow | ID |
 |----------|----|
 | Workflow Manager (MCP Proxy / orchestrator) | `ZQ5vm2rASsrCzXUTk3oIw` |
-| Web-scraper (example) | `<EXAMPLE_WORKFLOW_ID>` |
-| Bitrix24 Explorer for Claude | `<N8N_BRIDGE_WORKFLOW_ID>` |
+| КадАрбитр scraper | `bMN2iJsefpw3DCyi` |
+| Bitrix24 Explorer for Claude | `fsX-zC0M_SUTbcCUowIxY` |
 
 ---
 

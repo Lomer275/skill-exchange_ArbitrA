@@ -1,41 +1,47 @@
 ---
 name: safe-push
-description: "Безопасный коммит и пуш в одну команду с обязательной проверкой секретов. Используй этот скилл когда пользователь говорит '/safe-push', 'закоммить и запушь', 'commit and push', 'запушь', 'запушить', 'закоммить'. Скилл проверяет staged-файлы на наличие секретов (БЛОКИРУЕТ при нахождении), формирует сообщение коммита по"
+description: >
+  Safe commit and push in a single command with a mandatory secrets check.
+  Use this skill when the user says "/sup-push", "закоммить и запушь",
+  "commit and push", "запушь", "запушить", "закоммить". The skill checks staged files
+  for secrets (BLOCKS if any are found), builds the commit message per
+  Conventional Commits, and commits and pushes with safe error handling.
 ---
-# Safe-Push Skill
 
-Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits.
+# Sup-Push Skill
 
----
-
-## Входные данные
-
-Пользователь предоставляет одно или несколько из:
-- **Сообщение коммита** (опционально) — строка в чате или после команды
-- **Список файлов** для добавления (опционально) — если не указаны, используются уже staged
-
-Если нет staged-файлов и не указаны файлы — предупреждаем и останавливаемся.
+Safe commit + push with a blocking secrets check and Conventional Commits format.
 
 ---
 
-## Алгоритм выполнения
+## Input data
 
-### Шаг 1 — Проверка секретов (БЛОКИРУЮЩИЙ)
+The user provides one or more of:
+- **A commit message** (optional) — a string in the chat or after the command
+- **A list of files** to add (optional) — if not specified, the already-staged ones are used
 
-Выполни `git diff --staged` и `git status --short`.
+If there are no staged files and no files were specified — warn and stop.
 
-**Проверь список staged-файлов на опасные имена:**
+---
+
+## Execution algorithm
+
+### Step 1 — Secrets check (BLOCKING)
+
+Run `git diff --staged` and `git status --short`.
+
+**Check the list of staged files for dangerous names:**
 - `.env`, `.env.*`, `.env.local`, `.env.production`
 - `*.pem`, `*.key`, `*.p12`, `*.pfx`
 
-**Проверь содержимое staged-файлов на опасные паттерны в значениях строк:**
+**Check the contents of staged files for dangerous patterns in string values:**
 - `TOKEN\s*=\s*["'][^"']{8,}`
 - `API_KEY\s*=\s*["'][^"']{8,}`
 - `SECRET\s*=\s*["'][^"']{8,}`
 - `PASSWORD\s*=\s*["'][^"']{8,}`
 - `-----BEGIN .* PRIVATE KEY-----`
 
-**Если найдено** → ПОЛНАЯ ОСТАНОВКА. Показать:
+**If found** → FULL STOP. Show:
 ```
 🚫 СТОП — обнаружены секреты в staged-файлах!
 
@@ -46,40 +52,40 @@ description: "Безопасный коммит и пуш в одну коман
 Коммит заблокирован. Удали секреты из файла или добавь файл в .gitignore.
 Продолжение невозможно даже по явной просьбе.
 ```
-Не продолжать ни при каких обстоятельствах, даже если пользователь просит.
+Do not continue under any circumstances, even if the user asks.
 
-**Если нет staged-файлов** → предупредить и остановиться:
+**If there are no staged files** → warn and stop:
 ```
 ⚠️ Нет staged-файлов для коммита. Добавь файлы через git add или укажи их явно.
 ```
 
 ---
 
-### Шаг 2 — Формирование сообщения коммита
+### Step 2 — Building the commit message
 
-Прочитай `docs/guides/versioning_guidelines.md` (в RUNTIME, не из памяти) — для актуального формата Conventional Commits проекта.
+Read `docs/4. SUP-guides/versioning_guidelines.md` (at RUNTIME, not from memory) — for the project's current Conventional Commits format.
 
-**Формат коммита по Conventional Commits:**
+**Commit format per Conventional Commits:**
 ```
 <тип>(<область>): краткое описание на русском
 
 [опциональное тело]
 ```
 
-Типы: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`, `ci`
-Области: `tg-bot`, `max-bot`, `handler`, `tracker`, `bitrix`, `ai`, `docs`, `deps` (или любая релевантная)
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`, `ci`
+Scopes: `tg-bot`, `max-bot`, `handler`, `tracker`, `bitrix`, `ai`, `docs`, `deps` (or any relevant one)
 
-**Если пользователь предоставил сообщение:**
-1. Проверь формат — соответствует ли Conventional Commits
-2. Если не соответствует — предложи исправленный вариант
-3. Покажи итоговое сообщение перед коммитом и жди подтверждения
+**If the user provided a message:**
+1. Check the format — does it conform to Conventional Commits
+2. If it does not conform — propose a corrected version
+3. Show the final message before committing and wait for confirmation
 
-**Если сообщение не предоставлено:**
-1. Выполни `git diff --staged` и проанализируй изменения
-2. Предложи сообщение коммита
-3. Покажи и жди подтверждения пользователя
+**If no message was provided:**
+1. Run `git diff --staged` and analyze the changes
+2. Propose a commit message
+3. Show it and wait for the user's confirmation
 
-Формат показа:
+Display format:
 ```
 📝 Предлагаемое сообщение коммита:
 
@@ -90,9 +96,9 @@ description: "Безопасный коммит и пуш в одну коман
 
 ---
 
-### Шаг 3 — Коммит
+### Step 3 — Commit
 
-После подтверждения сообщения:
+After the message is confirmed:
 
 ```bash
 # Если пользователь указал конкретные файлы — добавляем их
@@ -102,7 +108,7 @@ git add <файлы>
 git commit -m "<сообщение>"
 ```
 
-Показать список закоммиченных файлов:
+Show the list of committed files:
 ```
 ✅ Закоммичено: <хеш>
 Файлы:
@@ -113,22 +119,22 @@ git commit -m "<сообщение>"
 
 ---
 
-### Шаг 4 — Пуш
+### Step 4 — Push
 
 ```bash
 git push
 ```
 
-**Сценарии:**
+**Scenarios:**
 
-**A. Ветка не отслеживается remote:**
+**A. The branch is not tracked by the remote:**
 ```
 ⚠️ Ветка <имя> не привязана к remote.
 Выполнить: git push -u origin <имя>? (да/нет)
 ```
-Ждать подтверждения перед выполнением.
+Wait for confirmation before executing.
 
-**B. Push отклонён (not fast-forward):**
+**B. Push rejected (not fast-forward):**
 ```
 ❌ Push отклонён — remote содержит коммиты которых нет локально.
 
@@ -138,10 +144,10 @@ git push
 
 Выбери вариант или напиши своё решение.
 ```
-НЕ делать force push без явной просьбы пользователя.
-Если пользователь явно просит force push — предупредить об опасности и запросить повторное подтверждение.
+Do NOT do a force push without an explicit request from the user.
+If the user explicitly asks for a force push — warn about the danger and request a repeat confirmation.
 
-**C. Успех:**
+**C. Success:**
 ```
 ✅ Запушено!
 
@@ -152,18 +158,18 @@ git push
 
 ---
 
-## Правила
+## Rules
 
-- **Секреты — абсолютная блокировка**: найден паттерн → стоп, без исключений, даже если пользователь настаивает
-- **Читать versioning_guidelines.md в runtime** — не полагаться на память о формате коммитов
-- **Без подтверждения не коммитить** — всегда показывать сообщение перед git commit
-- **Никогда не делать force push** без явного запроса пользователя ("force push", "принудительно запушь")
-- **При force push запросе** — сначала предупредить ("это перезапишет историю remote"), затем ждать повторного подтверждения
-- **Не добавлять git add -A / git add .** без явного указания пользователя — только конкретные файлы
-- **Staged без git add** — если пользователь не указал файлы и уже есть staged изменения, использовать их
+- **Secrets are an absolute block**: a pattern found → stop, no exceptions, even if the user insists
+- **Read versioning_guidelines.md at runtime** — do not rely on memory for the commit format
+- **Do not commit without confirmation** — always show the message before git commit
+- **Never do a force push** without an explicit user request ("force push", "принудительно запушь")
+- **On a force push request** — first warn ("this will overwrite the remote history"), then wait for a repeat confirmation
+- **Do not add git add -A / git add .** without an explicit user instruction — only specific files
+- **Staged without git add** — if the user did not specify files and there are already staged changes, use them
 
 ---
 
-## Быстрый режим
+## Quick mode
 
-Если пользователь передал сообщение коммита вместе с командой (например: "запушь feat(tg-bot): добавить my_case") — можно пропустить ожидание подтверждения сообщения и сразу коммитить (после проверки секретов). Показать итог после пуша.
+If the user passed the commit message together with the command (for example: "запушь feat(tg-bot): добавить my_case") — you may skip waiting for message confirmation and commit immediately (after the secrets check). Show the summary after the push.
