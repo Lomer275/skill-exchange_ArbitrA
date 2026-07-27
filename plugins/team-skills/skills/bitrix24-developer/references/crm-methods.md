@@ -8,7 +8,7 @@
 | ID | int | Deal ID |
 | TITLE | string | Deal title |
 | STAGE_ID | string | Stage code e.g. C4:1, C4:NEW |
-| CATEGORY_ID | int | Funnel ID (4=Main pipeline (example)) |
+| CATEGORY_ID | int | Funnel ID (4=БФЛ) |
 | ASSIGNED_BY_ID | int | Responsible user ID |
 | CONTACT_ID | int | Primary contact ID |
 | COMPANY_ID | int | Company ID |
@@ -26,11 +26,11 @@
 | CLOSED | Y/N | Closed flag |
 | UF_CRM_* | mixed | Custom fields |
 
-### Stage IDs format for Main pipeline (example) (CATEGORY_ID=4)
-- `C4:NEW` — новая
-- `C4:PREPARATION` — в работе (depends on config)
-- `C4:WON` — успешно завершена
-- `C4:LOSE` — провалена
+### Stage IDs format for БФЛ (CATEGORY_ID=4)
+- `C4:NEW` — new
+- `C4:PREPARATION` — in progress (depends on config)
+- `C4:WON` — successfully closed
+- `C4:LOSE` — lost
 - Custom stages: `C4:{STAGE_SORT_NUMBER}`
 
 Get all stages:
@@ -198,7 +198,7 @@ PARAMS: {
 
 ---
 
-## Timeline (Дела в CRM)
+## Timeline (Activities in CRM)
 
 ```
 # Add comment to deal
@@ -228,8 +228,8 @@ PARAMS: {
 ## Source / Channel tracking
 
 Source IDs (crm.status.list ENTITY_ID=SOURCE):
-- `CALL` — звонок
+- `CALL` — phone call
 - `EMAIL` — email
-- `WEB` — сайт
-- `SELF` — личные связи
+- `WEB` — website
+- `SELF` — personal contacts
 - Custom sources have custom IDs

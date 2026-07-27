@@ -1,46 +1,56 @@
 ---
 name: sprint-codex
-description: "Параллельный спринт через Codex-воркеры в git worktree. Читает спеку, строит волны по зависимостям, классифицирует волну (общий каталог vs worktree-per-task если задачи трогают shared/ или общие точки риска), запускает N Codex-имплементеров параллельно. После merge всей волны — делегирует ревью в /review-loop (НЕ зовёт /codereview-dual напрямую — иначе двойной ревью). Используй когда пользователь говорит '/sprint-codex', '/sprint-codex S05', 'параллельный спринт', 'спринт через кодекс', или когда routing решил sprint-codex (Codex доступен и волна ≥2 задач)."
----
-# /sprint-codex — Параллельный спринт через Codex-воркеры
-
-Drop-in замена `/sprint` для волн ≥2 задач. Codex-имплементеры работают параллельно в worktree, Claude оркестрирует merge → review-loop → accept → push.
-
----
-
-## Входные данные
-
-- `/sprint-codex S05` — обязательно номер спецификации.
-- `/sprint-codex S05 --dry-run` — показать план волн без выполнения.
-
-Если номер не передан — попроси у пользователя.
-
+description: >
+  Parallel sprint via Codex workers in a git worktree. Reads the spec, builds
+  waves by dependencies, classifies the wave (shared directory vs worktree-per-task
+  if tasks touch shared/ or common risk points), and launches N Codex implementers
+  in parallel. After merging the whole wave, it delegates review to /review-loop (does NOT call
+  /codereview-dual directly — otherwise a double review). Use when the user
+  says "/sprint-codex", "/sprint-codex S05", "параллельный спринт", "спринт через
+  кодекс", or when routing decides on sprint-codex (Codex available and wave ≥2 tasks).
+  Part of spec S11, Phase 4.
 ---
 
-## Алгоритм
+# /sprint-codex — Parallel sprint via Codex workers
 
-### Шаг 0 — Routing checks
-
-Те же что в `/codereview-dual`:
-
-1. **Kill-switch** (`.claude/codex.json:enabled` + env `CODEX_ENABLED` с precedence matrix). При выключенном — отказ старта с подсказкой включить через `/codex-toggle on` или предложить запустить classic `/sprint`.
-2. **Availability cache.** Свежая проверка если кэш устарел.
-
-При `available=false` — STOP с предложением `/sprint` (classic).
+Drop-in replacement for `/sprint` for waves of ≥2 tasks. Codex implementers work in parallel in worktrees; Claude orchestrates merge → review-loop → accept → push.
 
 ---
 
-### Шаг 1 — Парсинг спеки
+## Input
 
-1. Прочитай `docs/specifications/S<NN>_*.md`.
-2. Извлеки таблицу задач: `ID`, `Зависит от`, `Фаза`, `Статус`.
-3. Для каждой draft-задачи прочитай файл (`docs/tasks/T<NN>_*.md`):
+- `/sprint-codex S05` — the specification number is required.
+- `/sprint-codex S05 --dry-run` — show the wave plan without executing.
+
+If the number is not provided, ask the user for it.
+
+---
+
+## Algorithm
+
+### Step 0 — Routing checks
+
+Same as in `/codereview-dual`:
+
+1. **Kill-switch** (`.claude/codex.json:enabled` + env `SUP_CODEX_ENABLED` with a precedence matrix). When disabled — refuse to start with a hint to enable it via `/codex-toggle on`, or offer to run classic `/sprint`.
+2. **Availability cache.** Fresh check if the cache is stale.
+3. **Min CLI version + pre-warm (auth-race safety).** Verify `codex --version` ≥ **0.143.0** — older CLIs race the OAuth refresh under parallel workers and fail intermittently with `refresh_token_reused (401)` ([openai/codex#10332](https://github.com/openai/codex/issues/10332)); if lower, tell the user to upgrade (`npm i -g @openai/codex@latest`) before running a parallel sprint. Then **pre-warm once, before any fan-out:** `timeout 20 codex exec --skip-git-repo-check "ok"`. This starts the shared app-server daemon and refreshes the token serially, so the N parallel workers in Step 3.3 attach to a **warm** daemon and none triggers a cold-start refresh race. All workers keep the **shared** `CODEX_HOME` — never isolate it per worktree (see codex-worker Rules; worktree isolation is for files/`--cwd` only).
+
+If `available=false` — STOP with a suggestion to use `/sprint` (classic).
+
+---
+
+### Step 1 — Parsing the spec
+
+1. Read `docs/2. SUP-specifications/S<NN>_*.md`.
+2. Extract the task table: `ID`, `Зависит от`, `Фаза`, `Статус`.
+3. For each draft task, read the file (`docs/3. SUP-tasks/T<NN>_*.md`):
    - Acceptance criteria.
-   - Затронутые файлы (из текста или explicit раздела).
+   - Affected files (from the text or an explicit section).
 
 ---
 
-### Шаг 2 — Построение волн (топологическая сортировка)
+### Step 2 — Building waves (topological sort)
 
 ```python
 def build_waves(tasks):
@@ -50,7 +60,7 @@ def build_waves(tasks):
     while pending:
         wave = [t for t in pending if all(d in completed for d in t.deps)]
         if not wave:
-            raise CycleError("циклическая зависимость или non-completed deps")
+            raise CycleError("circular dependency or non-completed deps")
         waves.append(wave)
         for t in wave:
             completed.add(t.id)
@@ -58,48 +68,48 @@ def build_waves(tasks):
     return waves
 ```
 
-В чат: показать план волн.
+To chat: show the wave plan.
 
 ```markdown
-## /sprint-codex S<NN> — План
+## /sprint-codex S<NN> — Plan
 
-**Волн:** N
-**Задач всего:** M
+**Waves:** N
+**Total tasks:** M
 
-### Волна 1: <task-ids> (параллельно)
-### Волна 2: ...
+### Wave 1: <task-ids> (parallel)
+### Wave 2: ...
 ```
 
-При `--dry-run` — STOP здесь.
+On `--dry-run` — STOP here.
 
 ---
 
-### Шаг 3 — Цикл по волнам
+### Step 3 — Loop over waves
 
-Для каждой волны:
+For each wave:
 
-#### 3.1 — Классификация (общий каталог vs worktree)
+#### 3.1 — Classification (shared directory vs worktree)
 
-Собери множество файлов для каждой задачи (из acceptance criteria + текущего кода через `git grep`/`find`).
+Gather the set of files for each task (from acceptance criteria + current code via `git grep`/`find`).
 
-**Правила:**
-- Если множества **не пересекаются** И ни одна задача не трогает общие точки риска — общий каталог.
-- Иначе — worktree per task.
+**Rules:**
+- If the sets **do not overlap** AND no task touches common risk points — shared directory.
+- Otherwise — worktree per task.
 
-**Общие точки риска:**
-- `shared/` (любой файл).
+**Common risk points:**
+- `shared/` (any file).
 - `tg_bot/texts.py`.
 - `tg_bot/keyboards.py`.
 - `Handler/models.py`.
 
-В чат: «Волна N: <общий каталог|worktree-per-task>, причина: <...>».
+To chat: "Wave N: <shared directory|worktree-per-task>, reason: <...>".
 
-#### 3.2 — Подготовка worktree (если нужно)
+#### 3.2 — Preparing the worktree (if needed)
 
-Для каждой задачи в волне:
+For each task in the wave:
 
 ```bash
-WT_PATH="/tmp/codex-orch-wt/T${NN}-${SLUG}"
+WT_PATH="/tmp/sup-codex-wt/T${NN}-${SLUG}"
 BRANCH="codex/T${NN}-${SLUG}"
 
 # Collision check (R6)
@@ -107,7 +117,7 @@ if [ -e "$WT_PATH" ]; then
   TS=$(date +%s)
   mv "$WT_PATH" "${WT_PATH}.failed-${TS}"
   echo "⚠️ Existing worktree saved: ${WT_PATH}.failed-${TS}"
-  # переименовать ветку если есть
+  # rename the branch if it exists
   if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
     git branch -m "$BRANCH" "${BRANCH}-failed-${TS}"
   fi
@@ -116,126 +126,126 @@ fi
 # Create fresh worktree
 git worktree add "$WT_PATH" -b "$BRANCH"
 
-# venv passthrough (R3): symlink если venv в репо
+# venv passthrough (R3): symlink if venv is in the repo
 if [ -d "$(git rev-parse --show-toplevel)/.venv" ] && [ ! -e "$WT_PATH/.venv" ]; then
   ln -s "$(git rev-parse --show-toplevel)/.venv" "$WT_PATH/.venv"
 fi
 ```
 
-В чат для каждой задачи: «Создан worktree T<NN>: $WT_PATH».
+To chat, for each task: "Created worktree T<NN>: $WT_PATH".
 
-#### 3.3 — Параллельный запуск Codex-воркеров
+#### 3.3 — Launching Codex workers in parallel
 
-В **одном сообщении** (для реального параллелизма) делаем N вызовов:
+In **a single message** (for true parallelism), make N calls:
 
 ```
-Skill(skill="codex-worker", args="role=implementer task_file=docs/tasks/T<NN>_<name>.md spec_file=docs/specifications/S<NN>_<name>.md worktree=<WT_PATH-or-current> scope=edit:<paths> timeout_min=10 task_id=T<NN>")
+Skill(skill="codex-worker", args="role=implementer task_file=docs/3. SUP-tasks/T<NN>_<name>.md spec_file=docs/2. SUP-specifications/S<NN>_<name>.md worktree=<WT_PATH-or-current> scope=edit:<paths> timeout_min=10 task_id=T<NN>")
 ```
 
-Сохрани все task_id и output_file для каждого воркера.
+Save all task_id and output_file values for each worker.
 
-В чат:
+To chat:
 ```
-🚀 Волна N: запущено <K> Codex-воркеров параллельно.
+🚀 Wave N: launched <K> Codex workers in parallel.
 ```
 
-#### 3.4 — Сбор результатов
+#### 3.4 — Collecting results
 
-Жди завершения всех воркеров. Параллельно `Read(output_file)` каждого. По завершении (или таймауту) — собери отчёты:
+Wait for all workers to finish. In parallel, `Read(output_file)` for each. On completion (or timeout) — assemble the reports:
 
 ```markdown
-**Волна N — Результаты:**
-- T<NN1>: ✅ ok (<duration>s) — <краткий итог из output>
-- T<NN2>: ⚠️ timeout — debug в /tmp/codex-orch-wt/T<NN2>-...failed-<ts>
+**Wave N — Results:**
+- T<NN1>: ✅ ok (<duration>s) — <brief summary from output>
+- T<NN2>: ⚠️ timeout — debug in /tmp/sup-codex-wt/T<NN2>-...failed-<ts>
 - T<NN3>: ✅ ok (<duration>s) — ...
 ```
 
-#### 3.5 — Merge ветками
+#### 3.5 — Merging branches
 
-Только для **успешных** воркеров. Последовательно:
+Only for **successful** workers. Sequentially:
 
 ```bash
 cd <repo-root>
 git merge "codex/T<NN>-<slug>"
 ```
 
-При конфликте:
-- Покажи `git status` пользователю.
-- Спроси: «Разрешить вручную или откатить эту задачу?»
-- Действуй по ответу.
+On a conflict:
+- Show `git status` to the user.
+- Ask: "Resolve manually or roll back this task?"
+- Act according to the answer.
 
-При успехе merge:
+On a successful merge:
 ```bash
-git worktree remove "/tmp/codex-orch-wt/T<NN>-<slug>"
+git worktree remove "/tmp/sup-codex-wt/T<NN>-<slug>"
 git branch -d "codex/T<NN>-<slug>"
 ```
 
-Failed worktree-ы (с `.failed-<ts>`) **не удаляются** — остаются для дебага.
+Failed worktrees (with `.failed-<ts>`) are **not removed** — they remain for debugging.
 
 ---
 
-### Шаг 4 — После всех волн: ревью + accept + push
+### Step 4 — After all waves: review + accept + push
 
-**ВАЖНО (R5):** не зови `/codereview-dual` напрямую. `/review-loop` сам через routing решит dual или single.
+**IMPORTANT (R5):** do not call `/codereview-dual` directly. `/review-loop` will decide dual or single itself via routing.
 
 ```
-1. /review-loop  — для всех изменений пакетом
-   └─ внутри он зовёт /codereview (через routing → /codereview-dual)
-   └─ и /fix до чистоты от CRITICAL/HIGH
+1. /review-loop  — for all changes as a batch
+   └─ internally it calls /codereview (via routing → /codereview-dual)
+   └─ and /fix until clean of CRITICAL/HIGH
 
-2. Для каждой задачи в волнах: /accept T<NN>
+2. For each task in the waves: /accept T<NN>
 
-3. /safe-push  — один коммит на всю пачку (или по одному на задачу,
-                спросить у пользователя в начале спринта)
+3. /sup-push  — one commit for the whole batch (or one per task,
+                ask the user at the start of the sprint)
 ```
 
 ---
 
-### Шаг 5 — Cleanup
+### Step 5 — Cleanup
 
 ```bash
-# Files older than 7 days в /tmp/codex-orch/
-find /tmp/codex-orch -type f -mtime +7 -delete 2>/dev/null
+# Files older than 7 days in /tmp/sup-codex/
+find /tmp/sup-codex -type f -mtime +7 -delete 2>/dev/null
 
-# last-run.log сохраняем для дебага
+# keep last-run.log for debugging
 ```
 
 ---
 
-### Шаг 6 — Финальный отчёт
+### Step 6 — Final report
 
 ```markdown
-## /sprint-codex — Готово
+## /sprint-codex — Done
 
-**Спека:** S<NN>
-**Волн обработано:** N
-**Задач выполнено:** ✅ K | ⚠️ failed: M
+**Spec:** S<NN>
+**Waves processed:** N
+**Tasks completed:** ✅ K | ⚠️ failed: M
 
 ### Per-task:
-| ID | Статус | Duration | Worktree |
+| ID | Status | Duration | Worktree |
 |----|--------|----------|----------|
-| T77 | ✅ merged | 5m | (общий каталог) |
+| T77 | ✅ merged | 5m | (shared directory) |
 | T78 | ✅ merged | 8m | T78-<slug> (cleaned) |
 | T79 | ⚠️ timeout | 10m | T79-<slug>.failed-<ts> (debug) |
 
-### Review-loop: <чисто | N итераций, осталось MEDIUM/LOW>
-### Accept: ✅ K задач
-### Push: ✅ <commit hash> (или: коммит ожидает явного /safe-push)
+### Review-loop: <clean | N iterations, MEDIUM/LOW remaining>
+### Accept: ✅ K tasks
+### Push: ✅ <commit hash> (or: commit awaiting an explicit /sup-push)
 
-**Failed задачи:** требуют ручного разбора. Debug-снимки в /tmp/codex-orch-wt/*.failed-*
+**Failed tasks:** require manual triage. Debug snapshots in /tmp/sup-codex-wt/*.failed-*
 ```
 
 ---
 
-## Правила
+## Rules
 
-- **Routing — первый шаг.** Без kill-switch + availability проверки не стартуй.
-- **Параллельность через `Bash(run_in_background=true)`** — N вызовов `Skill("codex-worker", ...)` в одном сообщении (не последовательно).
-- **Worktree creation — последовательно** (избежать гонок), но воркеры внутри них — параллельно.
-- **Collision check (R6) перед каждым `git worktree add`** — переименование занятого пути в `.failed-<ts>`.
-- **venv passthrough (R3)** — симлинк `.venv` в worktree + env-переменные через `codex-worker`.
-- **После merge — только `/review-loop`** (R5), без прямого `/codereview-dual`.
-- **Failed worktree не удалять автоматически** — оставлять под `.failed-<ts>` для дебага.
-- **Конфликты merge — интерактив с пользователем**, не автоматическое разрешение.
-- **Cleanup `/tmp/codex-orch/` старше 7 дней** (R16) — на старте каждого спринта.
-- При циклической зависимости в волнах — STOP с понятной ошибкой.
+- **Routing is the first step.** Do not start without the kill-switch + availability checks.
+- **Parallelism via `Bash(run_in_background=true)`** — N calls to `Skill("codex-worker", ...)` in a single message (not sequentially).
+- **Worktree creation is sequential** (to avoid races), but the workers inside them run in parallel.
+- **Collision check (R6) before each `git worktree add`** — rename an occupied path to `.failed-<ts>`.
+- **venv passthrough (R3)** — symlink `.venv` into the worktree + env variables via `codex-worker`.
+- **After merge — only `/review-loop`** (R5), without a direct `/codereview-dual`.
+- **Do not remove failed worktrees automatically** — keep them under `.failed-<ts>` for debugging.
+- **Merge conflicts — interactive with the user**, not automatic resolution.
+- **Cleanup `/tmp/sup-codex/` older than 7 days** (R16) — at the start of each sprint.
+- On a circular dependency in the waves — STOP with a clear error.

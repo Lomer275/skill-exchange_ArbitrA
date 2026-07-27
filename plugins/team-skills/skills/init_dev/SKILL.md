@@ -1,18 +1,23 @@
 ---
 name: init_dev
-description: "Создаёт базовую структуру документации для нового проекта: папки docs/, гайды, architecture.md, HANDOFF.md, CHANGELOG.md, CLAUDE.md. Используй когда пользователь говорит '/init_dev', 'инициализируй проект',"
+description: >
+  Creates the base documentation structure for a new project: docs/ folders, guides,
+  SUP-architecture.md, SUP-HANDOFF.md, SUP-CHANGELOG.md, CLAUDE.md.
+  Use when the user says "/init_dev", "инициализируй проект",
+  "создай структуру документации", "новый проект", "init project docs".
 ---
+
 # Init Dev Skill
 
-Создаёт стандартную структуру документации проекта. Универсальный шаблон.
+Creates a standard project documentation structure. A universal template.
 
 ---
 
-## Алгоритм
+## Algorithm
 
-### Шаг 1 — Собрать информацию о проекте
+### Step 1 — Gather information about the project
 
-Задай пользователю следующие вопросы **одним сообщением**:
+Ask the user the following questions **in a single message**:
 
 ```
 Для инициализации проекта нужно несколько деталей:
@@ -26,22 +31,22 @@ description: "Создаёт базовую структуру документ�
 7. **Команда** — имена и роли участников
 ```
 
-Жди ответа пользователя перед продолжением.
+Wait for the user's response before continuing.
 
 ---
 
-### Шаг 2 — Определить нумерацию
+### Step 2 — Determine the numbering
 
-Проверь существующие файлы:
-- `glob docs/specifications/**/*.md` → найди максимальный SNN
-- `glob docs/tasks/**/*.md` → найди максимальный TNN
+Check existing files:
+- `glob docs/2. SUP-specifications/**/*.md` → find the maximum SNN
+- `glob docs/3. SUP-tasks/**/*.md` → find the maximum TNN
 
-Если файлов нет — начинай с S01 / T01.
-Если есть — следующий номер = max + 1.
+If there are no files — start from S01 / T01.
+If there are — the next number = max + 1.
 
 ---
 
-### Шаг 3 — Создать структуру папок
+### Step 3 — Create the folder structure
 
 ```
 docs/
@@ -54,15 +59,15 @@ docs/
 └── backlog/
 ```
 
-Замени `PREFIX` на префикс из шага 1.
+Replace `PREFIX` with the prefix from step 1.
 
-Создай `.gitkeep` в пустых папках чтобы git их отслеживал.
+Create a `.gitkeep` in empty folders so that git tracks them.
 
 ---
 
-### Шаг 4 — Скопировать гайды
+### Step 4 — Copy the guides
 
-Прочитай каждый файл из `docs/guides/` текущего репо и запиши в `docs/4. PREFIX-guides/` нового проекта:
+Read each file from `docs/4. SUP-guides/` of the current repo and write it to `docs/4. PREFIX-guides/` of the new project:
 
 - `doc_conventions.md`
 - `specifications_guide.md`
@@ -72,13 +77,13 @@ docs/
 - `architect_files_selection_guide.md`
 - `project_readme_guide.md`
 
-При копировании замени все упоминания `PROJECT` на новый PREFIX в тексте гайдов.
+When copying, replace all mentions of `SUP` with the new PREFIX in the text of the guides.
 
 ---
 
-### Шаг 5 — Создать architecture.md
+### Step 5 — Create SUP-architecture.md
 
-Используй ответы пользователя из шага 1. Создай файл `PREFIX-architecture.md`:
+Use the user's answers from step 1. Create the file `PREFIX-architecture.md`:
 
 ```markdown
 # PREFIX-architecture
@@ -112,7 +117,7 @@ docs/
 
 ---
 
-### Шаг 6 — Создать PREFIX-HANDOFF.md
+### Step 6 — Create PREFIX-HANDOFF.md
 
 ```markdown
 # PREFIX-HANDOFF — Текущее состояние
@@ -154,7 +159,7 @@ docs/
 
 ---
 
-### Шаг 7 — Создать PREFIX-CHANGELOG.md
+### Step 7 — Create PREFIX-CHANGELOG.md
 
 ```markdown
 # PREFIX-CHANGELOG
@@ -175,7 +180,7 @@ docs/
 
 ---
 
-### Шаг 8 — Создать CLAUDE.md
+### Step 8 — Create CLAUDE.md
 
 ```markdown
 # CLAUDE.md
@@ -239,9 +244,9 @@ docs/
 
 ---
 
-### Шаг 9 — Отчёт
+### Step 9 — Report
 
-Выведи итог:
+Output the summary:
 
 ```
 ✅ Проект PREFIX инициализирован
@@ -265,9 +270,9 @@ docs/
 
 ---
 
-## Правила
+## Rules
 
-- Всегда жди ответа пользователя перед созданием файлов
-- Не перезаписывай существующие файлы без явного подтверждения
-- Если папка `docs/` уже частично существует — создавай только то чего нет
-- Дата в файлах — всегда сегодняшняя (`currentDate` из системного контекста)
+- Always wait for the user's response before creating files
+- Do not overwrite existing files without explicit confirmation
+- If the `docs/` folder already partially exists — create only what is missing
+- The date in files is always today's (`currentDate` from the system context)

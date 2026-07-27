@@ -1,33 +1,41 @@
 ---
 name: codereview-dual
-description: "Двойной независимый код-ревью: параллельно запускает Codex-ревьюера в фоне и свои собственные фазы (acceptance criteria + adversarial), затем мержит findings в одну severity-ranked таблицу с пометками [both]/[claude]/[codex]. Output совместим с /fix и /review-loop. Используй когда пользователь говорит '/codereview-dual', 'двойной ревью', 'ревью с codex', 'две линзы', 'ревью с кодексом', или когда routing решил dual-режим (Codex доступен и enabled). При недоступности"
----
-# /codereview-dual — Параллельный двойной код-ревью с Codex
-
-Запускает Codex-ревьюера и Claude-ревьюера параллельно, мержит findings в один отчёт. Drop-in замена `/codereview` — output совместим с `/fix` и `/review-loop`.
-
----
-
-## Входные данные
-
-- `/codereview-dual` — задача определяется автоматически из `*HANDOFF.md` (первая 🟡)
-- `/codereview-dual T17` — явный номер задачи
-
-Если ничего не передано и в HANDOFF нет 🟡 — попроси у пользователя.
-
+description: >
+  Dual independent code review: runs a Codex reviewer in the background in parallel
+  with its own phases (acceptance criteria + adversarial), then merges the findings
+  into a single severity-ranked table with [both]/[claude]/[codex] markers. Output
+  is compatible with /fix and /review-loop. Use when the user says
+  "/codereview-dual", "двойной ревью", "ревью с codex", "две линзы", "ревью с кодексом",
+  or when routing decides on dual mode (Codex available and enabled). When Codex is
+  unavailable — graceful fallback to single-review with an explicit marker. Part of spec S11, Phase 3.
 ---
 
-## Алгоритм
+# /codereview-dual — Parallel dual code review with Codex
 
-### Шаг 0 — Routing checks (kill-switch + availability)
+Runs a Codex reviewer and a Claude reviewer in parallel, then merges the findings into one report. A drop-in replacement for `/codereview` — output is compatible with `/fix` and `/review-loop`.
+
+---
+
+## Input
+
+- `/codereview-dual` — the task is determined automatically from `*HANDOFF.md` (the first 🟡)
+- `/codereview-dual T17` — an explicit task number
+
+If nothing is passed and there is no 🟡 in HANDOFF — ask the user.
+
+---
+
+## Algorithm
+
+### Step 0 — Routing checks (kill-switch + availability)
 
 #### 0.1 — Kill-switch
 
-Прочитай `.claude/codex.json`:
+Read `.claude/codex.json`:
 
 ```bash
 ENABLED=$(jq -r '.enabled' .claude/codex.json)
-ENV_VAL="${CODEX_ENABLED:-}"
+ENV_VAL="${SUP_CODEX_ENABLED:-}"
 case "$ENV_VAL" in
   true|1|yes)   FINAL=true ;;
   false|0|no)   FINAL=false ;;
@@ -36,93 +44,94 @@ case "$ENV_VAL" in
 esac
 ```
 
-Если `FINAL=false` — отказ старта:
+If `FINAL=false` — refuse to start:
 
 ```
-❌ Codex отключён в .claude/codex.json (или через CODEX_ENABLED).
-Используй /codereview напрямую или включи Codex через /codex-toggle on.
+❌ Codex is disabled in .claude/codex.json (or via SUP_CODEX_ENABLED).
+Use /codereview directly or enable Codex via /codex-toggle on.
 ```
 
-STOP. Не продолжай.
+STOP. Don't continue.
 
 #### 0.2 — Availability cache
 
-Прочитай `availability_cache` из `.claude/codex.json`:
+Read `availability_cache` from `.claude/codex.json`:
 
-- Получи текущий session_id Claude Code (через переменную среды `CLAUDE_SESSION_ID` или metadata; если недоступно — генерируй UUID на запуск).
-- Сравни `availability_cache.session_id` и `checked_at`:
-  - совпадает session_id И `checked_at` ≤ 1 час назад → используй cached `available`.
-  - иначе → запусти проверку: `codex --version && timeout 10 codex exec --skip-git-repo-check "echo ok"`. Обнови `availability_cache`.
+- Get the current Claude Code session_id (via the `CLAUDE_SESSION_ID` env variable or metadata; if unavailable — generate a UUID per run).
+- Compare `availability_cache.session_id` and `checked_at`:
+  - session_id matches AND `checked_at` ≤ 1 hour ago → use the cached `available`.
+  - otherwise → run the check: `codex --version && timeout 10 codex exec --skip-git-repo-check "echo ok"`. Update `availability_cache`. This `codex exec` also warms the shared app-server daemon and refreshes the OAuth token serially, so a subsequent worker launch never triggers a cold-start refresh race.
+- **Min CLI version:** require `codex --version` ≥ **0.143.0** (adds the cross-process OAuth `refresh.lock`, [openai/codex#10332](https://github.com/openai/codex/issues/10332)); on older CLIs concurrent Codex work is unstable — hint the user to run `npm i -g @openai/codex@latest`.
 
-Если `available=false` — graceful fallback на single-review (см. Шаг 5 fallback).
-
----
-
-### Шаг 1 — Сбор контекста
-
-1. Найти файл задачи: glob `docs/tasks/T<NN>_*.md` (или из HANDOFF).
-2. Прочитать файл задачи: критерии приёмки, описание, затронутые файлы.
-3. Определить путь спецификации (из строки `**Спецификация:**`).
-4. Прочитать изменённые файлы кода (если перечислены или предоставлены).
-
-Если код не предоставлен и в задаче не указан — попроси пользователя приложить.
+If `available=false` — graceful fallback to single-review (see Step 5 fallback).
 
 ---
 
-### Шаг 2 — Параллельный старт Codex-ревьюера
+### Step 1 — Gather context
 
-В одном сообщении (без задержек):
+1. Find the task file: glob `docs/3. SUP-tasks/T<NN>_*.md` (or from HANDOFF).
+2. Read the task file: acceptance criteria, description, affected files.
+3. Determine the specification path (from the `**Спецификация:**` line).
+4. Read the changed code files (if listed or provided).
+
+If the code is not provided and not specified in the task — ask the user to attach it.
+
+---
+
+### Step 2 — Parallel start of the Codex reviewer
+
+In a single message (without delays):
 
 ```
-Skill(skill="codex-worker", args="role=reviewer task_file=docs/tasks/T<NN>_<name>.md spec_file=docs/specifications/S<NN>_<name>.md scope=read-only lens=correctness,edge-cases,risks timeout_min=5 task_id=T<NN>")
+Skill(skill="codex-worker", args="role=reviewer task_file=docs/3. SUP-tasks/T<NN>_<name>.md spec_file=docs/2. SUP-specifications/S<NN>_<name>.md scope=read-only lens=correctness,edge-cases,risks timeout_min=5 task_id=T<NN>")
 ```
 
-**Линза Codex:** `correctness`, `edge-cases`, `risks` — **отличается от Claude'овской**, чтобы дать дополнительный сигнал.
+**Codex lens:** `correctness`, `edge-cases`, `risks` — **different from Claude's**, to provide a complementary signal.
 
-Сохрани возвращённый `output_file` и `task_id`.
+Save the returned `output_file` and `task_id`.
 
-В чат:
+To chat:
 ```
-🚀 Codex-ревьюер запущен в фоне (lens: correctness/edge-cases/risks).
-Параллельно делаю свои фазы (A: критерии приёмки, B: adversarial).
+🚀 Codex reviewer launched in the background (lens: correctness/edge-cases/risks).
+In parallel I'm running my own phases (A: acceptance criteria, B: adversarial).
 ```
 
 ---
 
-### Шаг 3 — Свои фазы (параллельно во времени)
+### Step 3 — Own phases (in parallel over time)
 
-Сразу же (не дожидаясь Codex'а) выполни фазы из `/codereview`:
+Right away (without waiting for Codex), run the phases from `/codereview`:
 
-- **Фаза A — критерии приёмки:** для каждого пункта DoD задачи — найди в коде, вердикт ✅/❌/⚠️.
-- **Фаза B — adversarial:** «Как этот код сломается?» Корректность, безопасность, контракт, производительность, dead code.
-- **Фаза C — user walkthrough:** 3-5 сценариев (happy/empty/error/edge/concurrent).
-- **Фаза D — архитектурный fit:** соответствие паттернам проекта.
+- **Phase A — acceptance criteria:** for each DoD item of the task — find it in the code, verdict ✅/❌/⚠️.
+- **Phase B — adversarial:** "How will this code break?" Correctness, security, contract, performance, dead code.
+- **Phase C — user walkthrough:** 3-5 scenarios (happy/empty/error/edge/concurrent).
+- **Phase D — architectural fit:** conformance to project patterns.
 
-Сформируй свою таблицу findings с колонками: `ID, Severity, Фаза, Файл:строка, Категория, Описание, Рекомендация`.
+Build your own findings table with columns: `ID, Severity, Фаза, Файл:строка, Категория, Описание, Рекомендация`.
 
-**Категории** (для матчинга): `acceptance-criteria`, `correctness`, `security`, `performance`, `style`, `dead-code`, `architecture`, `edge-case`.
-
----
-
-### Шаг 4 — Сбор Codex output (poll)
-
-После завершения своих фаз — `Read(output_file)` от codex-worker.
-
-- Файл существует и непустой → парсим таблицу Codex'а.
-- Файл пустой → poll каждые 2-3 сек до появления непустого, лимит — `timeout_min` (5 мин).
-- Codex упал / `status: timeout|error` → fallback (Шаг 5).
-
-**Парсинг таблицы Codex'а:** ожидаем markdown-таблицу с теми же колонками. Если формат другой — наивный парсинг по line-by-line, или fallback.
+**Categories** (for matching): `acceptance-criteria`, `correctness`, `security`, `performance`, `style`, `dead-code`, `architecture`, `edge-case`.
 
 ---
 
-### Шаг 5 — Merge findings (или fallback)
+### Step 4 — Collect Codex output (poll)
 
-#### 5a — Полноценный merge (Codex отдал результат)
+After finishing your own phases — `Read(output_file)` from codex-worker.
 
-**Алгоритм матчинга (R11):**
+- File exists and is non-empty → parse the Codex table.
+- File is empty → poll every 2-3 sec until it becomes non-empty, limit — `timeout_min` (5 min).
+- Codex crashed / `status: timeout|error` → fallback (Step 5).
 
-Для каждого finding из обоих источников — попарно сравнить с findings другого источника:
+**Parsing the Codex table:** expect a markdown table with the same columns. If the format is different — naive line-by-line parsing, or fallback.
+
+---
+
+### Step 5 — Merge findings (or fallback)
+
+#### 5a — Full merge (Codex returned a result)
+
+**Matching algorithm (R11):**
+
+For each finding from both sources — compare it pairwise with the findings of the other source:
 
 ```python
 def is_same(c, x):
@@ -133,32 +142,32 @@ def is_same(c, x):
     )
 ```
 
-Если совпало:
-- Описание = более информативное (длиннее по символам при равной информативности).
-- Метка = `[both]`.
+If matched:
+- Description = the more informative one (longer in characters when informativeness is equal).
+- Marker = `[both]`.
 - **Severity disagreement (R13):**
-  - Если severity разные — берём максимум (CRITICAL > HIGH > MEDIUM > LOW).
-  - Метка расширяется: `[both, severity=max(claude=X, codex=Y)→Z]`.
-  - При радикальном расхождении (CRITICAL↔LOW) — дополнительная метка `[severity-disputed]`.
+  - If the severities differ — take the maximum (CRITICAL > HIGH > MEDIUM > LOW).
+  - The marker is extended: `[both, severity=max(claude=X, codex=Y)→Z]`.
+  - On a radical disagreement (CRITICAL↔LOW) — an additional marker `[severity-disputed]`.
 
-Несовпавшие — `[claude]` или `[codex]` в зависимости от источника.
+Unmatched ones — `[claude]` or `[codex]` depending on the source.
 
-#### 5b — Fallback (Codex недоступен)
+#### 5b — Fallback (Codex unavailable)
 
-Если `availability_cache.available=false` или Codex вернул `status: timeout|error`:
+If `availability_cache.available=false` or Codex returned `status: timeout|error`:
 
-В чат:
+To chat:
 ```
-⚠️ Codex недоступен (<причина>). Делаю single-review (только Claude).
+⚠️ Codex unavailable (<reason>). Doing a single-review (Claude only).
 ```
 
-Используй только свои findings, в шапке таблицы — пометка `[fallback: claude-only, Codex недоступен: <причина>]`.
+Use only your own findings, with a marker in the table header `[fallback: claude-only, Codex unavailable: <reason>]`.
 
 ---
 
-### Шаг 6 — Запись в файл задачи
+### Step 6 — Write to the task file
 
-В файл задачи (`docs/tasks/T<NN>_*.md`) добавь/обнови секцию:
+In the task file (`docs/3. SUP-tasks/T<NN>_*.md`) add/update the section:
 
 ```markdown
 ## Code Review (dual)
@@ -176,35 +185,35 @@ def is_same(c, x):
 | R4 | MEDIUM | C | ... | ... | ... | [both, severity=max(claude=LOW, codex=MEDIUM)→MEDIUM] |
 ```
 
-Если секция уже была — добавь новую (не перезаписывай старые ревью), пометив датой.
+If the section already existed — add a new one (don't overwrite old reviews), marking it with a date.
 
 ---
 
-### Шаг 7 — Финальный отчёт в чат
+### Step 7 — Final report to chat
 
 ```markdown
-## /codereview-dual — Готово
+## /codereview-dual — Done
 
-**Задача:** T<NN> — <название>
-**Найдено:** N CRITICAL, M HIGH, K MEDIUM, L LOW
-**Источники:** [both]: <число> | [claude]: <число> | [codex]: <число>
-**Расхождения severity:** <число> [severity-disputed]
+**Task:** T<NN> — <name>
+**Found:** N CRITICAL, M HIGH, K MEDIUM, L LOW
+**Sources:** [both]: <count> | [claude]: <count> | [codex]: <count>
+**Severity disagreements:** <count> [severity-disputed]
 
-**Файл задачи обновлён:** docs/tasks/T<NN>_*.md (секция `## Code Review (dual)`)
+**Task file updated:** docs/3. SUP-tasks/T<NN>_*.md (section `## Code Review (dual)`)
 
-**Следующий шаг:**
-- Если есть CRITICAL/HIGH — запусти `/fix` или `/review-loop`.
-- Если только MEDIUM/LOW — можно `/accept`.
+**Next step:**
+- If there are CRITICAL/HIGH — run `/fix` or `/review-loop`.
+- If only MEDIUM/LOW — you can `/accept`.
 ```
 
 ---
 
-## Правила
+## Rules
 
-- **Routing — первый шаг.** Без kill-switch + availability проверки не стартуй.
-- **Параллельность во времени, а не concurrency.** Codex стартует в фоне через `Skill("codex-worker", ...)`, Claude параллельно делает свои фазы, потом читает output Codex'а.
-- **Линза Codex отличается от Claude.** Не дублируй покрытие — Claude берёт критерии+adversarial, Codex — корректность+edge-cases+risks.
-- **Severity max при расхождении.** Адверсариально — выбираем худший случай.
-- **Output совместим с /fix и /review-loop.** Колонка «Источник» — последняя; downstream-скиллы её игнорируют.
-- **Fallback на single-review при недоступном Codex.** Не падай — деградируй с понятным сообщением.
-- **Не пиши прямой git commit/push** — это `/safe-push`.
+- **Routing is the first step.** Don't start without the kill-switch + availability check.
+- **Parallelism over time, not concurrency.** Codex starts in the background via `Skill("codex-worker", ...)`, Claude runs its own phases in parallel, then reads the Codex output.
+- **The Codex lens differs from Claude's.** Don't duplicate coverage — Claude takes criteria+adversarial, Codex — correctness+edge-cases+risks.
+- **Severity max on disagreement.** Adversarially — pick the worst case.
+- **Output is compatible with /fix and /review-loop.** The "Источник" (Source) column is last; downstream skills ignore it.
+- **Fallback to single-review when Codex is unavailable.** Don't crash — degrade with a clear message.
+- **Don't write a direct git commit/push** — that's `/sup-push`.

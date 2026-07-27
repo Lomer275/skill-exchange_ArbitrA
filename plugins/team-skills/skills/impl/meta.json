@@ -1,0 +1,9 @@
+{
+  "name": "impl",
+  "display_name": "Impl — Claude решает, Codex реализует",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Точка входа режима «Claude думает — Codex программирует». Делегирует написание кода Codex-имплементеру для ЛЮБОЙ правки, файл задачи не нужен: Claude находит код и пишет бриф, Codex реализует, Claude читает дифф и гоняет тесты. Без него делегирование существует только внутри /sprint-codex и /codereview-dual.",
+  "tags": ["codex", "workflow", "delegation", "core"],
+  "created": "2026-07-27"
+}

@@ -1,28 +1,34 @@
 ---
 name: codex-toggle
-description: "Управление kill-switch'ем связки Claude × Codex. Включает/выключает связку без переустановки CLI и без потери конфигов. Используй когда пользователь говорит '/codex-toggle', '/codex-toggle on', '/codex-toggle off', '/codex-toggle status', 'выключи codex', 'включи codex', 'отключи кодекс', 'верни classic-режим',"
+description: >
+  Manage the kill-switch for the Claude × Codex integration. Enables/disables the
+  integration without reinstalling the CLI and without losing configs. Use when the user says
+  "/codex-toggle", "/codex-toggle on", "/codex-toggle off", "/codex-toggle status",
+  "выключи codex", "включи codex", "отключи кодекс", "верни classic-режим",
+  "статус codex". Part of spec S11, Phase 5.
 ---
-# /codex-toggle — Управление kill-switch'ем Codex
 
-Включает/выключает связку Claude × Codex одной командой. **Не удаляет** Codex CLI и не трогает `~/.codex/`. Включить обратно — мгновенно.
+# /codex-toggle — Managing the Codex kill-switch
 
----
-
-## Подкоманды
-
-- `/codex-toggle on` — включить Codex (routing уйдёт в dual/codex-варианты).
-- `/codex-toggle off [причина]` — выключить (routing вернётся в classic).
-- `/codex-toggle status` — показать текущее состояние.
-
-Если подкоманда не передана — спросить пользователя или показать `status`.
+Enables/disables the Claude × Codex integration with a single command. **Does not delete** the Codex CLI and does not touch `~/.codex/`. Re-enabling is instant.
 
 ---
 
-## Алгоритм
+## Subcommands
 
-### Если `.claude/codex.json` не существует
+- `/codex-toggle on` — enable Codex (routing will switch to dual/codex variants).
+- `/codex-toggle off [reason]` — disable (routing reverts to classic).
+- `/codex-toggle status` — show the current state.
 
-`/codex-setup` ещё не запускался. Сообщи:
+If no subcommand is passed — ask the user or show `status`.
+
+---
+
+## Algorithm
+
+### If `.claude/codex.json` does not exist
+
+`/codex-setup` has not been run yet. Report:
 
 ```
 ❌ .claude/codex.json не найден. Сначала запусти /codex-setup для базовой инициализации.
@@ -35,29 +41,29 @@ STOP.
 ### `on`
 
 ```bash
-# Прочитать текущее
+# Read current state
 ENABLED=$(jq -r '.enabled' .claude/codex.json)
 
-# Обновить (T83: availability_cache как структурированный объект, не null — для consistency с codex-worker schema)
+# Update (T83: availability_cache as a structured object, not null — for consistency with the codex-worker schema)
 jq '.enabled = true | .disabled_reason = null | .disabled_at = null | .availability_cache = {"checked_at": null, "available": null, "sandbox_works": null}' \
   .claude/codex.json > .claude/codex.json.tmp && mv .claude/codex.json.tmp .claude/codex.json
 ```
 
-В чат:
+To chat:
 ```
 ✅ Codex включён.
 - enabled: true
 - availability_cache очищен (форсируем перепроверку при следующем routing-триггере)
-- env CODEX_ENABLED имеет приоритет над файлом, проверь shell
+- env SUP_CODEX_ENABLED имеет приоритет над файлом, проверь shell
 
 Routing теперь будет выбирать /codereview-dual и /sprint-codex когда Codex доступен.
 ```
 
 ---
 
-### `off [причина]`
+### `off [reason]`
 
-Парсинг причины: всё после `off` — текст причины (опционально).
+Reason parsing: everything after `off` is the reason text (optional).
 
 ```bash
 REASON="${ARGS:-нет причины}"
@@ -68,7 +74,7 @@ jq --arg r "$REASON" --arg t "$NOW" \
   .claude/codex.json > .claude/codex.json.tmp && mv .claude/codex.json.tmp .claude/codex.json
 ```
 
-В чат:
+To chat:
 ```
 🛑 Codex отключён.
 - причина: <REASON>
@@ -83,12 +89,12 @@ Codex CLI и AGENTS.md не тронуты.
 
 ### `status`
 
-Прочитай все поля `.claude/codex.json`. Проверь:
+Read all fields of `.claude/codex.json`. Check:
 
-- наличие `codex` бинаря в shell;
-- env-переменную `CODEX_ENABLED`.
+- whether the `codex` binary is present in the shell;
+- the `SUP_CODEX_ENABLED` env variable.
 
-Выведи:
+Output:
 
 ```markdown
 ## /codex-toggle status
@@ -108,7 +114,7 @@ Codex CLI и AGENTS.md не тронуты.
 
 **Окружение:**
 - `command -v codex`: <путь или "не найден">
-- env CODEX_ENABLED: <значение или "не задана">
+- env SUP_CODEX_ENABLED: <значение или "не задана">
 
 **Эффективное состояние:**
 - Файл: <enabled>
@@ -118,11 +124,11 @@ Codex CLI и AGENTS.md не тронуты.
 
 ---
 
-## Правила
+## Rules
 
-- **НЕ удаляет** Codex CLI, не трогает `~/.codex/`, не удаляет AGENTS.md или новые скиллы.
-- `availability_cache` обнуляется при любом `on/off` — форсируем перепроверку.
-- При `off` без причины — записать `"нет причины"` (не пусто).
-- Имя `disabled_reason` хранится в человеческом виде (русская строка ок).
-- Дата `disabled_at` — ISO 8601.
-- При невалидном JSON в codex.json — STOP с сообщением «Файл повреждён, запусти `/codex-setup` ещё раз».
+- **Does NOT delete** the Codex CLI, does not touch `~/.codex/`, does not delete AGENTS.md or new skills.
+- `availability_cache` is reset on any `on/off` — we force a re-check.
+- On `off` without a reason — write `"нет причины"` (not empty).
+- The `disabled_reason` value is stored in human-readable form (a Russian string is fine).
+- The `disabled_at` date is ISO 8601.
+- On invalid JSON in codex.json — STOP with the message "Файл повреждён, запусти `/codex-setup` ещё раз".

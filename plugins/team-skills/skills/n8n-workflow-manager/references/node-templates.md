@@ -1,4 +1,4 @@
-# Node Templates — Готовые шаблоны параметров
+# Node Templates — Ready-made parameter templates
 
 ## Webhook Trigger
 
@@ -19,7 +19,7 @@
 }
 ```
 
-## Schedule Trigger (каждый день в 09:00)
+## Schedule Trigger (every day at 09:00)
 
 ```json
 {
@@ -143,7 +143,7 @@
 }
 ```
 
-## Wait Node (5 секунд)
+## Wait Node (5 seconds)
 
 ```json
 {
@@ -183,7 +183,7 @@
 }
 ```
 
-## Execute Workflow (вызов другого воркфлоу)
+## Execute Workflow (call another workflow)
 
 ```json
 {
@@ -200,7 +200,7 @@
 }
 ```
 
-## When Executed by Another Workflow (триггер)
+## When Executed by Another Workflow (trigger)
 
 ```json
 {

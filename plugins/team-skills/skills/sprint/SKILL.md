@@ -1,23 +1,23 @@
 ---
 name: sprint
-description: "Автономный оркестратор выполнения спецификации. Читает все 🟡 задачи из спеки, группирует в волны по зависимостям, выполняет каждую волну параллельно. Поддерживает headless `/sprint --yes <Sxx>` режим: на каждом checkpoint обращается к `scripts/autopilot/check_authz.py` (читает блок ```yaml autopilot``` из SUP-HANDOFF.md) и решает auto-go vs TG-ask-and-wait вместо ожидания stdin. Используй когда пользователь говорит '/sprint S02', 'прогони спринт', 'выполни спеку', '/sprint --yes S14', 'запусти спринт в cron-режиме', 'автономный спринт'."
+description: "Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from the spec, groups them into waves by dependencies, and runs each wave in parallel. Supports a headless `/sprint --yes <Sxx>` mode: at each checkpoint it consults `scripts/autopilot/check_authz.py` (which reads the ```yaml autopilot``` block from SUP-HANDOFF.md) and decides auto-go vs TG-ask-and-wait instead of waiting on stdin. Use when the user says '/sprint S02', 'прогони спринт', 'выполни спеку', '/sprint --yes S14', 'запусти спринт в cron-режиме', 'автономный спринт'."
 ---
 
 # Sprint Skill (project-local with --yes mode)
 
-> **Проектная версия.** Этот файл переопределяет marketplace `team-skills:sprint`. Если требуется чистый интерактивный sprint (без `--yes`), поведение полностью совпадает с marketplace-версией. Различия — секция «Headless --yes mode» ниже + checkpoint-патчи в Фазе 1 и Шагах 3/4/5.
+> **Project version.** This file overrides the marketplace `team-skills:sprint`. If a pure interactive sprint (without `--yes`) is needed, the behavior is fully identical to the marketplace version. The differences are the "Headless --yes mode" section below plus the checkpoint patches in Phase 1 and Steps 3/4/5.
 
-Автономный оркестратор выполнения спецификации. Читает все 🟡 задачи из спеки, группирует в волны по зависимостям, выполняет каждую волну параллельно.
+Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from the spec, groups them into waves by dependencies, and runs each wave in parallel.
 
 ---
 
-## Входные данные
+## Inputs
 
-- `/sprint S02` — интерактивный режим: показать план, ждать «да/ок/go» от пользователя на каждом checkpoint
-- `/sprint S02 --dry-run` — только показать план волн, ничего не выполнять
-- `/sprint --yes S14` — **headless-режим для cron/auto-pilot.** План auto-confirm'ится, на checkpoint'ах вместо stdin читается pre-authorization из SUP-HANDOFF.md (см. секцию «Headless --yes mode»). Когда pre-auth не разрешает auto-go — `/sprint` бьёт в TG через `scripts/autopilot/tg_ask.sh` и ждёт клика человека до 2 часов через `tg_wait_answer.sh`. Дизайн-доки и контракт checkpoint'ов см. в `.claude/skills/auto-pilot/SKILL.md`.
+- `/sprint S02` — interactive mode: show the plan, wait for "да/ок/go" from the user at each checkpoint
+- `/sprint S02 --dry-run` — only show the wave plan, execute nothing
+- `/sprint --yes S14` — **headless mode for cron/auto-pilot.** The plan is auto-confirmed; at checkpoints, instead of stdin, the pre-authorization is read from SUP-HANDOFF.md (see the "Headless --yes mode" section). When pre-auth does not permit auto-go, `/sprint` pings TG via `scripts/autopilot/tg_ask.sh` and waits for a human click for up to 2 hours via `tg_wait_answer.sh`. For design docs and the checkpoint contract, see `.claude/skills/auto-pilot/SKILL.md`.
 
-Если номер спеки не передан — сообщить об ошибке и остановиться:
+If no spec number is passed — report an error and stop:
 
 ```text
 ❌ Укажи номер спецификации: /sprint S02
@@ -27,29 +27,29 @@ description: "Автономный оркестратор выполнения �
 
 ## Headless --yes mode
 
-При `--yes` каждый checkpoint, который в интерактивном режиме «ждёт ответа», проходит через **трёхзначное решение**:
+Under `--yes`, every checkpoint that "waits for an answer" in interactive mode goes through a **three-way decision**:
 
-| Решение | Источник | Что делать |
+| Decision | Source | What to do |
 |---|---|---|
-| `auto` | task в `pre_authorized_tasks` (HANDOFF YAML) | продолжить без эскалации, залогировать в TG `✓ T125 pre-auth — продолжаю` |
-| `ask` | task в `always_escalate_tasks` или `<checkpoint>_default = ask` | `tg_ask.sh` + `tg_wait_answer.sh` (таймаут 7200 = 2 часа). Ответ «yes» → продолжить. «no» → пометить ⚠️ blocked. «skip» → пометить ⛔ skipped. Timeout → пометить ⚠️ blocked с пометкой «no human reply in 2h». |
-| `skip` | редкий override | пометить задачу ⛔ skipped без эскалации |
+| `auto` | task is in `pre_authorized_tasks` (HANDOFF YAML) | continue without escalation, log to TG `✓ T125 pre-auth — продолжаю` |
+| `ask` | task is in `always_escalate_tasks` or `<checkpoint>_default = ask` | `tg_ask.sh` + `tg_wait_answer.sh` (timeout 7200 = 2 hours). Answer "yes" → continue. "no" → mark ⚠️ blocked. "skip" → mark ⛔ skipped. Timeout → mark ⚠️ blocked with the note "no human reply in 2h". |
+| `skip` | rare override | mark the task ⛔ skipped without escalation |
 
-**Технический контракт:** на каждом checkpoint скилл вызывает:
+**Technical contract:** at each checkpoint the skill calls:
 
 ```bash
 DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint <key>)
 ```
 
-Возможные значения `<key>`: `risky_default`, `deploy_default`, `manual_test_default`, `test_failure_default`, `unplanned_risk_default`. Plan-confirm проверяется отдельно:
+Possible values of `<key>`: `risky_default`, `deploy_default`, `manual_test_default`, `test_failure_default`, `unplanned_risk_default`. Plan-confirm is checked separately:
 
 ```bash
 PLAN_OK=$(python3 scripts/autopilot/check_authz.py --checkpoint plan_confirmed)  # yes|no
 ```
 
-Если `--yes` передан, но в HANDOFF блока `yaml autopilot` нет → ВСЁ дефолтит на `ask`. Это безопасно.
+If `--yes` is passed but there is no `yaml autopilot` block in HANDOFF → EVERYTHING defaults to `ask`. This is safe.
 
-**Эскалация через TG:**
+**Escalation via TG:**
 
 ```bash
 MSG_ID=$(scripts/autopilot/tg_ask.sh "⚠️ <skill>: <TNN> — нужно решение
@@ -58,9 +58,9 @@ MSG_ID=$(scripts/autopilot/tg_ask.sh "⚠️ <skill>: <TNN> — нужно ре�
   "✅ Да=yes|❌ Нет=no|⏩ Пропустить=skip")
 ```
 
-**КРИТИЧНО:** не вызывай `tg_wait_answer.sh` с timeout > 480 сек — Bash-tool sub-агента имеет hard cap 600 сек, длинный wait будет убит, sub-агент увидит фальшивый «timeout» и пометит задачу blocked **до того как пользователь успеет кликнуть**.
+**CRITICAL:** do not call `tg_wait_answer.sh` with timeout > 480 sec — the sub-agent's Bash tool has a hard cap of 600 sec; a long wait will be killed, the sub-agent will see a fake "timeout" and mark the task blocked **before the user has had a chance to click**.
 
-Правильный паттерн — retry-loop, до 12 итераций (96 мин total wait):
+The correct pattern is a retry-loop, up to 12 iterations (96 min total wait):
 
 ```bash
 ATTEMPT=0
@@ -77,74 +77,74 @@ if [[ -z "$ANSWER" || "$ANSWER" == "timeout" ]]; then
 fi
 ```
 
-ANSWER в {yes|no|skip|timeout}. Скилл интерпретирует по контексту checkpoint'а (см. секции ниже).
+ANSWER is in {yes|no|skip|timeout}. The skill interprets it by the checkpoint's context (see the sections below).
 
-**TG-логирование (нормальная работа, без блокировок):**
+**TG logging (normal operation, no blocking):**
 
-В режиме `--yes` пингуй TG на:
-- Старт волны: `🟡 Sprint S14 Волна 2/4 — 5 задач [T125 T126 T127 T128 T130]`
-- Конец волны: `✅ Sprint S14 Волна 2/4 готова — коммит <sha>`
-- Финал sprint'а: `✅ Sprint S14 закончен — 16/16 задач` (или partial)
+In `--yes` mode, ping TG on:
+- Wave start: `🟡 Sprint S14 Волна 2/4 — 5 задач [T125 T126 T127 T128 T130]`
+- Wave end: `✅ Sprint S14 Волна 2/4 готова — коммит <sha>`
+- Sprint finish: `✅ Sprint S14 закончен — 16/16 задач` (or partial)
 
-Шаблоны и стиль — см. секцию «TG-логирование» в `.claude/skills/auto-pilot/SKILL.md`. Не дублировать жаргоном, держать одну-две короткие строки.
+For templates and style, see the "TG logging" section in `.claude/skills/auto-pilot/SKILL.md`. Do not duplicate with jargon; keep it to one or two short lines.
 
 ---
 
-## Алгоритм: Фаза 0 — Парсинг спеки и построение волн
+## Algorithm: Phase 0 — Parse the spec and build waves
 
-### 0.0 — Распарсить аргументы
+### 0.0 — Parse arguments
 
-Извлечь:
-- `spec_id` (например `S14`)
-- `--yes` (boolean — headless-режим)
+Extract:
+- `spec_id` (e.g. `S14`)
+- `--yes` (boolean — headless mode)
 - `--dry-run` (boolean)
 
-`--yes` и `--dry-run` могут идти в любом порядке относительно `S14`. Если оба переданы — `--dry-run` побеждает (план показывается, ничего не выполняется, эскалаций не делаем).
+`--yes` and `--dry-run` may appear in any order relative to `S14`. If both are passed, `--dry-run` wins (the plan is shown, nothing is executed, no escalations are made).
 
-### 0.1 — Найти файл спеки
+### 0.1 — Find the spec file
 
-Выполнить поиск:
+Run the search:
 
 ```text
 glob docs/2. SUP-specifications/SNN_*.md
 ```
 
-Если файл не найден — проверить `docs/backlog/` и `docs/2. SUP-specifications/*_done.md`.
-Если всё равно не найден → СТОП:
+If the file is not found — check `docs/backlog/` and `docs/2. SUP-specifications/*_done.md`.
+If still not found → STOP:
 
 ```text
 ❌ Спецификация S02 не найдена в docs/2. SUP-specifications/
 ```
 
-### 0.2 — Собрать задачи со статусом 🟡
+### 0.2 — Collect tasks with status 🟡
 
-Прочитать файл спеки. Найти все строки таблицы задач где статус = 🟡.
-Извлечь для каждой: номер TNN, название, колонку "Зависит от" (если есть).
+Read the spec file. Find all rows in the task table where the status = 🟡.
+Extract for each: the TNN number, the title, and the "Зависит от" column (if present).
 
-Если 🟡 задач нет:
+If there are no 🟡 tasks:
 
 ```text
 ℹ️ В спецификации S02 нет активных задач (все ✅ или 🔵).
 ```
 
-Остановиться.
+Stop.
 
-### 0.3 — Построить граф зависимостей
+### 0.3 — Build the dependency graph
 
-**Если в спеке есть явная колонка "Зависит от":**
+**If the spec has an explicit "Зависит от" column:**
 
-- Строить граф по ней: TNN → [список TNN-блокеров]
+- Build the graph from it: TNN → [list of blocking TNNs]
 
-**Fallback — если колонки нет:**
+**Fallback — if there is no such column:**
 
-- Считать все задачи независимыми → одна волна, выполнять последовательно (параллелизм не применяется без явных зависимостей)
+- Treat all tasks as independent → a single wave, executed sequentially (parallelism is not applied without explicit dependencies)
 
-### 0.4 — Разбить на волны
+### 0.4 — Split into waves
 
-Волна 1: задачи без блокеров (in-degree == 0)
-Волна N: задачи, все блокеры которых выполнены в предыдущих волнах
+Wave 1: tasks with no blockers (in-degree == 0)
+Wave N: tasks whose blockers are all completed in previous waves
 
-Если граф содержит цикл → СТОП:
+If the graph contains a cycle → STOP:
 
 ```text
 ❌ Обнаружен цикл зависимостей: T05 → T06 → T05
@@ -153,14 +153,14 @@ glob docs/2. SUP-specifications/SNN_*.md
 
 ---
 
-## Алгоритм: Фаза 1 — Предполётный план
+## Algorithm: Phase 1 — Pre-flight plan
 
-### 1.1 — Предварительное сканирование рисков
+### 1.1 — Preliminary risk scan
 
-Для каждой задачи прочитать файл задачи и критерии приёмки.
-Определить ожидаемые точки остановки (см. раздел "Определение рисков").
+For each task, read the task file and the acceptance criteria.
+Determine the expected stop points (see the "Risk detection" section).
 
-### 1.2 — Вывести план
+### 1.2 — Output the plan
 
 ```text
 ## Sprint S02 — План
@@ -176,7 +176,7 @@ glob docs/2. SUP-specifications/SNN_*.md
 Итого: ~N точек где нужен ты. Продолжать? (да/нет)
 ```
 
-В режиме `--yes` дополнительно показать решение для каждой точки остановки:
+In `--yes` mode, additionally show the decision for each stop point:
 
 ```text
 Ожидаемые точки остановки (с pre-auth из HANDOFF):
@@ -185,85 +185,85 @@ glob docs/2. SUP-specifications/SNN_*.md
   🧪  T06 — MANUAL_TEST → ask (default)
 ```
 
-### 1.3 — Если --dry-run
+### 1.3 — If --dry-run
 
-Вывести план и завершить. Ничего не выполнять. Подтверждения не запрашивать.
+Output the plan and finish. Execute nothing. Do not request confirmation.
 
 ### 1.4 — Plan confirmation
 
-**Интерактивный режим:** ждать "да" / "ок" / "go" от пользователя. При "нет" / "стоп" — завершить.
+**Interactive mode:** wait for "да" / "ок" / "go" from the user. On "нет" / "стоп" — finish.
 
-**`--yes` режим:**
+**`--yes` mode:**
 
 ```bash
 PLAN_OK=$(python3 scripts/autopilot/check_authz.py --checkpoint plan_confirmed)
 ```
 
-- `PLAN_OK == "yes"` → продолжить, TG-залогировать `→ Беру: /sprint S14, план auto-confirmed`
-- `PLAN_OK == "no"` → ВСЕГДА эскалировать (план не подтверждён) — `tg_ask` с текстом плана; ANSWER ∈ {yes → продолжить, no/timeout → завершить с outcome=partial}
+- `PLAN_OK == "yes"` → continue, log to TG `→ Беру: /sprint S14, план auto-confirmed`
+- `PLAN_OK == "no"` → ALWAYS escalate (plan not confirmed) — `tg_ask` with the plan text; ANSWER ∈ {yes → continue, no/timeout → finish with outcome=partial}
 
 ---
 
-## Алгоритм: Фаза 2 — Выполнение волн
+## Algorithm: Phase 2 — Executing waves
 
-### 2.1 — Для каждой волны
+### 2.1 — For each wave
 
-Объявить старт волны:
+Announce the wave start:
 
 ```text
 ## Волна N/M — старт [T05, T07]
 ```
 
-В `--yes` дополнительно: `scripts/autopilot/tg_notify.sh "🟡 Sprint <Spec> Волна N/M — <K задач>"`
+In `--yes`, additionally: `scripts/autopilot/tg_notify.sh "🟡 Sprint <Spec> Волна N/M — <K задач>"`
 
-Если волна содержит более одной задачи — запустить параллельно через `superpowers:dispatching-parallel-agents`. Каждый агент получает:
+If the wave contains more than one task — run them in parallel via `superpowers:dispatching-parallel-agents`. Each agent receives:
 
-- Номер задачи TNN
-- Путь к файлу задачи
-- Инструкцию выполнить алгоритм "Выполнение одной задачи" ниже
-- В `--yes` режиме — флаг что headless: вместо «ждать пользователя» использовать `check_authz.py` + `tg_ask.sh` + `tg_wait_answer.sh`
+- The TNN task number
+- The path to the task file
+- An instruction to follow the "Executing a single task" algorithm below
+- In `--yes` mode — a flag that it is headless: instead of "waiting for the user", use `check_authz.py` + `tg_ask.sh` + `tg_wait_answer.sh`
 
-Если волна содержит одну задачу — выполнить напрямую (без диспатча агента).
+If the wave contains a single task — execute it directly (without dispatching an agent).
 
-### 2.2 — Ждать завершения всех задач волны
+### 2.2 — Wait for all tasks of the wave to complete
 
-Следующая волна стартует только после того, как ВСЕ задачи текущей волны завершены (статус: ✅ done или ⚠️ blocked или ⛔ skipped).
+The next wave starts only after ALL tasks of the current wave have completed (status: ✅ done or ⚠️ blocked or ⛔ skipped).
 
-### 2.3 — Обработка заблокированных задач
+### 2.3 — Handling blocked tasks
 
-Если задача завершилась со статусом ⚠️ blocked или ⛔ skipped:
+If a task finished with status ⚠️ blocked or ⛔ skipped:
 
-- Все задачи следующих волн, зависящие от неё, получают статус ⛔ skipped
-- Независимые задачи следующих волн продолжают выполнение
+- All tasks of later waves that depend on it get status ⛔ skipped
+- Independent tasks of later waves continue executing
 
-### 2.4 — После волны
+### 2.4 — After the wave
 
-В `--yes`: `scripts/autopilot/tg_notify.sh "✅ Sprint <Spec> Волна N/M готова — коммит <sha> → dev"`
+In `--yes`: `scripts/autopilot/tg_notify.sh "✅ Sprint <Spec> Волна N/M готова — коммит <sha> → dev"`
 
-### 2.5 — После всех волн
+### 2.5 — After all waves
 
-Вывести финальный отчёт. В `--yes`: TG-итог `✅ Sprint <Spec> закончен — <K>/<Total> задач`.
+Output the final report. In `--yes`: TG summary `✅ Sprint <Spec> закончен — <K>/<Total> задач`.
 
 ---
 
-## Алгоритм: Выполнение одной задачи
+## Algorithm: Executing a single task
 
-### Шаг 1 — Сбор контекста *(параллельно)*
+### Step 1 — Gather context *(in parallel)*
 
-Параллельно прочитать:
+Read in parallel:
 
-- Файл задачи: `docs/3. SUP-tasks/TNN_*.md`
-- Файл спеки (уже прочитан в Фазе 0 — переиспользовать)
-- Все файлы кода упомянутые в задаче
-- Связанные файлы (импорты, конфиги) если упомянуты
+- The task file: `docs/3. SUP-tasks/TNN_*.md`
+- The spec file (already read in Phase 0 — reuse it)
+- All code files mentioned in the task
+- Related files (imports, configs) if mentioned
 
-Извлечь из задачи: критерии приёмки, список изменяемых файлов, описание.
+Extract from the task: acceptance criteria, the list of files to change, the description.
 
-### Шаг 2 — Авто-валидация плана
+### Step 2 — Auto-validate the plan
 
-Сгенерировать внутренний план имплементации. Проверить план против критериев приёмки.
+Generate an internal implementation plan. Check the plan against the acceptance criteria.
 
-Если какой-то критерий не покрыт → СТОП:
+If some criterion is not covered → STOP:
 
 ```text
 ⛔ T05 — план не покрывает критерии приёмки
@@ -271,21 +271,21 @@ PLAN_OK=$(python3 scripts/autopilot/check_authz.py --checkpoint plan_confirmed)
   - AC#3: уведомление отправляется при изменении статуса сделки
 ```
 
-Статус задачи → ⚠️ blocked. В `--yes` режиме дополнительно TG-эскалация `🔴 T05 — план не покрывает AC#3` (это не нужно ask'ать, просто сообщить).
+Task status → ⚠️ blocked. In `--yes` mode, additionally a TG escalation `🔴 T05 — план не покрывает AC#3` (no need to ask, just notify).
 
-Если план покрывает все критерии → продолжить к шагу 3.
+If the plan covers all criteria → continue to step 3.
 
-### Шаг 3 — Checkpoint (RISKY / DEPLOY)
+### Step 3 — Checkpoint (RISKY / DEPLOY)
 
-Определить риски по правилам из раздела "Определение рисков".
+Determine risks using the rules in the "Risk detection" section.
 
-**Интерактивный режим, найден DEPLOY или RISKY:**
+**Interactive mode, DEPLOY or RISKY found:**
 
-Вывести план с пометками, ждать «да/нет/пропустить».
+Output the plan with markers, wait for "да/нет/пропустить".
 
-**`--yes` режим:**
+**`--yes` mode:**
 
-Для каждого риска определить ключ checkpoint'а:
+For each risk, determine the checkpoint key:
 - DEPLOY → `deploy_default`
 - RISKY → `risky_default`
 
@@ -293,114 +293,114 @@ PLAN_OK=$(python3 scripts/autopilot/check_authz.py --checkpoint plan_confirmed)
 DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint <key>)
 ```
 
-- `DECISION=auto` → продолжить, TG-логировать `✓ T125 pre-auth для <checkpoint> — продолжаю`
-- `DECISION=skip` → задача ⛔ skipped, TG `⏩ T125 skipped (HANDOFF directive)`
-- `DECISION=ask` → эскалация по retry-loop паттерну (см. секцию «Эскалация через TG» в начале файла). Краткое: `tg_ask.sh` → сохрани `MSG_ID` → `tg_wait_answer.sh "$MSG_ID" 480 5` в цикле до 12 раз.
+- `DECISION=auto` → continue, log to TG `✓ T125 pre-auth для <checkpoint> — продолжаю`
+- `DECISION=skip` → task ⛔ skipped, TG `⏩ T125 skipped (HANDOFF directive)`
+- `DECISION=ask` → escalate using the retry-loop pattern (see the "Escalation via TG" section at the start of the file). Briefly: `tg_ask.sh` → save `MSG_ID` → `tg_wait_answer.sh "$MSG_ID" 480 5` in a loop up to 12 times.
 
-Интерпретация: `yes` → продолжить, `no` → ⚠️ blocked, `skip` → ⛔ skipped, `timeout` → ⚠️ blocked (запись в логе «no human reply in 96 min»).
+Interpretation: `yes` → continue, `no` → ⚠️ blocked, `skip` → ⛔ skipped, `timeout` → ⚠️ blocked (log entry "no human reply in 96 min").
 
-**Если RISKY и DEPLOY отсутствуют** — шаг пропускается.
+**If RISKY and DEPLOY are absent** — the step is skipped.
 
-### Шаг 4 — Имплементация
+### Step 4 — Implementation
 
-Написать код согласно плану. Автономно, без остановок.
+Write the code per the plan. Autonomously, without stops.
 
-Если в процессе обнаружен **незапланированный риск** (паттерн из «Определение рисков» которого не было в плане шага 2) → НЕМЕДЛЕННЫЙ СТОП:
+If an **unplanned risk** is discovered in the process (a pattern from "Risk detection" that was not in the step 2 plan) → IMMEDIATE STOP:
 
-**Интерактивный режим:** показать новый риск, ждать «да/нет/пропустить».
+**Interactive mode:** show the new risk, wait for "да/нет/пропустить".
 
-**`--yes` режим:**
+**`--yes` mode:**
 
 ```bash
 DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint unplanned_risk_default)
 ```
 
-Дальше как в Шаге 3 (auto/skip/ask).
+Then proceed as in Step 3 (auto/skip/ask).
 
-### Шаг 5 — Тестирование
+### Step 5 — Testing
 
-#### Авто-тесты
+#### Auto-tests
 
-Запустить тесты затронутых модулей. **Если тесты прошли** → перейти к шагу 6.
+Run the tests of the affected modules. **If the tests pass** → proceed to step 6.
 
-**Если тесты упали:**
+**If the tests fail:**
 
-- Попытка 1: проанализировать traceback, найти причину, починить
-- Попытка 2: после фикса запустить тесты снова
-- Попытка 3: финальная попытка
+- Attempt 1: analyze the traceback, find the cause, fix it
+- Attempt 2: after the fix, run the tests again
+- Attempt 3: final attempt
 
-После 3 провалов:
+After 3 failures:
 
-**Интерактивный режим:** СТОП, ждать инструкций.
+**Interactive mode:** STOP, wait for instructions.
 
-**`--yes` режим:**
+**`--yes` mode:**
 
 ```bash
 DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint test_failure_default)
 ```
 
-- `auto` → пометить ⚠️ blocked (не рискуем без явной auth), TG-залог
-- `skip` → ⛔ skipped, TG-залог
-- `ask` → `tg_ask` с последним traceback'ом + «yes (попробуй ещё) / no (стоп) / skip»
+- `auto` → mark ⚠️ blocked (we don't take risks without explicit auth), log to TG
+- `skip` → ⛔ skipped, log to TG
+- `ask` → `tg_ask` with the last traceback + "yes (try again) / no (stop) / skip"
 
-После получения инструкций — продолжить или завершить с ⚠️ blocked.
+After receiving instructions — continue or finish with ⚠️ blocked.
 
-#### Ручное тестирование (MANUAL_TEST)
+#### Manual testing (MANUAL_TEST)
 
-Если задача помечена MANUAL_TEST (UI-изменения без авто-тестов):
+If the task is marked MANUAL_TEST (UI changes without auto-tests):
 
-**Интерактивный режим:** сформулировать сценарий, попросить пользователя.
+**Interactive mode:** formulate a scenario, ask the user.
 
-**`--yes` режим:**
+**`--yes` mode:**
 
 ```bash
 DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint manual_test_default)
 ```
 
-- `auto` → пропустить ручную проверку (трюком — мы доверяем что задача протестирована автотестами/sub-агентом)
-- `skip` → ⛔ skipped (задача требует ручной проверки которой не будет)
-- `ask` → `tg_ask` с инструкциями что проверить + «yes (всё ок) / no (не работает) / skip»
+- `auto` → skip the manual check (we trust that the task is tested by auto-tests/sub-agent)
+- `skip` → ⛔ skipped (the task requires a manual check that won't happen)
+- `ask` → `tg_ask` with instructions on what to check + "yes (all good) / no (broken) / skip"
 
-### Шаг 6 — Review loop
+### Step 6 — Review loop
 
-Выполнить скилл `review-loop` для текущей задачи.
-Цикл `codereview → fix` до `CRITICAL==0 AND HIGH==0`, максимум 5 итераций.
-Фиксы применяются в быстром режиме (без ожидания подтверждения).
+Run the `review-loop` skill for the current task.
+The `codereview → fix` loop until `CRITICAL==0 AND HIGH==0`, maximum 5 iterations.
+Fixes are applied in fast mode (without waiting for confirmation).
 
-### Шаг 7 — Accept + Push
+### Step 7 — Accept + Push
 
-После чистого review-loop:
+After a clean review-loop:
 
-1. Выполнить `/accept TNN` — скилл закроет задачу, перенесёт файл, обновит HANDOFF и CHANGELOG
-2. Выполнить `/sup-push` — скилл проверит секреты, сформирует коммит, запушит
+1. Run `/accept TNN` — the skill closes the task, moves the file, updates HANDOFF and CHANGELOG
+2. Run `/sup-push` — the skill checks secrets, builds the commit, and pushes
 
-Объявить завершение:
+Announce completion:
 
 ```text
 ✅ T05 — выполнено и закрыто
 ```
 
-В `--yes` дополнительно: TG-лог `✓ T05 закрыт → коммит <sha>`.
+In `--yes`, additionally: TG log `✓ T05 закрыт → коммит <sha>`.
 
 ---
 
-## Определение рисков
+## Risk detection
 
-Сканировать файлы которые планируется изменить. Риск определяется по паттернам:
+Scan the files planned to be changed. Risk is determined by patterns:
 
-| Тип | Паттерны |
+| Type | Patterns |
 |-----|----------|
-| `DEPLOY` | `docker-compose.yml`, `nginx.conf`, `.github/workflows/`, `Dockerfile`, `gunicorn` конфиги |
-| `RISKY` | файлы с `migration`, `migrate`, `auth`, `password`, `token`, `SECRET`, env-переменные, внешние API (Bitrix, YooKassa, Supabase) |
-| `MANUAL_TEST` | изменения в `tg_bot/keyboards`, `tg_bot/texts`, шаблоны сообщений, UI-handlers без unit-тестов |
+| `DEPLOY` | `docker-compose.yml`, `nginx.conf`, `.github/workflows/`, `Dockerfile`, `gunicorn` configs |
+| `RISKY` | files with `migration`, `migrate`, `auth`, `password`, `token`, `SECRET`, env variables, external APIs (Bitrix, YooKassa, Supabase) |
+| `MANUAL_TEST` | changes in `tg_bot/keyboards`, `tg_bot/texts`, message templates, UI handlers without unit tests |
 
-**Незапланированный риск** — паттерн обнаружен в процессе имплементации (шаг 4), которого не было в плане шага 2.
+**Unplanned risk** — a pattern discovered during implementation (step 4) that was not in the step 2 plan.
 
 ---
 
-## Финальный отчёт
+## Final report
 
-После завершения всех волн:
+After all waves are complete:
 
 ```text
 ## Sprint S02 — Итог
@@ -418,30 +418,30 @@ DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint ma
   ⚠️ T08 — нет ответа в TG за 2 часа. Запусти /sprint S02 заново когда сможешь.
 ```
 
-В `--yes`: TG-итог одной строкой `<emoji> Sprint <Spec> закончен — <K>/<Total> done, <B> blocked, <S> skipped`.
+In `--yes`: a one-line TG summary `<emoji> Sprint <Spec> закончен — <K>/<Total> done, <B> blocked, <S> skipped`.
 
 ---
 
-## Правила
+## Rules
 
-- **DEPLOY — всегда checkpoint** (в интерактивном режиме — ждёт стдин; в --yes — через `deploy_default`/per-task)
-- **RISKY — всегда checkpoint** (аналогично)
-- **3 попытки на тесты**: после провала — эскалация
-- **Незапланированный риск → немедленный СТОП**: обнаружен в процессе → checkpoint
-- **Заблокированная задача не блокирует волну**: другие задачи той же волны продолжают
-- **Зависимые от blocked → автоматически skipped**: не пытаться выполнять
-- **Цикл зависимостей → СТОП на старте**
-- **--dry-run → только план** (даже если есть --yes — план выводится с пометками, ничего не выполняется)
-- **Fallback без зависимостей → последовательно**
-- **sup-push после каждого accept**: не накапливать коммиты между задачами
-- **--yes без HANDOFF YAML-блока → всё дефолтит на `ask`**. Если TG creds тоже не настроены — `/sprint --yes` отказывается стартовать с ошибкой «No HANDOFF authz + no TG creds = no autonomy possible»
+- **DEPLOY — always a checkpoint** (in interactive mode it waits for stdin; in --yes — via `deploy_default`/per-task)
+- **RISKY — always a checkpoint** (likewise)
+- **3 attempts for tests**: after failure — escalation
+- **Unplanned risk → immediate STOP**: discovered in the process → checkpoint
+- **A blocked task does not block the wave**: other tasks of the same wave continue
+- **Dependents of a blocked task → automatically skipped**: do not attempt to execute
+- **Dependency cycle → STOP at the start**
+- **--dry-run → plan only** (even with --yes — the plan is output with markers, nothing is executed)
+- **Fallback without dependencies → sequentially**
+- **sup-push after every accept**: do not accumulate commits between tasks
+- **--yes without a HANDOFF YAML block → everything defaults to `ask`**. If TG creds are also not configured — `/sprint --yes` refuses to start with the error "No HANDOFF authz + no TG creds = no autonomy possible"
 
 ---
 
-## См. также
+## See also
 
-- **`/auto-pilot`** — оркестратор-роутер. В cron-режиме именно он зовёт `/sprint --yes`. Дизайн TG-шаблонов и checkpoint-контракт — там.
-- **`/sprint-codex`** — параллельная имплементация задач волны через Codex-воркеры в git worktree. Routing автоматически выбирает его если Codex доступен и волна ≥2 задач. См. спеку S11.
-- **`/codex-toggle`** — переключение classic ↔ codex.
-- **`/review-loop`** — цикл ревью после имплементации задачи (Шаг 6).
-- **`/accept`** + **`/sup-push`** — закрытие задачи и коммит (Шаг 7).
+- **`/auto-pilot`** — orchestrator-router. In cron mode it is the one that calls `/sprint --yes`. The TG template design and checkpoint contract are there.
+- **`/sprint-codex`** — parallel implementation of wave tasks via Codex workers in a git worktree. Routing selects it automatically if Codex is available and the wave has ≥2 tasks. See spec S11.
+- **`/codex-toggle`** — switching classic ↔ codex.
+- **`/review-loop`** — the review loop after implementing a task (Step 6).
+- **`/accept`** + **`/sup-push`** — closing the task and committing (Step 7).

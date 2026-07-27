@@ -1,47 +1,54 @@
 ---
 name: codereview
-description: "Многофазный придирчивый код-ревью задачи. Используй этот скилл всякий раз, когда пользователь просит проверить код, сделать ревью, найти баги, проверить критерии приёмки, или говорит '/codereview', 'сделай ревью', 'проверь код', 'посмотри что не так', 'найди баги', 'code review'. Скилл охватывает все фазы: проверку критериев приёмки, adversarial review, user walkthrough, архитектурный"
+description: >
+  Multi-phase, meticulous code review of a task. Use this skill whenever
+  the user asks to check code, do a review, find bugs, verify
+  acceptance criteria, or says "/codereview", "сделай ревью", "проверь код",
+  "посмотри что не так", "найди баги", "code review". The skill covers all phases:
+  acceptance criteria check, adversarial review, user walkthrough, architectural
+  fit. The result is a structured table of findings with severity and an entry in the task file.
 ---
+
 # Code Review Skill
 
-Придирчивый многофазный ревью кода задачи. Только анализ — без фиксов.
+A meticulous, multi-phase review of a task's code. Analysis only — no fixes.
 
 ---
 
-## Входные данные
+## Input data
 
-Пользователь предоставляет одно или несколько из:
-- Файл задачи (с критериями приёмки)
-- Изменённые файлы кода (вставляет в чат или загружает)
-- Номер задачи (`T01`, `T02`, …) для идентификации
+The user provides one or more of:
+- A task file (with acceptance criteria)
+- Changed code files (pasted into the chat or uploaded)
+- A task number (`T01`, `T02`, …) for identification
 
-Если ничего не предоставлено — попроси файл задачи и изменённые файлы.
-
----
-
-## Алгоритм выполнения
-
-### 0. Сбор контекста
-
-1. Найди и прочитай **файл задачи** — нужны:
-   - Критерии приёмки (Acceptance Criteria)
-   - Описание задачи
-   - Затронутые файлы (если указаны)
-
-2. Прочитай **все предоставленные файлы кода** — изменённые + контекстные (роутинг, layout, store, config, downstream-компоненты).
-
-3. Если пользователь упомянул номер задачи, но не приложил файлы — попроси их явно.
+If nothing is provided — ask for the task file and the changed files.
 
 ---
 
-### Фаза A — Проверка критериев приёмки
+## Execution algorithm
 
-Для каждого критерия приёмки из файла задачи:
-- Найди соответствующий код
-- Вынеси вердикт: ✅ выполнен / ❌ не выполнен / ⚠️ частично
-- Для ❌ и ⚠️ — укажи конкретную строку/файл и объясни что не так
+### 0. Context gathering
 
-Формат:
+1. Find and read the **task file** — you need:
+   - Acceptance Criteria
+   - The task description
+   - The affected files (if specified)
+
+2. Read **all the provided code files** — changed + contextual ones (routing, layout, store, config, downstream components).
+
+3. If the user mentioned a task number but did not attach files — ask for them explicitly.
+
+---
+
+### Phase A — Acceptance criteria check
+
+For each acceptance criterion from the task file:
+- Find the corresponding code
+- Render a verdict: ✅ met / ❌ not met / ⚠️ partial
+- For ❌ and ⚠️ — point to the specific line/file and explain what is wrong
+
+Format:
 ```
 | # | Критерий | Статус | Комментарий |
 |---|----------|--------|-------------|
@@ -51,75 +58,75 @@ description: "Многофазный придирчивый код-ревью з
 
 ---
 
-### Фаза B — Adversarial Review
+### Phase B — Adversarial Review
 
-Задай себе вопрос: **«Как этот код сломается?»**
+Ask yourself: **"How will this code break?"**
 
-Проверяй по категориям:
+Check by category:
 
-**Корректность:**
-- Граничные случаи (пустой массив, null, 0, очень большое число)
-- Race conditions, async/await ошибки
-- Неправильные предположения о типах данных
+**Correctness:**
+- Boundary cases (empty array, null, 0, a very large number)
+- Race conditions, async/await errors
+- Incorrect assumptions about data types
 
-**Безопасность:**
-- XSS, инъекции, небезопасная десериализация
-- Открытые секреты или токены в коде
-- Небезопасные дефолты
+**Security:**
+- XSS, injections, unsafe deserialization
+- Exposed secrets or tokens in the code
+- Insecure defaults
 
-**API контракт:**
-- Соответствие ожидаемому интерфейсу (типы, поля, формат ответа)
-- Breaking changes для вызывающего кода
+**API contract:**
+- Conformance to the expected interface (types, fields, response format)
+- Breaking changes for the calling code
 
-**Производительность:**
-- N+1 запросы
-- Тяжёлые операции в render / hot path
-- Утечки памяти (незакрытые подписки, listeners)
+**Performance:**
+- N+1 queries
+- Heavy operations in render / hot path
+- Memory leaks (unclosed subscriptions, listeners)
 
 **Dead code:**
-- Неиспользуемые импорты, переменные, функции
-- Закомментированный код
+- Unused imports, variables, functions
+- Commented-out code
 
 ---
 
-### Фаза C — User Walkthrough
+### Phase C — User Walkthrough
 
-Мысленно пройди **3–5 пользовательских сценариев** через изменённый код:
+Mentally walk through **3–5 user scenarios** across the changed code:
 
-1. Happy path — всё работает штатно
-2. Empty state — нет данных / первый запуск
-3. Error state — сервер вернул ошибку / сеть недоступна
-4. Edge case — нестандартный ввод пользователя
-5. Concurrent actions — пользователь нажал кнопку дважды
+1. Happy path — everything works as intended
+2. Empty state — no data / first launch
+3. Error state — the server returned an error / the network is unavailable
+4. Edge case — non-standard user input
+5. Concurrent actions — the user clicked a button twice
 
-Для каждого сценария: опиши что происходит, укажи проблему если есть.
+For each scenario: describe what happens, and point out the problem if there is one.
 
-Также проверь **исходящие ссылки**: все API endpoints, роуты, импорты — существуют ли они?
-
----
-
-### Фаза D — Архитектурный fit
-
-- Вписывается ли изменение в существующую архитектуру?
-- Не создаёт ли технический долг, который заблокирует следующие задачи?
-- Соблюдены ли принятые паттерны проекта (если известны)?
+Also check the **outgoing links**: all API endpoints, routes, imports — do they exist?
 
 ---
 
-## Классификация находок
+### Phase D — Architectural fit
 
-| Severity | Когда |
+- Does the change fit into the existing architecture?
+- Does it create technical debt that will block the next tasks?
+- Are the project's adopted patterns followed (if known)?
+
+---
+
+## Classification of findings
+
+| Severity | When |
 |----------|-------|
-| **CRITICAL** | Падение приложения, потеря данных, security-уязвимость |
-| **HIGH** | Неправильное поведение, нарушение критерия приёмки, блокер |
-| **MEDIUM** | Edge case, плохой UX, dead code, техдолг |
-| **LOW** | Стиль, нейминг, мелкие улучшения |
+| **CRITICAL** | Application crash, data loss, security vulnerability |
+| **HIGH** | Incorrect behavior, acceptance criterion violation, blocker |
+| **MEDIUM** | Edge case, poor UX, dead code, tech debt |
+| **LOW** | Style, naming, minor improvements |
 
 ---
 
-## Формат вывода
+## Output format
 
-### Сводка
+### Summary
 
 ```
 ## Code Review — [Название задачи / ID]
@@ -129,7 +136,7 @@ description: "Многофазный придирчивый код-ревью з
 **Вердикт:** ✅ Готово к принятию / ⚠️ Требует фиксов / ❌ Заблокировано
 ```
 
-### Таблица находок
+### Findings table
 
 ```
 | ID | Severity | Фаза | Файл:строка | Описание | Рекомендация |
@@ -139,25 +146,25 @@ description: "Многофазный придирчивый код-ревью з
 | R3 | MEDIUM | C | UserList.tsx | Empty state не обработан — падает на .map() | Проверить array на undefined перед map |
 ```
 
-### Детали по каждой находке (для CRITICAL и HIGH)
+### Details for each finding (for CRITICAL and HIGH)
 
-Краткое объяснение + конкретный пример кода где проблема.
-
----
-
-## Правила
-
-- **Только анализ** — не предлагай готовый код фиксов (это делает `/fix`)
-- Конкретность: всегда указывай файл и строку где проблема
-- Если код не предоставлен для какого-то критерия — помечай как ⚠️ «не проверено»
-- Сравни с предыдущим ревью если оно есть в файле задачи — отметь регрессии
-- Если задача не имеет критериев приёмки — сообщи об этом и делай только фазы B, C, D
+A brief explanation + a concrete code example where the problem is.
 
 ---
 
-## См. также
+## Rules
 
-- **`/codereview-dual`** — двойной независимый ревью с Codex CLI как второй линзой (correctness/edge-cases/risks). Routing автоматически выбирает его, если Codex доступен и `enabled: true` в `.claude/codex.json`.
-- **`/codex-toggle`** — переключение между classic-ревью и dual.
-- **`/review-loop`** — цикл `codereview → fix` до чистоты от CRITICAL/HIGH.
-- **`/fix`** — применение фиксов из таблицы findings.
+- **Analysis only** — do not propose ready-made fix code (that's what `/fix` does)
+- Be specific: always point to the file and line where the problem is
+- If code was not provided for some criterion — mark it as ⚠️ "not checked"
+- Compare with the previous review if there is one in the task file — note regressions
+- If the task has no acceptance criteria — report this and do only phases B, C, D
+
+---
+
+## See also
+
+- **`/codereview-dual`** — a dual independent review with Codex as a second lens (correctness/edge-cases/risks). Routing selects it automatically if Codex is available and `enabled: true` in `.claude/codex.json`. See spec S11.
+- **`/codex-toggle`** — switching between classic review and dual.
+- **`/review-loop`** — the `codereview → fix` loop until clean of CRITICAL/HIGH.
+- **`/fix`** — applying fixes from the findings table.

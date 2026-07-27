@@ -1,13 +1,13 @@
 # Smart Processes Reference
 
-## Known entityTypeIds (Экспресс-Банкрот)
+## Known entityTypeIds (Express-Bankrot)
 
 | Smart Process | entityTypeId |
 |---------------|-------------|
-| Smart-process A (example) | 1094 |
-| Smart-process B (example) | 1122 |
-| Smart-process C (example) | 1104 |
-| Логи встреч/договоров | 1112 |
+| KadArbitr | 1094 |
+| EFRSB/Fedresurs | 1122 |
+| Employee conversion | 1104 |
+| Meeting/contract logs | 1112 |
 
 ## Get all smart process types
 ```
@@ -36,23 +36,23 @@ PARAMS: {"filter": {"ENTITY_ID": "DYNAMIC_{entityTypeId}_STAGE_{categoryId}"}}
 
 | Bitrix type | Description |
 |-------------|-------------|
-| string | Строка |
-| text | Текст |
-| integer | Целое число |
-| double | Число с плавающей точкой |
-| boolean | Флаг Y/N |
-| date | Дата |
-| datetime | Дата+время |
-| enumeration | Список (передавать ID значения) |
-| user | Пользователь (передавать USER_ID) |
-| crm | Привязка к CRM объекту |
-| crm_contact | Контакт |
-| crm_deal | Сделка |
-| file | Файл |
-| iblock_element | Элемент инфоблока |
-| money | Деньги (формат: "1000|RUB") |
+| string | String |
+| text | Text |
+| integer | Integer |
+| double | Floating-point number |
+| boolean | Y/N flag |
+| date | Date |
+| datetime | Date+time |
+| enumeration | List (pass the value ID) |
+| user | User (pass USER_ID) |
+| crm | Link to a CRM object |
+| crm_contact | Contact |
+| crm_deal | Deal |
+| file | File |
+| iblock_element | Infoblock element |
+| money | Money (format: "1000|RUB") |
 | url | URL |
-| address | Адрес |
+| address | Address |
 
 ## crm.item.list — all params
 

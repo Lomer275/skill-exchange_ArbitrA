@@ -1,151 +1,151 @@
 ---
 name: spec-brainstorm
-description: Интерактивное со-создание новой SUP-спецификации в режиме «вопрос-ответ». Не генерирует спеку из воздуха — проводит человека через структурированную разведку (проблема → цель → фазы → архитектура → риски → DoD), затем делегирует финальную запись файла в /sup-spec-writer. Используй когда пользователь говорит '/spec-brainstorm', 'давай распишем новую спеку', 'надо подумать над новой спекой', 'хочу набросать SNN', 'обсудим новый спек', 'давай спроектируем фичу', 'распиши со мной', 'набросаем спеку вместе', или когда есть сырая идея для большого куска работы которую нужно превратить в SNN_*.md. Принципиально интерактивный — задаёт вопросы по одному за раз через AskUserQuestion, не пишет файл пока человек не финализировал содержание.
+description: Interactive co-creation of a new SUP specification in a question-and-answer mode. Does not generate a spec out of thin air — it guides the person through structured discovery (problem → goal → phases → architecture → risks → DoD), then delegates the final file write to /sup-spec-writer. Use when the user says '/spec-brainstorm', 'давай распишем новую спеку', 'надо подумать над новой спекой', 'хочу набросать SNN', 'обсудим новый спек', 'давай спроектируем фичу', 'распиши со мной', 'набросаем спеку вместе', or when there is a raw idea for a large chunk of work that needs to be turned into SNN_*.md. Fundamentally interactive — asks questions one at a time via AskUserQuestion, does not write the file until the person has finalized the content.
 ---
 
-# /spec-brainstorm — со-создание новой спеки
+# /spec-brainstorm — co-creating a new spec
 
-Спеки — это стратегические решения. Они не должны генерироваться из шаблонов или воздуха. Этот скилл проводит человека через структурированную разведку и в конце **передаёт результат** в `/sup-spec-writer` для записи файла по конвенциям проекта.
+Specs are strategic decisions. They must not be generated from templates or thin air. This skill guides the person through structured discovery and at the end **hands off the result** to `/sup-spec-writer` to write the file according to project conventions.
 
-**Принцип:** ты не пишешь спеку **за** человека. Ты помогаешь ему её **сформулировать**.
+**Principle:** you don't write the spec **for** the person. You help them **formulate** it.
 
 ---
 
-## Чем отличается от /sup-spec-writer
+## How it differs from /sup-spec-writer
 
-| Аспект | /spec-brainstorm (этот) | /sup-spec-writer |
+| Aspect | /spec-brainstorm (this one) | /sup-spec-writer |
 |---|---|---|
-| Режим | Интерактивный, вопросы → ответы | Генеративный, по входному описанию |
-| Когда | Новая идея, ещё нет структуры | Структура понятна, нужно оформить |
-| Output | Финальный draft SNN с `status: draft` | Файл по всем конвенциям |
-| Вызывает | `/sup-spec-writer` в конце | Ничего |
+| Mode | Interactive, questions → answers | Generative, from an input description |
+| When | New idea, no structure yet | Structure is clear, needs formatting |
+| Output | Final draft SNN with `status: draft` | File following all conventions |
+| Calls | `/sup-spec-writer` at the end | Nothing |
 
-Если у человека уже есть **готовое описание спеки** (одним сообщением: цель, фазы, задачи) — **не используй этот скилл**, иди в `/sup-spec-writer` напрямую.
-
----
-
-## Входные данные
-
-- `/spec-brainstorm` — старт с нуля, вытащить идею из человека
-- `/spec-brainstorm "сырая идея в свободной форме"` — старт с зерном, дальше уточняем
+If the person already has a **complete spec description** (in a single message: goal, phases, tasks) — **do not use this skill**, go to `/sup-spec-writer` directly.
 
 ---
 
-## Фаза 0 — Прочитать конвенции в runtime
+## Input
 
-Не полагайся на память. **Прочитай эти файлы** перед началом:
-
-1. `docs/4. SUP-guides/specifications_guide.md` — структура спеки
-2. `docs/4. SUP-guides/doc_conventions.md` — именование, нумерация
-3. `docs/4. SUP-guides/business_requirements_template.md` — если спека высокого уровня и нужна BR-привязка
-4. `SUP-architecture.md` — куда новая спека ляжет в общую картину
-5. `SUP-HANDOFF.md` — что сейчас в работе (не дублируем?)
-
-Это твой контекст. Не пересказывай его пользователю — просто используй при формулировании вопросов.
+- `/spec-brainstorm` — start from scratch, draw the idea out of the person
+- `/spec-brainstorm "raw free-form idea"` — start with a seed, then refine
 
 ---
 
-## Фаза 1 — Понять проблему (НЕ решение)
+## Phase 0 — Read the conventions at runtime
 
-Самая частая ошибка спек — прыгать сразу к «как сделаем» без чёткого «зачем». Начни с проблемы.
+Don't rely on memory. **Read these files** before starting:
 
-Задай через `AskUserQuestion` (по одному вопросу за раз, с конкретными опциями):
+1. `docs/4. SUP-guides/specifications_guide.md` — spec structure
+2. `docs/4. SUP-guides/doc_conventions.md` — naming, numbering
+3. `docs/4. SUP-guides/business_requirements_template.md` — if the spec is high-level and needs a BR linkage
+4. `SUP-architecture.md` — where the new spec fits into the overall picture
+5. `SUP-HANDOFF.md` — what's in progress right now (not duplicating?)
 
-1. **Какую проблему решаем?**
-   - «Текущий процесс X занимает Y минут, надо до Z»
-   - «Менеджеры жалуются на A»
-   - «Клиенты теряются на этапе B»
-   - «Метрика X деградирует»
-   - Other (свободная формулировка)
-
-2. **Кто страдает прямо сейчас?**
-   - Клиенты бота
-   - Менеджеры (внутренние)
-   - Я как разработчик (тех-долг)
-   - Бизнес (выручка/конверсия)
-   - Несколько (multi-select)
-
-3. **Что произойдёт если НЕ сделать в этом квартале?**
-   - Ничего критичного — backlog
-   - Терпимо ещё месяц-два
-   - Каждый день копятся проблемы
-   - Уже горит
-
-Если человек отвечает «не знаю» или ответы рассогласованы — **остановись и подсветь это**. Спека без чёткой проблемы превратится в плохую задачу.
+This is your context. Don't relay it to the user — just use it when formulating questions.
 
 ---
 
-## Фаза 2 — Сформулировать цель и ограничения
+## Phase 1 — Understand the problem (NOT the solution)
 
-Теперь когда понятно «зачем», вытащи **what** в одном предложении:
+The most common spec mistake is jumping straight to "how we'll do it" without a clear "why." Start with the problem.
 
-**«Цель: <глагол> <объект> чтобы <метрика/исход>».**
+Ask via `AskUserQuestion` (one question at a time, with concrete options):
 
-Пример: «Уменьшить время ответа AI-чата с 12с до 5с чтобы клиенты не уходили в TG.»
+1. **What problem are we solving?**
+   - "The current process X takes Y minutes, needs to be Z"
+   - "Managers complain about A"
+   - "Clients get lost at stage B"
+   - "Metric X is degrading"
+   - Other (free-form)
 
-Задай вопросы:
+2. **Who is suffering right now?**
+   - Bot clients
+   - Managers (internal)
+   - Me as the developer (tech debt)
+   - The business (revenue/conversion)
+   - Several (multi-select)
 
-1. **Какой измеримый исход?** Метрика которая покажет что сработало.
-2. **Что НЕ входит в скоуп?** Самая важная часть — что мы намеренно не делаем. Без этого спека расползётся.
-3. **Есть ли жёсткие constraints?** Бюджет на токены, дедлайн, нельзя трогать прод-БД, нельзя ломать API клиента и т.д.
+3. **What happens if we DON'T do it this quarter?**
+   - Nothing critical — backlog
+   - Tolerable for another month or two
+   - Problems pile up every day
+   - Already on fire
 
-Сохрани ответы в свой контекст. **Зачитай человеку summary** — «правильно понял? цель X, исход Y, не делаем Z, ограничения C» — и попроси подтвердить или скорректировать.
-
----
-
-## Фаза 3 — Архитектурный набросок
-
-На этом этапе у тебя есть проблема, цель и границы. Время сделать набросок «как».
-
-1. **Какие слои затронем?** (multi-select)
-   - TG-бот / MAX-бот (`tg_bot/`, `max_bot/`)
-   - Django (модели, миграции, API — `Handler/`, `Tracker/`)
-   - AI-pipeline (`shared/ai_pipeline/`)
-   - Bitrix-интеграция (`bitrix/`)
-   - Внешние сервисы (Supabase, OpenAI, Точка)
-   - Инфра (docker, CI, миграции)
-   - Документация
-
-2. **Естественные границы фаз?** Опции на основе слоёв:
-   - Одна фаза: всё за раз, скоуп маленький
-   - Две фазы: data + UX
-   - Три+ фазы: data → integration → UX → polish
-
-3. **Какие будут новые модели / миграции?** (если применимо) — кратко. Если есть — это серьёзный риск, нужна отдельная задача с тегом `require_human_approval`.
-
-4. **Что может пойти не так?** Назови 2-3 риска навскидку — нужно для секции DoD.
-
-Если человек теряется — **предложи 2-3 архитектурных варианта** на основе того что прочитал в `SUP-architecture.md`, и попроси выбрать. Не выдумывай — используй паттерны проекта.
+If the person answers "I don't know" or the answers are inconsistent — **stop and flag it**. A spec without a clear problem will turn into a bad task.
 
 ---
 
-## Фаза 4 — Definition of Done
+## Phase 2 — Formulate the goal and constraints
 
-Спека без чёткого DoD = постоянное «ещё одна задачка». Задай:
+Now that the "why" is clear, draw out the **what** in a single sentence:
 
-1. **Какие критерии «готово»?** (multi-select + Other)
-   - Метрика X достигла Y
-   - Все задачи закрыты + ревью пройдены
-   - Прод-деплой и не упал за N дней
-   - Менеджеры протестировали и подтвердили
-   - Юзер-тестирование на dev
+**"Goal: <verb> <object> so that <metric/outcome>".**
 
-2. **Кто финально подтверждает приёмку?** Ты сам? Менеджер? Клиент? (важно — определяет когда спека `status: done`)
+Example: "Reduce AI-chat response time from 12s to 5s so that clients don't leave for TG."
+
+Ask:
+
+1. **What is the measurable outcome?** The metric that will show it worked.
+2. **What is NOT in scope?** The most important part — what we deliberately won't do. Without this the spec will sprawl.
+3. **Are there hard constraints?** Token budget, deadline, can't touch the prod DB, can't break the client API, etc.
+
+Save the answers to your context. **Read the summary back to the person** — "did I get it right? goal X, outcome Y, not doing Z, constraints C" — and ask them to confirm or adjust.
 
 ---
 
-## Фаза 5 — Финализация в draft
+## Phase 3 — Architectural sketch
 
-Теперь у тебя в контексте:
-- Проблема + кто страдает + срочность
-- Цель + метрика + что-не-делаем + constraints
-- Затронутые слои + фазы + риски
+At this point you have the problem, the goal, and the boundaries. Time to sketch the "how."
+
+1. **Which layers will we touch?** (multi-select)
+   - TG bot / MAX bot (`tg_bot/`, `max_bot/`)
+   - Django (models, migrations, API — `Handler/`, `Tracker/`)
+   - AI pipeline (`shared/ai_pipeline/`)
+   - Bitrix integration (`bitrix/`)
+   - External services (Supabase, OpenAI, Tochka)
+   - Infra (docker, CI, migrations)
+   - Documentation
+
+2. **Natural phase boundaries?** Options based on the layers:
+   - One phase: everything at once, small scope
+   - Two phases: data + UX
+   - Three+ phases: data → integration → UX → polish
+
+3. **What new models / migrations will there be?** (if applicable) — briefly. If there are any — that's a serious risk, it needs a separate task tagged `require_human_approval`.
+
+4. **What could go wrong?** Name 2-3 risks off the top of your head — needed for the DoD section.
+
+If the person is stuck — **offer 2-3 architectural options** based on what you read in `SUP-architecture.md`, and ask them to choose. Don't make things up — use the project's patterns.
+
+---
+
+## Phase 4 — Definition of Done
+
+A spec without a clear DoD = a constant "just one more little task." Ask:
+
+1. **What are the "done" criteria?** (multi-select + Other)
+   - Metric X reached Y
+   - All tasks closed + reviews passed
+   - Prod-deployed and didn't break for N days
+   - Managers tested and confirmed
+   - User testing on dev
+
+2. **Who gives final acceptance sign-off?** You yourself? A manager? The client? (important — determines when the spec is `status: done`)
+
+---
+
+## Phase 5 — Finalize into a draft
+
+Now you have in your context:
+- Problem + who's suffering + urgency
+- Goal + metric + what-we-won't-do + constraints
+- Affected layers + phases + risks
 - DoD
 
-**Покажи человеку summary в виде черновой структуры:**
+**Show the person a summary as a draft structure:**
 
 ```markdown
-# SNN_<slug>: <одно предложение цели>
+# SNN_<slug>: <one-sentence goal>
 
 ## Проблема
 <2-3 строки>
@@ -177,63 +177,63 @@ description: Интерактивное со-создание новой SUP-с�
 - <ссылки на прошлые SNN>
 ```
 
-**Спроси:** «Это финал? Готов передать в /sup-spec-writer для записи файла? Или ещё покрутим?»
+**Ask:** "Is this final? Ready to hand off to /sup-spec-writer to write the file? Or shall we iterate more?"
 
-Если есть правки — итерируй. Если ОК — переходи к фазе 6.
+If there are edits — iterate. If it's OK — move to Phase 6.
 
 ---
 
-## Фаза 6 — Делегировать запись файла в /sup-spec-writer
+## Phase 6 — Delegate the file write to /sup-spec-writer
 
-**Не пиши файл сам.** Вызови `/sup-spec-writer` через Skill tool, передав ему финальный summary как вход.
+**Don't write the file yourself.** Call `/sup-spec-writer` via the Skill tool, passing it the final summary as input.
 
-Контракт вызова (в одном сообщении ему):
+Call contract (in a single message to it):
 ```
-Создай новую спецификацию по следующему черновику.
-Статус: draft (не active!) — нужно человеческое подтверждение перед запуском задач.
-Следующий номер SNN — определи сканом docs/2. SUP-specifications/ + docs/backlog/.
+Create a new specification from the following draft.
+Status: draft (not active!) — human confirmation is required before launching tasks.
+Next SNN number — determine it by scanning docs/2. SUP-specifications/ + docs/backlog/.
 
-<вставить весь summary из фазы 5>
+<insert the entire summary from Phase 5>
 ```
 
-После того как /sup-spec-writer вернёт файл — **прочитай его** и покажи человеку:
+After /sup-spec-writer returns the file — **read it** and show the person:
 ```
-✅ Спека создана: docs/2. SUP-specifications/SNN_<slug>.md
+✅ Spec created: docs/2. SUP-specifications/SNN_<slug>.md
    Status: draft
 
-Следующие шаги:
-1. Проверь файл — особенно нумерацию (SNN) и формулировки
-2. Когда готов — переведи в `status: active` (правка YAML frontmatter)
-3. После active /auto-pilot сможет сам декомпозировать в TNN-задачи
+Next steps:
+1. Review the file — especially the numbering (SNN) and the wording
+2. When ready — promote it to `status: active` (edit the YAML frontmatter)
+3. Once active, /auto-pilot can decompose it into TNN tasks on its own
 ```
 
 ---
 
-## Что НЕ делать
+## What NOT to do
 
-1. **Не задавай больше 2-3 вопросов в одном `AskUserQuestion` блоке.** Лучше последовательно, чтобы каждый ответ информировал следующий.
-2. **Не предлагай "решение" пока не зафиксирована "проблема".** Это типовая ошибка.
-3. **Не пиши файл напрямую** — всегда через `/sup-spec-writer`. Конвенции эволюционируют, единая точка записи их соблюдает.
-4. **Не ставь `status: active` автоматически.** Только `draft`. Человек переводит в active, когда готов отдать в работу.
-5. **Не декомпозируй на TNN-задачи в этом скилле.** Декомпозиция — отдельный шаг (через `/sup-spec-writer` или `/auto-pilot` Rule 4).
-6. **Не пытайся «вытащить» спеку которая ещё не созрела.** Если после фазы 1 видно что человек не уверен в проблеме — лучше сказать «давай вернёмся когда будет понятнее».
+1. **Don't ask more than 2-3 questions in a single `AskUserQuestion` block.** Better to go sequentially, so each answer informs the next.
+2. **Don't propose a "solution" until the "problem" is nailed down.** This is a typical mistake.
+3. **Don't write the file directly** — always via `/sup-spec-writer`. Conventions evolve, and a single write point enforces them.
+4. **Don't set `status: active` automatically.** Only `draft`. The person promotes it to active when they're ready to hand it off for work.
+5. **Don't decompose into TNN tasks in this skill.** Decomposition is a separate step (via `/sup-spec-writer` or `/auto-pilot` Rule 4).
+6. **Don't try to "extract" a spec that isn't ripe yet.** If after Phase 1 it's clear the person isn't sure about the problem — better to say "let's come back when it's clearer."
 
 ---
 
 ## Edge cases
 
-**Спека уже частично есть в `docs/backlog/`** — спроси у человека, активируем ту или создаём новую. Если активируем — фазы 1-4 пропускаем, идём напрямую в фазу 6 с дополнениями.
+**The spec already partly exists in `docs/backlog/`** — ask the person whether we activate that one or create a new one. If we activate — skip Phases 1-4, go straight to Phase 6 with additions.
 
-**Это малая фича на одну задачу** — не нужно делать спеку. Предложи человеку: «Это уровень TNN, не SNN. Создать задачу в существующей спеке S0X?» и иди в `/sup-spec-writer` с типом T.
+**This is a small single-task feature** — no spec needed. Suggest to the person: "This is TNN level, not SNN. Create a task in the existing spec S0X?" and go to `/sup-spec-writer` with type T.
 
-**Тема пересекается с активной спекой** — подсвети это после фазы 0 («это похоже на работу в S08, точно нужна отдельная SNN?») — пусть человек решит сам.
+**The topic overlaps with an active spec** — flag it after Phase 0 ("this looks like work in S08, are you sure a separate SNN is needed?") — let the person decide.
 
 ---
 
-## Связи с другими скиллами
+## Links to other skills
 
-| Скилл | Когда |
+| Skill | When |
 |---|---|
-| `/sup-spec-writer` | Фаза 6 — финальная запись файла |
-| `superpowers:brainstorming` | Можно подключить как стилистический референс для разведки в фазе 1-3 |
-| `/auto-pilot` | НЕ напрямую — но создаваемая draft-спека ляжет в его Rule 4 для авто-декомпозиции |
+| `/sup-spec-writer` | Phase 6 — final file write |
+| `superpowers:brainstorming` | Can be plugged in as a stylistic reference for discovery in Phases 1-3 |
+| `/auto-pilot` | NOT directly — but the draft spec created will feed into its Rule 4 for auto-decomposition |

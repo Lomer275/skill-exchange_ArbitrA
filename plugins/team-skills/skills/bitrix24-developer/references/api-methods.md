@@ -383,7 +383,7 @@ items.slice(0, 50).forEach((item, i) => {
 
 const response = await this.helpers.httpRequest({
   method: 'POST',
-  url: 'https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/batch',
+  url: '${BITRIX_WEBHOOK}batch',
   body: { halt: 0, cmd }
 });
 // response.result.result — object with each command's result

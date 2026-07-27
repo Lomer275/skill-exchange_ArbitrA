@@ -1,104 +1,112 @@
 ---
 name: visualcheck
-description: "Визуальная проверка UI — анализ скриншотов, макетов, компонентов на баги вёрстки, UX-проблемы и несоответствия дизайну. Используй этот скилл когда пользователь просит проверить UI, посмотреть на вёрстку, найти визуальные баги, говорит '/visualcheck', 'проверь UI', 'посмотри на интерфейс', 'визуальная проверка', 'что не так с вёрсткой', 'проверь дизайн', 'visual check', или загружает скриншоты для ревью. Скилл анализирует desktop и mobile состояния, проверяет типичные"
+description: >
+  Visual UI check — analyzes screenshots, mockups, and components for layout bugs,
+  UX problems, and design inconsistencies. Use this skill when the user
+  asks to check the UI, look at the layout, find visual bugs, says
+  "/visualcheck", "проверь UI", "посмотри на интерфейс", "визуальная проверка",
+  "что не так с вёрсткой", "проверь дизайн", "visual check", or uploads screenshots
+  for review. The skill analyzes desktop and mobile states, checks for common
+  UI bugs, and records the results with a severity.
 ---
+
 # Visual Check Skill
 
-Визуальная проверка UI по скриншотам или коду компонентов. Находит баги вёрстки,
-UX-проблемы и несоответствия дизайну.
+Visual UI check based on screenshots or component code. Finds layout bugs,
+UX problems, and design inconsistencies.
 
 ---
 
-## Входные данные
+## Inputs
 
-Пользователь предоставляет одно или несколько из:
-- **Скриншоты** — загружает изображения в чат (desktop / mobile / разные состояния)
-- **Код компонентов** — JSX/TSX/HTML/CSS файлы
-- **Файл задачи** — для понимания что именно должно работать
-- **Номер задачи** — `T01`, `T02`, …
+The user provides one or more of:
+- **Screenshots** — uploads images to the chat (desktop / mobile / different states)
+- **Component code** — JSX/TSX/HTML/CSS files
+- **Task file** — to understand what exactly is supposed to work
+- **Task number** — `T01`, `T02`, …
 
-Если ничего нет — попроси скриншоты или код компонентов.
-
----
-
-## Алгоритм выполнения
-
-### 0. Сбор контекста
-
-1. Определи **что проверяем**: задача, компонент, страница
-2. Определи **что есть**: скриншоты, код, или и то и другое
-3. Если есть файл задачи — прочитай описание и затронутые компоненты
+If nothing is provided — ask for screenshots or component code.
 
 ---
 
-### Фаза 1 — Анализ скриншотов (если предоставлены)
+## Execution algorithm
 
-Если пользователь загрузил скриншоты — анализируй визуально по чеклисту ниже.
+### 0. Gather context
 
-Проверяй для каждого предоставленного состояния:
-
-**Структура и layout:**
-- [ ] Элементы не наезжают друг на друга
-- [ ] Нет горизонтального скролла (особенно на мобильном)
-- [ ] Отступы и выравнивание консистентны
-- [ ] Сетка / колонки не сломаны
-
-**Текст:**
-- [ ] Текст не обрезан (truncation без ellipsis)
-- [ ] Нет overflow за пределы контейнера
-- [ ] Шрифты читаемы, не слишком мелкие (мин. 12px для основного текста)
-- [ ] Нет orphan-слов (одно слово на строке там где не ожидается)
-
-**Изображения и иконки:**
-- [ ] Нет broken images (placeholder или пустой квадрат)
-- [ ] Иконки правильного размера и не пикселизированы
-- [ ] Alt-текст проверить если видно в коде
-
-**Интерактивные элементы:**
-- [ ] Кнопки минимум 44×44px (tap target на мобильном)
-- [ ] Ссылки визуально отличимы от текста
-- [ ] Состояния hover/focus видны (если есть в скриншотах)
-
-**Модалки и оверлеи:**
-- [ ] Модалки центрированы
-- [ ] Backdrop корректно перекрывает контент
-- [ ] Нет контента торчащего из-под модалки
-
-**Мобильный (375px):**
-- [ ] Контент помещается без горизонтального скролла
-- [ ] Навигация не сломана
-- [ ] Таблицы / широкие элементы адаптированы
+1. Determine **what we are checking**: task, component, page
+2. Determine **what is available**: screenshots, code, or both
+3. If there is a task file — read the description and the affected components
 
 ---
 
-### Фаза 2 — Анализ кода (если предоставлен без скриншотов)
+### Phase 1 — Screenshot analysis (if provided)
 
-Если есть код компонентов но нет скриншотов — анализируй статически:
+If the user uploaded screenshots — analyze them visually against the checklist below.
+
+Check for each provided state:
+
+**Structure and layout:**
+- [ ] Elements do not overlap each other
+- [ ] No horizontal scroll (especially on mobile)
+- [ ] Spacing and alignment are consistent
+- [ ] Grid / columns are not broken
+
+**Text:**
+- [ ] Text is not cut off (truncation without ellipsis)
+- [ ] No overflow beyond the container
+- [ ] Fonts are readable, not too small (min. 12px for body text)
+- [ ] No orphan words (one word on a line where not expected)
+
+**Images and icons:**
+- [ ] No broken images (placeholder or empty square)
+- [ ] Icons are the correct size and not pixelated
+- [ ] Check alt text if visible in the code
+
+**Interactive elements:**
+- [ ] Buttons are at least 44×44px (tap target on mobile)
+- [ ] Links are visually distinguishable from text
+- [ ] hover/focus states are visible (if present in the screenshots)
+
+**Modals and overlays:**
+- [ ] Modals are centered
+- [ ] The backdrop correctly covers the content
+- [ ] No content sticking out from under the modal
+
+**Mobile (375px):**
+- [ ] Content fits without horizontal scroll
+- [ ] Navigation is not broken
+- [ ] Tables / wide elements are adapted
+
+---
+
+### Phase 2 — Code analysis (if provided without screenshots)
+
+If there is component code but no screenshots — analyze statically:
 
 **CSS / Tailwind:**
-- Конфликтующие стили (противоречивые margin/padding)
-- `overflow: hidden` который может прятать контент неожиданно
-- Отсутствие `min-width: 0` на flex-детях (классический баг с текстом)
-- Hardcoded размеры в px там где нужен fluid layout
-- Отсутствие mobile-first медиазапросов
+- Conflicting styles (contradictory margin/padding)
+- `overflow: hidden` that may hide content unexpectedly
+- Missing `min-width: 0` on flex children (a classic text bug)
+- Hardcoded px sizes where a fluid layout is needed
+- Missing mobile-first media queries
 
 **JSX / HTML:**
-- Условный рендер без fallback для empty state
-- Отсутствие skeleton/loading состояния
-- Длинные строки без `truncate` или `word-break`
-- Изображения без `width`/`height` (layout shift)
-- Отсутствие `key` в списках
+- Conditional render without a fallback for the empty state
+- Missing skeleton/loading state
+- Long strings without `truncate` or `word-break`
+- Images without `width`/`height` (layout shift)
+- Missing `key` in lists
 
-**Доступность (a11y — базовый уровень):**
-- Кнопки без `aria-label` если только иконка
-- Формы без `<label>`
-- Нет `alt` у `<img>`
+**Accessibility (a11y — basic level):**
+- Buttons without `aria-label` if icon-only
+- Forms without a `<label>`
+- No `alt` on `<img>`
 
 ---
 
-### Фаза 3 — Сценарии состояний
+### Phase 3 — State scenarios
 
-Мысленно (или по скриншотам) проверь:
+Mentally (or from the screenshots) check:
 
 | Состояние | Что смотреть |
 |-----------|-------------|
@@ -110,7 +118,7 @@ UX-проблемы и несоответствия дизайну.
 
 ---
 
-## Классификация
+## Classification
 
 | Severity | Когда |
 |----------|-------|
@@ -120,9 +128,9 @@ UX-проблемы и несоответствия дизайну.
 
 ---
 
-## Формат вывода
+## Output format
 
-### Сводка
+### Summary
 
 ```
 ## Visual Check — [Название задачи / компонента]
@@ -132,7 +140,7 @@ UX-проблемы и несоответствия дизайну.
 **Вердикт:** ✅ OK / ⚠️ Есть замечания / ❌ Критические проблемы
 ```
 
-### Таблица находок
+### Findings table
 
 ```
 | ID | Severity | Состояние | Элемент | Описание | Рекомендация |
@@ -144,10 +152,10 @@ UX-проблемы и несоответствия дизайну.
 
 ---
 
-## Правила
+## Rules
 
-- Конкретность: указывай компонент / элемент / состояние
-- Если скриншоты не предоставлены и код тоже — попроси перед началом
-- Если есть и скриншоты и код — анализируй оба, код даёт дополнительный контекст
-- Не придумывай проблемы — только то, что видишь или явно следует из кода
-- Для UI/HIGH — обязательно объясни почему это блокирует пользователя
+- Be specific: name the component / element / state
+- If neither screenshots nor code are provided — ask before starting
+- If both screenshots and code are present — analyze both; the code gives additional context
+- Do not invent problems — only what you see or what clearly follows from the code
+- For UI/HIGH — always explain why it blocks the user

@@ -1,51 +1,51 @@
-# Bitrix24 API Reference — Экспресс-Банкрот
+# Bitrix24 API Reference — Express-Bankrot
 
-## Базовые параметры
+## Base parameters
 
-- **Portal**: `<YOUR_BITRIX_PORTAL>`
-- **Webhook endpoint**: `https://<YOUR_BITRIX_PORTAL>/rest/<USER_ID>/<WEBHOOK_TOKEN>/`
-- **Формат вызова из n8n**: POST на `{endpoint}{METHOD}`
+- **Portal**: `bitrix.express-bankrot.ru`
+- **Webhook endpoint**: `${BITRIX_WEBHOOK}`
+- **Call format from n8n**: POST to `{endpoint}{METHOD}`
 
-## Сделки (CRM Deals)
+## Deals (CRM Deals)
 
-| Метод | Описание |
+| Method | Description |
 |-------|----------|
-| `crm.deal.list` | Список сделок с фильтром |
-| `crm.deal.get` | Сделка по ID |
-| `crm.deal.update` | Обновить поля сделки |
-| `crm.deal.add` | Создать сделку |
+| `crm.deal.list` | List deals with a filter |
+| `crm.deal.get` | Deal by ID |
+| `crm.deal.update` | Update deal fields |
+| `crm.deal.add` | Create a deal |
 
-Основной воронка: `CATEGORY_ID = <MAIN_FUNNEL_ID>` (пример: 4) (Main pipeline (example)).  
-Другие: Pipeline B, C, D, E (example names).
+Main funnel: `CATEGORY_ID = 4` (BFL / personal bankruptcy).  
+Others: VBFL, PS, Contract termination, One-time services.
 
-## Лиды (CRM Leads)
+## Leads (CRM Leads)
 
-| Метод | Описание |
+| Method | Description |
 |-------|----------|
-| `crm.lead.list` | Список лидов |
-| `crm.lead.get` | Лид по ID |
-| `crm.lead.update` | Обновить лид |
+| `crm.lead.list` | List leads |
+| `crm.lead.get` | Lead by ID |
+| `crm.lead.update` | Update lead |
 
-## Контакты и компании
+## Contacts and companies
 
-| Метод | Описание |
+| Method | Description |
 |-------|----------|
-| `crm.contact.list` | Список контактов |
-| `crm.contact.update` | Обновить контакт |
-| `crm.company.list` | Список компаний |
-| `crm.company.update` | Обновить компанию |
+| `crm.contact.list` | List contacts |
+| `crm.contact.update` | Update contact |
+| `crm.company.list` | List companies |
+| `crm.company.update` | Update company |
 
-## Smart Processes (Умные процессы)
+## Smart Processes
 
-| entityTypeId | Название |
+| entityTypeId | Name |
 |-------------|----------|
-| 1094 | Smart-process A (example) |
-| 1122 | Smart-process B (example) |
-| 1104 | Smart-process C (example) |
-| 1112 | Логи встреч/договоров |
+| 1094 | KadArbitr |
+| 1122 | EFRSB/Fedresurs |
+| 1104 | Employee conversion |
+| 1112 | Meeting/contract logs |
 
-Методы:
-- `crm.item.list` — с параметром `entityTypeId`
+Methods:
+- `crm.item.list` — with the `entityTypeId` parameter
 - `crm.item.get`
 - `crm.item.update`
 - `crm.item.add`
@@ -53,7 +53,7 @@
 ## Batch API
 
 ```
-POST /rest/<USER_ID>/<WEBHOOK_TOKEN>/batch
+POST ${BITRIX_WEBHOOK}batch
 {
   "halt": 0,
   "cmd": {
@@ -63,35 +63,35 @@ POST /rest/<USER_ID>/<WEBHOOK_TOKEN>/batch
 }
 ```
 
-До 50 команд в одном запросе.
+Up to 50 commands in a single request.
 
-## Пользователи и права
+## Users and permissions
 
-| Метод | Описание |
+| Method | Description |
 |-------|----------|
-| `user.get` | Получить пользователя |
-| `user.update` | Обновить пользователя |
-| `im.user.list` | Список пользователей чата |
-| `bizproc.workflow.instances` | Список запущенных БП |
+| `user.get` | Get a user |
+| `user.update` | Update a user |
+| `im.user.list` | List of chat users |
+| `bizproc.workflow.instances` | List of running BPs |
 
-## Бизнес-процессы
+## Business processes
 
-| Метод | Описание |
+| Method | Description |
 |-------|----------|
-| `bizproc.workflow.start` | Запустить БП |
-| `bizproc.workflow.terminate` | Остановить БП |
-| `bizproc.workflow.template.list` | Список шаблонов |
-| `bizproc.task.list` | Задачи БП |
+| `bizproc.workflow.start` | Start a BP |
+| `bizproc.workflow.terminate` | Stop a BP |
+| `bizproc.workflow.template.list` | List of templates |
+| `bizproc.task.list` | BP tasks |
 
-⚠️ `bizproc.workflow.template.update` — только через OAuth app, не через webhook токен.
+⚠️ `bizproc.workflow.template.update` — only via an OAuth app, not via a webhook token.
 
-## Диск (Bitrix Drive)
+## Drive (Bitrix Drive)
 
-- Задержки: 500ms между чтением папок, 3s между записью
-- `disk.folder.getchildren` — содержимое папки
-- `disk.file.uploadurl` — загрузка файла
+- Delays: 500ms between folder reads, 3s between writes
+- `disk.folder.getchildren` — folder contents
+- `disk.file.uploadurl` — file upload
 
-## Фильтры и пагинация
+## Filters and pagination
 
 ```json
 {
@@ -102,4 +102,4 @@ POST /rest/<USER_ID>/<WEBHOOK_TOKEN>/batch
 }
 ```
 
-Для получения всех записей: итерировать по `start` с шагом 50.
+To retrieve all records: iterate over `start` in steps of 50.

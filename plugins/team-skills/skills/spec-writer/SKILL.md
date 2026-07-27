@@ -1,135 +1,141 @@
 ---
 name: spec-writer
-description: "Создаёт документы проекта: спецификации (S), задачи (T) и бизнес-требования (BR) по всем конвенциям проекта. Читает гайды в runtime — не полагается на память. Используй когда пользователь говорит '/spec-writer', 'создай спеку', 'создай задачу', 'новая спека', 'новая задача', 'напиши спецификацию', 'создай BR',"
+description: >
+  Creates SUP-project documents: specifications (S), tasks (T), and business requirements (BR)
+  following all project conventions. Reads guides at runtime — does not rely on memory.
+  Use when the user says "/sup-spec-writer", "создай спеку", "создай задачу",
+  "новая спека", "новая задача", "напиши спецификацию", "создай BR",
+  "задекомпозируй спеку на задачи".
 ---
-# Spec-Writer Skill
 
-Создаёт один документ за вызов (спеку, задачу или BR) с корректной нумерацией и структурой.
-Читает гайды в runtime — не полагается на память. Только скелет — контент заполняет пользователь.
+# Sup-Spec-Writer Skill
 
----
-
-## Входные данные
-
-- `/spec-writer` — уточнить тип документа у пользователя
-- `/spec-writer spec "Название"` — создать спецификацию
-- `/spec-writer task "Название" S03` — создать задачу (с привязкой к спеке)
-- `/spec-writer br "Название"` — создать бизнес-требование
-- "создай задачу для S05" — создать задачу, привязанную к спеке S05
-- "задекомпозируй спеку S04 на задачи" — создать одну задачу (не все сразу — по одной за вызов)
+Creates one document per invocation (a spec, task, or BR) with correct numbering and structure.
+Reads guides at runtime — does not rely on memory. Skeleton only — the user fills in the content.
 
 ---
 
-## Алгоритм
+## Inputs
 
-### Шаг 1 — Определить тип документа
+- `/sup-spec-writer` — ask the user for the document type
+- `/sup-spec-writer spec "Title"` — create a specification
+- `/sup-spec-writer task "Title" S03` — create a task (linked to a spec)
+- `/sup-spec-writer br "Title"` — create a business requirement
+- "создай задачу для S05" — create a task linked to spec S05
+- "задекомпозируй спеку S04 на задачи" — create a single task (not all at once — one per invocation)
 
-Если тип не указан явно — **задай один вопрос**:
+---
+
+## Algorithm
+
+### Step 1 — Determine the document type
+
+If the type is not explicitly specified — **ask one question**:
 
 ```
 Какой документ создать?
-1. Спецификация (S) — docs/specifications/
-2. Задача (T) — docs/tasks/
-3. Бизнес-требование (BR) — docs/business-requirements/
+1. Спецификация (S) — docs/2. SUP-specifications/
+2. Задача (T) — docs/3. SUP-tasks/
+3. Бизнес-требование (BR) — docs/1. SUP-business requirements/
 ```
 
-Не продолжай до ответа пользователя.
+Do not proceed until the user answers.
 
-### Шаг 2 — Прочитать гайды (ОБЯЗАТЕЛЬНО в runtime)
+### Step 2 — Read the guides (MANDATORY at runtime)
 
-**Всегда читай** (независимо от типа):
+**Always read** (regardless of type):
 ```
-docs/guides/doc_conventions.md
+docs/4. SUP-guides/doc_conventions.md
 ```
 
-**Дополнительно по типу:**
-- Если type=S → читай `docs/guides/specifications_guide.md`
-- Если type=T → читай `docs/guides/task_decomposition_guide.md`
-- Если type=BR → читай `docs/guides/business_requirements_template.md`
+**Additionally, depending on the type:**
+- If type=S → read `docs/4. SUP-guides/specifications_guide.md`
+- If type=T → read `docs/4. SUP-guides/task_decomposition_guide.md`
+- If type=BR → read `docs/4. SUP-guides/business_requirements_template.md`
 
-**Никогда не пропускай этот шаг** — не полагайся на кешированные знания.
+**Never skip this step** — do not rely on cached knowledge.
 
-### Шаг 3 — Определить следующий номер
+### Step 3 — Determine the next number
 
-#### Для спецификации (SNN):
+#### For a specification (SNN):
 
-Выполни glob по двум директориям:
+Run a glob over both directories:
 ```
-glob docs/specifications/S*.md
+glob docs/2. SUP-specifications/S*.md
 glob docs/backlog/S*.md
 ```
 
-Из всех найденных имён файлов извлеки числа после `S` (двузначный формат).
-Найди максимальное число → следующий номер = max + 1, формат двузначный (`01`, `02`, ..., `10`, `11`).
+From all matched file names, extract the numbers after `S` (two-digit format).
+Find the maximum number → next number = max + 1, in two-digit format (`01`, `02`, ..., `10`, `11`).
 
-Пример: если найдены S01, S02, S05, S06 → следующий = S07.
+Example: if S01, S02, S05, S06 are found → next = S07.
 
-#### Для задачи (TNN):
+#### For a task (TNN):
 
-Выполни рекурсивный glob:
+Run a recursive glob:
 ```
-glob docs/tasks/**/T*.md
-```
-
-Это покрывает и текущие задачи, и файлы в `Done/` (вложенные папки).
-Из всех найденных имён файлов извлеки числа после `T`.
-Найди максимальное → следующий = max + 1, двузначный формат.
-
-Пример: если найдены T01..T55 включая Done/ → следующий = T56.
-
-#### Для бизнес-требований (BRNN):
-
-Выполни glob:
-```
-glob docs/business-requirements/BR*.md
+glob docs/3. SUP-tasks/**/T*.md
 ```
 
-Из имён файлов извлеки числа после `BR`.
-Найди максимальное → следующий = max + 1, двузначный формат.
+This covers both current tasks and files in `Done/` (nested folders).
+From all matched file names, extract the numbers after `T`.
+Find the maximum → next = max + 1, two-digit format.
 
-### Шаг 4 — Проверить конфликт
+Example: if T01..T55 are found including Done/ → next = T56.
 
-Если файл с вычисленным номером уже существует:
-- Сообщи пользователю: `Файл SNN уже существует: <путь>`
-- Предложи: `Обновить существующий файл или создать новый (следующий номер)?`
-- Дожди ответа — не продолжай.
+#### For a business requirement (BRNN):
 
-### Шаг 5 — Уточнить недостающие данные (если нужно)
+Run a glob:
+```
+glob docs/1. SUP-business requirements/SUP-BR*.md
+```
 
-Если название не передано — задай **один вопрос**:
+From the file names, extract the numbers after `BR`.
+Find the maximum → next = max + 1, two-digit format.
+
+### Step 4 — Check for a conflict
+
+If a file with the computed number already exists:
+- Tell the user: `Файл SNN уже существует: <путь>`
+- Suggest: `Обновить существующий файл или создать новый (следующий номер)?`
+- Wait for an answer — do not proceed.
+
+### Step 5 — Clarify missing data (if needed)
+
+If the title was not provided — ask **one question**:
 ```
 Как назвать документ? (используется для имени файла в snake_case)
 ```
 
-Для задачи (type=T) — если не указана привязка к спецификации:
+For a task (type=T) — if no spec link is specified:
 ```
 К какой спецификации относится задача? (например, S03)
 ```
 
-**Задавай вопросы по одному** — не задавай несколько сразу.
+**Ask questions one at a time** — do not ask several at once.
 
-### Шаг 6 — Сформировать имя файла и путь
+### Step 6 — Build the file name and path
 
-Преобразуй название в `snake_case`:
-- Всё в нижний регистр
-- Пробелы и дефисы → подчёркивания
-- Убрать спецсимволы
+Convert the title into `snake_case`:
+- All lowercase
+- Spaces and hyphens → underscores
+- Remove special characters
 
-**Пути по типу:**
+**Paths by type:**
 
-| Тип | Путь |
+| Type | Path |
 |-----|------|
-| S | `docs/specifications/SNN_<snake_case>.md` |
-| T | `docs/tasks/TNN_<snake_case>.md` |
-| BR | `docs/business-requirements/BRNN_<snake_case>.md` |
+| S | `docs/2. SUP-specifications/SNN_<snake_case>.md` |
+| T | `docs/3. SUP-tasks/TNN_<snake_case>.md` |
+| BR | `docs/1. SUP-business requirements/SUP-BRNN_<snake_case>.md` |
 
-### Шаг 7 — Создать файл-скелет
+### Step 7 — Create the skeleton file
 
-Создавай **только скелет** — заголовки секций, статус, номер, пустые поля.
-Не заполняй контент за пользователя.
-Статус нового документа всегда = `draft`.
+Create **only a skeleton** — section headings, status, number, empty fields.
+Do not fill in the content for the user.
+The status of a new document is always = `draft`.
 
-#### Скелет для спецификации (S):
+#### Skeleton for a specification (S):
 
 ```markdown
 # SNN. <Название>
@@ -171,12 +177,12 @@ glob docs/business-requirements/BR*.md
 - ...
 ```
 
-#### Скелет для задачи (T):
+#### Skeleton for a task (T):
 
 ```markdown
 # TNN. <Название>
 
-**Спецификация:** docs/specifications/SNN_<spec_name>.md
+**Спецификация:** docs/2. SUP-specifications/SNN_<spec_name>.md
 **Статус:** draft
 **Дата:** YYYY-MM-DD
 
@@ -199,10 +205,10 @@ glob docs/business-requirements/BR*.md
 - ...
 ```
 
-#### Скелет для бизнес-требования (BR):
+#### Skeleton for a business requirement (BR):
 
 ```markdown
-# BRNN. <Название>
+# SUP-BRNN. <Название>
 
 **Статус:** draft
 **Дата:** YYYY-MM-DD
@@ -241,12 +247,12 @@ glob docs/business-requirements/BR*.md
 - ...
 ```
 
-### Шаг 8 — Отчёт
+### Step 8 — Report
 
-После создания файла выведи итог в формате:
+After creating the file, output a summary in the format:
 
 ```
-✅ Создан файл: docs/specifications/S07_my_feature.md
+✅ Создан файл: docs/2. SUP-specifications/S07_my_feature.md
 
 Структура:
   - Статус: draft
@@ -255,26 +261,26 @@ glob docs/business-requirements/BR*.md
 
 Следующие шаги:
   - Заполни секции контентом
-  - При готовности запусти /spec-writer для задач (TNN)
+  - При готовности запусти /sup-spec-writer для задач (TNN)
   - Для закрытия задачи запусти /accept
 ```
 
-Адаптируй "Следующие шаги" под тип документа:
-- Для BR → предложи создать связанную спеку
-- Для T → напомни про привязку к спеке и /accept
+Adapt "Следующие шаги" to the document type:
+- For BR → suggest creating a linked spec
+- For T → remind about the spec link and /accept
 
 ---
 
-## Правила
+## Rules
 
-- **Один вызов = один файл.** Никогда не создавай два документа за один вызов.
-- **Только скелет.** Не заполняй контент за пользователя — только структуру.
-- **Статус нового документа всегда `draft`.**
-- **Всегда читай гайды в runtime** (Шаг 2) — не полагайся на память или предыдущие прочтения.
-- **Нумерация всегда двузначная:** 01, 02, ..., 10, 11, 12...
-- **TNN: сканировать рекурсивно включая Done/.** Максимальный номер из всех файлов — не только активных задач.
-- **SNN: сканировать и specs/, и backlog/.** Оба источника.
-- Если тип не указан — спроси сначала, не угадывай.
-- Если нужны уточнения по содержанию — задавай **по одному вопросу** за раз.
-- Если файл с номером уже существует — сообщи и спроси что делать.
-- Дата в документе — всегда сегодня (`currentDate` из системного контекста).
+- **One invocation = one file.** Never create two documents in a single invocation.
+- **Skeleton only.** Do not fill in the content for the user — structure only.
+- **The status of a new document is always `draft`.**
+- **Always read the guides at runtime** (Step 2) — do not rely on memory or previous reads.
+- **Numbering is always two-digit:** 01, 02, ..., 10, 11, 12...
+- **TNN: scan recursively including Done/.** The maximum number across all files — not only active tasks.
+- **SNN: scan both specs/ and backlog/.** Both sources.
+- If the type is not specified — ask first, do not guess.
+- If content clarifications are needed — ask **one question** at a time.
+- If a file with that number already exists — report it and ask what to do.
+- The date in the document is always today (`currentDate` from the system context).
