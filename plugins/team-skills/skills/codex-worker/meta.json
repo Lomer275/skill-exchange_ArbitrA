@@ -2,8 +2,8 @@
   "name": "codex-worker",
   "display_name": "Codex Worker (internal helper)",
   "author": "kostya",
-  "version": "1.1.0",
-  "description": "Internal helper для запуска Codex-воркера. Вызывается из /impl, /fix, /codereview-dual и /sprint-codex. Принимает либо файл задачи (путь «по спеке»), либо разовый brief_file (путь /impl). Запуск через движок плагина codex@openai-codex (app-server, без bubblewrap); fallback — legacy codex exec.",
+  "version": "1.2.0",
+  "description": "Internal helper для запуска Codex-воркера. Вызывается из /impl, /fix, /codereview-dual и /sprint-codex. Принимает файл задачи либо разовый brief_file (путь /impl). Движок выбирается по ЗДОРОВЬЮ, а не по наличию: плагин codex@openai-codex несёт свой движок, который может быть старше глобального CLI и молча возвращать пустой результат — тогда воркер уходит на legacy codex exec (обязательно с < /dev/null, иначе CLI ждёт EOF на stdin и висит до таймаута).",
   "tags": [
     "internal",
     "codex",

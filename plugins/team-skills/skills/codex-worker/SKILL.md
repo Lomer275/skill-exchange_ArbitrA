@@ -87,10 +87,34 @@ If `FINAL=false` — return `status: disabled, notes: kill-switch active`.
 COMPANION=$(ls -d "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1)
 ```
 
-- `COMPANION` is non-empty and the file exists → **companion mode** (Steps 4–7 below).
-- Otherwise → **legacy mode** (Appendix A). Log `notes: companion not found, legacy codex exec`.
+- `COMPANION` is non-empty, the file exists **and is healthy** → **companion mode** (Steps 4–7 below).
+- Otherwise → **legacy mode** (Appendix A). Log `notes: companion <not found|unhealthy: reason>, legacy codex exec`.
 
-> Companion is the `codex@openai-codex` plugin engine. It is maintained by OpenAI and uses the app-server protocol rather than `codex exec` + bubblewrap. The path is resolved by glob (the version in the path is not hardcoded — it survives plugin updates).
+**Health probe — presence is not health.** The plugin bundles its *own* Codex engine, which can
+be older than the globally installed CLI. When it is too old for the models the account is
+entitled to, every task fails with `status:1` and an **empty** `rawOutput` — no error surfaces
+in `--json`, so a presence-only check routes all delegation into a silent dead end.
+Observed 2026-07-27: plugin 1.0.4 vs global CLI 0.145.0 → `The 'gpt-5.6-sol' model requires a
+newer version of Codex`, while legacy `codex exec` worked fine.
+
+Probe once and cache in `.claude/codex.json:availability_cache.companion_healthy` (TTL 1h,
+re-probe on `/codex-setup` and `/codex-toggle`):
+
+```bash
+# без --json: диагностика движка идёт в stdout человекочитаемо
+PROBE=$(timeout 120 node "$COMPANION" task --cwd "$PWD" --prompt-file <(echo "reply with: ok") 2>&1)
+case "$PROBE" in
+  *"Turn failed"*|*"Codex error"*|*invalid_request_error*) COMPANION="" ;;  # → legacy
+esac
+```
+
+If the probe fails, record the reason in `notes` so the cause is visible rather than inferred
+from an empty output file.
+
+> Companion is the `codex@openai-codex` plugin engine, maintained by OpenAI, using the app-server
+> protocol rather than `codex exec` + bubblewrap. The path is resolved by glob (the version is not
+> hardcoded — it survives plugin updates). Legacy is not a lesser path: it drives the **globally
+> installed** CLI, which is usually newer than the plugin's bundled engine.
 
 ---
 
@@ -270,12 +294,20 @@ Used **only** when the plugin engine is not found (Step 3). Kept for environment
 Differences from companion mode:
 1. **Sandbox capability detection (T82/T83).** The Codex CLI requires `bubblewrap` for shell tools; it is not present on dev. Probe `codex exec --skip-git-repo-check "pwd"`, a three-state result (`true/false/unknown`), TTL cache of 1h in `.claude/codex.json:availability_cache.sandbox_works`. On `false`/`unknown` → inline mode.
 2. **Inline prompt assembly.** When `INLINE_MODE=true`, the content of `inline_files` (or TASK_FILE+SPEC_FILE) is embedded at the end of the prompt (limit ~100KB, priority TASK > SPEC > ARTEFACTS), with a "DO NOT use shell tools" note. The `inline`/`inline_files` parameters from the contract apply only here.
-3. **Launch:** `cli_flags` from codex.json (`output_last_message`, `skip_git_repo_check`):
+3. **Launch:** `cli_flags` from codex.json (`output_last_message`, `skip_git_repo_check`).
+   **`< /dev/null` is mandatory** — see the note below:
    ```bash
    cd <worktree-or-cwd>
-   $ENV_PREFIX codex exec $SKIP_GIT_FLAG $OUTPUT_FLAG "$OUTPUT_FILE" "$(cat $PROMPT_FILE)"
+   $ENV_PREFIX codex exec $SKIP_GIT_FLAG $OUTPUT_FLAG "$OUTPUT_FILE" "$(cat $PROMPT_FILE)" < /dev/null
    ```
    Here Codex itself writes the final message to `$OUTPUT_FILE` via `--output-last-message` (no JSON parsing needed).
+
+   > **Never launch without closing stdin.** With a non-TTY stdin (which is always the case from
+   > the Bash tool) `codex exec` treats it as an extra prompt source: it prints
+   > `Reading additional input from stdin...` and blocks until EOF. The prompt argument is never
+   > processed, nothing is written, and the run burns the whole watchdog window before dying as a
+   > `timeout` — a failure mode that looks like "Codex is slow" and is nothing of the sort.
+   > Verified on CLI 0.145.0, 2026-07-27.
 4. **Watchdog** — the same: `Bash(run_in_background)` → poll `OUTPUT_FILE` for non-emptiness → `TaskStop` at the deadline.
 
 The return contract is identical. In `notes` specify `engine=legacy`.
