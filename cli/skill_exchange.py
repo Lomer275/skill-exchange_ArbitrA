@@ -13,10 +13,21 @@ import indexer as idx_module
 
 REPO_ROOT = Path(__file__).parent.parent
 
-SKILL_FILES_TO_INSTALL = ("SKILL.md", "README.md")
+# Never installed: build artefacts and editor droppings that add nothing.
+SKILL_INSTALL_IGNORE = ("__pycache__", "*.pyc", ".DS_Store")
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
+
+def _copy_skill(src: Path, dest: Path) -> None:
+    """Install a skill as a whole directory.
+
+    A skill is a folder, not a pair of files: it may ship references/, a script
+    or data next to SKILL.md, and every one of those is load-bearing. Copying a
+    whitelist installs a skill that looks fine in the listing and fails on use.
+    """
+    shutil.copytree(src, dest, ignore=shutil.ignore_patterns(*SKILL_INSTALL_IGNORE))
+
 
 def _resolve_target(args, config) -> Path:
     """Determine where install/uninstall should operate."""
@@ -85,20 +96,13 @@ def cmd_install(args):
 
     target_dir = _resolve_target(args, config)
     target_dir.mkdir(parents=True, exist_ok=True)
+    if not (skill_src / "SKILL.md").exists():
+        print(f"Ошибка: в '{args.name}' отсутствует SKILL.md — скилл невалиден.")
+        sys.exit(1)
     dest = target_dir / args.name
     if dest.exists():
         shutil.rmtree(dest)
-    dest.mkdir(parents=True)
-    copied = []
-    for filename in SKILL_FILES_TO_INSTALL:
-        src = skill_src / filename
-        if src.exists():
-            shutil.copy(src, dest / filename)
-            copied.append(filename)
-    if "SKILL.md" not in copied:
-        print(f"Ошибка: в '{args.name}' отсутствует SKILL.md — скилл невалиден.")
-        shutil.rmtree(dest)
-        sys.exit(1)
+    _copy_skill(skill_src, dest)
     print(f"Скилл '{args.name}' установлен в {dest}")
     print(f"Активируй через перезапуск Claude Code. Скилл будет доступен как /{args.name}")
 
@@ -234,11 +238,7 @@ def cmd_update(args):
         dest = target_dir / name
         if dest.exists():
             shutil.rmtree(dest)
-        dest.mkdir(parents=True)
-        for filename in SKILL_FILES_TO_INSTALL:
-            src = skill_src / filename
-            if src.exists():
-                shutil.copy(src, dest / filename)
+        _copy_skill(skill_src, dest)
         print(f"  Установлен в {dest}")
     print("Готово.")
 

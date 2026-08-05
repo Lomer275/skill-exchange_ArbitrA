@@ -1,0 +1,9 @@
+{
+  "name": "agents-context",
+  "display_name": "Agents Context",
+  "author": "Костя",
+  "version": "1.0.0",
+  "description": "Раскладывает общий контекст команды по обоим агентам — Claude Code и Codex",
+  "tags": ["agents", "codex", "setup", "context"],
+  "created": "2026-08-05"
+}

@@ -98,16 +98,33 @@ def test_list_empty_catalog(tmp_path):
 
 # ── install ──────────────────────────────────────────────────────────────────
 
-def test_install_copies_skill_md_and_readme(tmp_path):
+def test_install_copies_whole_skill_directory(tmp_path):
+    """A skill is a folder, not a pair of files.
+
+    Skills ship references/, scripts and data next to SKILL.md, and every one of
+    those is load-bearing: a whitelist installs a skill that lists fine and fails
+    on first use. Only build artefacts are left behind.
+    """
     skills_dir = tmp_path / "skills"
     install_dir = tmp_path / "target"
     make_skill_in_dir(skills_dir, "cool-skill")
+    src = skills_dir / "cool-skill"
+    (src / "run.sh").write_text("#!/bin/sh\necho hi\n")
+    (src / "references").mkdir()
+    (src / "references" / "api.md").write_text("# api\n")
+    (src / "__pycache__").mkdir()
+    (src / "__pycache__" / "junk.pyc").write_text("x")
+
     config = {"default_path": str(install_dir), "installed": []}
     run_cli(["install", "cool-skill"], skills_dir=skills_dir, config=config)
-    assert (install_dir / "cool-skill" / "SKILL.md").exists()
-    assert (install_dir / "cool-skill" / "README.md").exists()
-    # meta.json should NOT be installed
-    assert not (install_dir / "cool-skill" / "meta.json").exists()
+
+    dest = install_dir / "cool-skill"
+    assert (dest / "SKILL.md").exists()
+    assert (dest / "README.md").exists()
+    assert (dest / "meta.json").exists()
+    assert (dest / "run.sh").exists()
+    assert (dest / "references" / "api.md").exists()
+    assert not (dest / "__pycache__").exists()
 
 
 def test_install_missing_skill_exits(tmp_path):
