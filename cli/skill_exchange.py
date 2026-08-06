@@ -25,8 +25,24 @@ def _copy_skill(src: Path, dest: Path) -> None:
     A skill is a folder, not a pair of files: it may ship references/, a script
     or data next to SKILL.md, and every one of those is load-bearing. Copying a
     whitelist installs a skill that looks fine in the listing and fails on use.
+
+    Scripts get their executable bit restored on the way in. Repositories with
+    core.fileMode=false record a mode of 100644 no matter what chmod did locally,
+    so a shipped script arrives unrunnable and the skill fails on first use with
+    "Permission denied" — a failure with nothing in it that points at git.
     """
     shutil.copytree(src, dest, ignore=shutil.ignore_patterns(*SKILL_INSTALL_IGNORE))
+    for path in dest.rglob("*"):
+        if path.is_file() and _has_shebang(path):
+            path.chmod(path.stat().st_mode | 0o111)
+
+
+def _has_shebang(path: Path) -> bool:
+    try:
+        with path.open("rb") as fh:
+            return fh.read(2) == b"#!"
+    except OSError:
+        return False
 
 
 def _resolve_target(args, config) -> Path:
