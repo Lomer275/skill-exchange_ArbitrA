@@ -349,6 +349,18 @@
         "quality"
       ],
       "created": "2026-05-02"
+    },
+    {
+      "name": "write-emulator",
+      "display_name": "Write Emulator",
+      "author": "Александр Лебедев",
+      "version": "1.0.0",
+      "description": "Пишет эмулятор внешнего сервиса (КадАрбитр, БФЛ+, Руспрофайл, CLI-бинарь) для unit-тестов по принятым паттернам DI-фейков",
+      "tags": [
+        "testing",
+        "workflow"
+      ],
+      "created": "2026-08-12"
     }
   ]
 }
