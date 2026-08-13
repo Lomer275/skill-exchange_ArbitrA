@@ -15,8 +15,11 @@ your own audit.
    the protocol, and the team standard you compare against; sections 3–7 are the phases;
    section 9 lists the traps that make audits produce confident wrong answers.
 2. Work through the phases in order, saving every command's output as you go.
-3. Produce both deliverables: the report file on the machine and the short chat summary.
-4. Run the self-check in section 12 before you hand anything over.
+   Section 2.0 lists the company-wide requirements that are checked first and always.
+3. **Run the critical pass over your own findings (step 8.0) before writing anything up.**
+   It is mandatory: in the first field run three of five findings collapsed on re-check.
+4. Produce both deliverables: the report file on the machine and the short chat summary.
+5. Run the self-check in section 12 before you hand anything over.
 
 ## Hard rules
 
