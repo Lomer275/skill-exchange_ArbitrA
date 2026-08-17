@@ -54,6 +54,7 @@ python cli/skill_exchange.py install <имя-скилла>
 | [sprint](plugins/team-skills/skills/sprint/README.md) | kostya | workflow, automation, spec | Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run и --yes (headless mode для cron-автопилота с check_authz из HANDOFF YAML, TG-ask retry-loop). |
 | [sprint-codex](plugins/team-skills/skills/sprint-codex/README.md) | kostya | workflow, codex, parallel | Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач. |
 | [visualcheck](plugins/team-skills/skills/visualcheck/README.md) | kostya | ui, design, quality | Визуальная проверка UI по скриншотам или коду: баги вёрстки, UX-проблемы, несоответствия дизайну. Анализ desktop+mobile. |
+| [write-emulator](plugins/team-skills/skills/write-emulator/README.md) | Александр Лебедев | testing, workflow | Пишет эмулятор внешнего сервиса (КадАрбитр, БФЛ+, Руспрофайл, CLI-бинарь) для unit-тестов по принятым паттернам DI-фейков |
 
 ## Добавить свой скилл
 
