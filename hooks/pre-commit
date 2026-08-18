@@ -14,6 +14,50 @@ result = subprocess.run(
 repo_root = Path(result.stdout.strip())
 sys.path.insert(0, str(repo_root / "cli"))
 
+import re
+
+# --- барьер от секретов (18.08.2026, после утечки боевого вебхука) ---
+# Правило в references/pitfalls.md §9 существовало с 12.08 и не сработало: его никто
+# не проверял машинно. Теперь проверяет хук.
+SECRET_PATTERNS = [
+    (re.compile(rb"/rest/\d+/[A-Za-z0-9]{10,}"), "входящий вебхук Битрикса"),
+    (re.compile(rb"-----BEGIN [A-Z ]*PRIVATE KEY"), "приватный ключ"),
+    (re.compile(rb"(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*\S{16,}"), "ключ или пароль значением"),
+]
+ALLOW_MARKERS = (b"example.tld", b"BITRIX_WEBHOOK", b"<user>", b"<token>", b"REDACTED", b"YOUR_")
+
+_staged = subprocess.run(
+    ["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=ACM"],
+    capture_output=True, check=True,
+).stdout.split(b"\x00")
+
+_found = []
+for _raw in _staged:
+    if not _raw:
+        continue
+    _name = _raw.decode("utf-8", "surrogateescape")
+    try:
+        _blob = (Path(_name)).read_bytes()
+    except OSError:
+        continue
+    if b"\x00" in _blob[:1024]:
+        continue
+    for _no, _line in enumerate(_blob.splitlines(), 1):
+        if any(_m in _line for _m in ALLOW_MARKERS):
+            continue
+        for _rx, _what in SECRET_PATTERNS:
+            if _rx.search(_line):
+                _found.append("%s:%d — %s" % (_name, _no, _what))
+                break
+
+if _found:
+    print("[pre-commit] ОТКЛОНЕНО: в коммит попал секрет.", file=sys.stderr)
+    for _f in _found[:20]:
+        print("  - " + _f, file=sys.stderr)
+    print("[pre-commit] Репозиторий публичный: значение уедет всем и останется в истории.", file=sys.stderr)
+    print("[pre-commit] Замени на переменную или плейсхолдер.", file=sys.stderr)
+    sys.exit(1)
+
 import indexer
 
 errors = indexer.validate_all()
