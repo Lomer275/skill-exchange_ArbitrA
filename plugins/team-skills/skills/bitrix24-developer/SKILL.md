@@ -19,6 +19,26 @@ description: >
 ```
 Portal:       bitrix.express-bankrot.ru
 Webhook base: ${BITRIX_WEBHOOK}
+
+### Откуда берётся вебхук
+
+Значение живёт **только** в файле у каждого на машине и подставляется переменной окружения —
+в текст скилла его вписывать нельзя ни при каких обстоятельствах: обменник публичный,
+и однажды это уже случилось (вебхук пролежал открытым три недели, историю пришлось переписывать).
+
+```bash
+mkdir -p ~/.secrets && chmod 700 ~/.secrets
+printf 'export BITRIX_WEBHOOK="https://<портал>/rest/<id>/<токен>/"\n' > ~/.secrets/bitrix_webhook.env
+chmod 600 ~/.secrets/bitrix_webhook.env
+grep -q bitrix_webhook.env ~/.bashrc || echo '[ -f ~/.secrets/bitrix_webhook.env ] && . ~/.secrets/bitrix_webhook.env' >> ~/.bashrc
+```
+
+Проверка, что подхватилось: `curl -s "${BITRIX_WEBHOOK}user.current"` отдаёт вашего пользователя.
+При ротации меняется **один этот файл** — больше нигде значения быть не должно.
+
+**Права зависят от того, чей вебхук.** Часть методов доступна только админскому:
+`task.checklistitem.add`, `tasks.task.delete`, управление стадиями. Если метод отвечает
+«действие недоступно» — дело не в синтаксисе, а в том, под кем выписан вебхук.
 n8n bridge:   Workflow ID = fsX-zC0M_SUTbcCUowIxY  ("Bitrix24 Explorer for Claude")
 ```
 
