@@ -295,12 +295,25 @@ Differences from companion mode:
 1. **Sandbox capability detection (T82/T83).** The Codex CLI requires `bubblewrap` for shell tools; it is not present on dev. Probe `codex exec --skip-git-repo-check "pwd"`, a three-state result (`true/false/unknown`), TTL cache of 1h in `.claude/codex.json:availability_cache.sandbox_works`. On `false`/`unknown` → inline mode.
 2. **Inline prompt assembly.** When `INLINE_MODE=true`, the content of `inline_files` (or TASK_FILE+SPEC_FILE) is embedded at the end of the prompt (limit ~100KB, priority TASK > SPEC > ARTEFACTS), with a "DO NOT use shell tools" note. The `inline`/`inline_files` parameters from the contract apply only here.
 3. **Launch:** `cli_flags` from codex.json (`output_last_message`, `skip_git_repo_check`).
-   **`< /dev/null` is mandatory** — see the note below:
+   **`< /dev/null` is mandatory**, and for `role=implementer` **`-s workspace-write` is mandatory too** —
+   see both notes below:
    ```bash
    cd <worktree-or-cwd>
-   $ENV_PREFIX codex exec $SKIP_GIT_FLAG $OUTPUT_FLAG "$OUTPUT_FILE" "$(cat $PROMPT_FILE)" < /dev/null
+   # implementer → -s workspace-write; reviewer → без флага (дефолт read-only и есть цель)
+   SANDBOX_FLAG=""; [ "$ROLE" = "implementer" ] && SANDBOX_FLAG="-s workspace-write"
+   $ENV_PREFIX codex exec $SANDBOX_FLAG $SKIP_GIT_FLAG $OUTPUT_FLAG "$OUTPUT_FILE" "$(cat $PROMPT_FILE)" < /dev/null
    ```
    Here Codex itself writes the final message to `$OUTPUT_FILE` via `--output-last-message` (no JSON parsing needed).
+
+   > **`codex exec` defaults to the `read-only` sandbox.** Without `-s workspace-write` an implementer
+   > run looks entirely successful — the process exits **0**, the final message is written, the watchdog
+   > is happy — but every `apply_patch` was silently denied and `/tmp` was unreachable, so pytest died
+   > before collection with `No usable temporary directory found`. Nothing is created; `git status` is
+   > clean; only the worker's own final message admits it («оба вызова apply_patch отклонены
+   > sandbox-политикой»). The caller must therefore never treat `status: ok` as evidence of a change —
+   > check `git status` — but the flag removes the failure mode at the source.
+   > Verified on CLI 0.145.0, 2026-07-30 (task T350, repo arbitra_inbox).
+   > Companion mode is unaffected: it passes `--write` for implementers already.
 
    > **Never launch without closing stdin.** With a non-TTY stdin (which is always the case from
    > the Bash tool) `codex exec` treats it as an extra prompt source: it prints
