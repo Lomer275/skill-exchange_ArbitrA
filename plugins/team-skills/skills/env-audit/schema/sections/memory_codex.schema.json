@@ -1,0 +1,31 @@
+{
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": ["dir", "exists", "files", "bytes", "newest", "oldest"],
+  "properties": {
+    "dir": {"type": "string"},
+    "exists": {"type": "boolean"},
+    "files": {"type": "integer", "minimum": 0},
+    "bytes": {"type": "integer", "minimum": 0},
+    "newest": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["date", "source", "trust"],
+      "properties": {
+        "date": {"type": ["string", "null"], "format": "date"},
+        "source": {"enum": ["name", "header", "mtime", null]},
+        "trust": {"enum": ["high", "medium", "low", null]}
+      }
+    },
+    "oldest": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["date", "source", "trust"],
+      "properties": {
+        "date": {"type": ["string", "null"], "format": "date"},
+        "source": {"enum": ["name", "header", "mtime", null]},
+        "trust": {"enum": ["high", "medium", "low", null]}
+      }
+    }
+  }
+}
