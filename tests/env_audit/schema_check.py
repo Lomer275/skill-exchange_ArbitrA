@@ -39,7 +39,9 @@ def load_schema() -> dict:
         grouped.setdefault(key, []).append((part, _read(path)))
     if grouped:
         architecture = section_properties["architecture"]
-        architecture_properties = architecture.setdefault("properties", {})
+        # The section maps project root -> per-root document, so check fragments describe the per-root object.
+        root_schema = architecture.setdefault("additionalProperties", {"type": "object"})
+        architecture_properties = root_schema.setdefault("properties", {})
         for key, fragments in grouped.items():
             base = next((doc for part, doc in fragments if not part), None)
             combined = deepcopy(base) if base is not None else {"type": "object"}
