@@ -1,0 +1,331 @@
+{
+  "$id": "urn:env-audit:schema:arch:python",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["modules", "parse_errors", "tests"],
+  "properties": {
+    "applicable": {"type": "boolean"},
+    "modules": {"type": "integer", "minimum": 0},
+    "parse_errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "line"],
+        "properties": {
+          "path": {"type": "string"},
+          "kind": {"type": "string"},
+          "line": {"type": ["integer", "null"], "minimum": 1}
+        }
+      }
+    },
+    "edges": {"oneOf": [{"$ref": "#/$defs/disabled"}, {"$ref": "#/$defs/edge_counts"}]},
+    "package_edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "target", "edges"],
+        "properties": {
+          "source": {"type": "string"},
+          "target": {"type": "string"},
+          "edges": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "scc": {"oneOf": [{"$ref": "#/$defs/disabled"}, {"$ref": "#/$defs/scc_groups"}]},
+    "modules_top": {"type": "array", "items": {"$ref": "#/$defs/module"}, "maxItems": 30},
+    "longest_functions": {"type": "array", "items": {"$ref": "#/$defs/function_metric"}, "maxItems": 5},
+    "fan_in_top": {"type": "array", "items": {"$ref": "#/$defs/fan_in"}},
+    "fan_out_top": {"type": "array", "items": {"$ref": "#/$defs/fan_out"}},
+    "fn_layers": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["heuristic", "functions"],
+      "properties": {
+        "heuristic": {"const": true},
+        "functions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "name", "layer"],
+            "properties": {
+              "path": {"type": "string"},
+              "name": {"type": "string"},
+              "layer": {"enum": ["core", "adapters"]}
+            }
+          }
+        }
+      }
+    },
+    "layers": {"oneOf": [{"$ref": "#/$defs/disabled"}, {"$ref": "#/$defs/layers"}]},
+    "layer_edges": {"type": "array", "items": {"$ref": "#/$defs/layer_edge"}},
+    "framework_libs": {"$ref": "#/$defs/framework_libs"},
+    "core_io": {"type": "array", "items": {"$ref": "#/$defs/core_io"}},
+    "orphans": {
+      "oneOf": [
+        {"$ref": "#/$defs/disabled"},
+        {"type": "array", "items": {"$ref": "#/$defs/orphan"}}
+      ]
+    },
+    "duplicates": {"oneOf": [{"$ref": "#/$defs/disabled"}, {"$ref": "#/$defs/duplicates"}]},
+    "channels": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/disabled"},
+        {"$ref": "#/$defs/channels"}
+      ]
+    },
+    "interface_to_client_edges": {"type": "array", "items": {"$ref": "#/$defs/interface_edge"}},
+    "runtime_to_tools_edges": {"type": "array", "items": {"$ref": "#/$defs/runtime_edge"}},
+    "framework_conventions": {"type": "object", "additionalProperties": true},
+    "config": {"oneOf": [{"$ref": "#/$defs/disabled"}, {"$ref": "#/$defs/config"}]},
+    "tests": {"$ref": "#/$defs/tests"}
+  },
+  "$defs": {
+    "disabled": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicable"],
+      "properties": {"applicable": {"const": false}}
+    },
+    "edge_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "prod", "module", "lazy", "type_checking", "in_ready", "annotation_only", "prod_to_tests"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "prod": {"type": "integer", "minimum": 0},
+        "module": {"type": "integer", "minimum": 0},
+        "lazy": {"type": "integer", "minimum": 0},
+        "type_checking": {"type": "integer", "minimum": 0},
+        "in_ready": {"type": "integer", "minimum": 0},
+        "annotation_only": {"type": "integer", "minimum": 0},
+        "prod_to_tests": {"type": "integer", "minimum": 0}
+      }
+    },
+    "scc_groups": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_level", "with_lazy", "top_packages", "second_packages"],
+      "properties": {
+        "module_level": {"type": "array", "items": {"$ref": "#/$defs/scc"}},
+        "with_lazy": {"type": "array", "items": {"$ref": "#/$defs/scc"}},
+        "top_packages": {"type": "array", "items": {"$ref": "#/$defs/scc"}},
+        "second_packages": {"type": "array", "items": {"$ref": "#/$defs/scc"}}
+      }
+    },
+    "scc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "members", "crosses_packages", "lazy_edges", "name_in_tests"],
+      "properties": {
+        "size": {"type": "integer", "minimum": 2},
+        "members": {"type": "array", "items": {"type": "string"}, "maxItems": 20},
+        "crosses_packages": {"type": "boolean"},
+        "lazy_edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "target", "line", "comment_above"],
+            "properties": {
+              "source": {"type": "string"},
+              "target": {"type": "string"},
+              "line": {"type": "integer", "minimum": 1},
+              "comment_above": {"type": "boolean"}
+            }
+          }
+        },
+        "name_in_tests": {"type": "boolean"}
+      }
+    },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "lines", "sloc", "sloc_no_strings"],
+      "properties": {
+        "path": {"type": "string"},
+        "lines": {"type": "integer", "minimum": 0},
+        "sloc": {"type": "integer", "minimum": 0},
+        "sloc_no_strings": {"type": "integer", "minimum": 0},
+        "top_defs": {"type": "integer", "minimum": 0},
+        "class_methods_max": {"type": "integer", "minimum": 0},
+        "longest_func": {"type": "integer", "minimum": 0},
+        "assign_share": {"type": "number", "minimum": 0},
+        "share_of_prod": {"type": "number", "minimum": 0},
+        "churn": {"type": ["integer", "null"], "minimum": 0},
+        "direct_io_imports": {"type": "array", "items": {"type": "string"}},
+        "test_importers": {"type": "integer", "minimum": 0},
+        "is_composition_root": {"type": "boolean"},
+        "is_models_py": {"type": "boolean"},
+        "frozen": {"type": "boolean"},
+        "in_dispatcher_closure": {"type": "boolean"},
+        "in_base": {"type": "boolean"}
+      }
+    },
+    "function_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "name", "lines"],
+      "properties": {
+        "path": {"type": "string"},
+        "name": {"type": "string"},
+        "lines": {"type": "integer", "minimum": 1}
+      }
+    },
+    "fan_in": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "fan_in"],
+      "properties": {"path": {"type": "string"}, "fan_in": {"type": "integer", "minimum": 1}}
+    },
+    "fan_out": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "fan_out"],
+      "properties": {"path": {"type": "string"}, "fan_out": {"type": "integer", "minimum": 1}}
+    },
+    "layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "assignment", "unclassified"],
+      "properties": {
+        "source": {"enum": ["audit_json", "computed"]},
+        "assignment": {
+          "type": "object",
+          "additionalProperties": {"enum": ["core", "application", "adapters", "interface", "composition", "tools"]}
+        },
+        "unclassified": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "layer_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "target", "source_layer", "target_layer"],
+      "properties": {
+        "source": {"type": "string"},
+        "target": {"type": "string"},
+        "source_layer": {"type": "string"},
+        "target_layer": {"type": "string"}
+      }
+    },
+    "framework_libs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_manifests", "names", "io_list_source", "io_list_size"],
+      "properties": {
+        "source_manifests": {"type": "array", "items": {"type": "string"}},
+        "names": {"type": "array", "items": {"type": "string"}},
+        "io_list_source": {"const": "manifest+builtin"},
+        "io_list_size": {"type": "integer", "minimum": 1}
+      }
+    },
+    "core_io": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "imports", "functions"],
+      "properties": {
+        "path": {"type": "string"},
+        "imports": {"type": "array", "items": {"type": "string"}},
+        "functions": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+      }
+    },
+    "orphan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "lines", "class", "documented_as_active_in", "branches_checked", "branches_total"],
+      "properties": {
+        "path": {"type": "string"},
+        "lines": {"type": "integer", "minimum": 0},
+        "class": {"enum": ["orphan", "test_only", "shadowed"]},
+        "documented_as_active_in": {"type": "array", "items": {"type": "string"}},
+        "branches_checked": {"type": "integer", "minimum": 0},
+        "branches_total": {"type": "integer", "minimum": 0}
+      }
+    },
+    "duplicates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["same_basename_pairs", "function_hash_groups", "callseq_pairs", "sibling", "truncated"],
+      "properties": {
+        "same_basename_pairs": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "function_hash_groups": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "callseq_pairs": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "sibling": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["common_root", "jaccard"],
+          "properties": {
+            "common_root": {"type": "boolean"},
+            "jaccard": {"type": "number", "minimum": 0, "maximum": 1}
+          }
+        },
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "channels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packages", "group_id", "cross_channel_edges", "shared_to_channel_edges", "imported_sdk_count", "importers_by_package", "constants_only_modules", "same_name_pairs"],
+      "properties": {
+        "packages": {"type": "array", "items": {"type": "string"}, "minItems": 2},
+        "group_id": {"type": "string"},
+        "cross_channel_edges": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "shared_to_channel_edges": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "imported_sdk_count": {"type": "integer", "minimum": 0},
+        "importers_by_package": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+        "constants_only_modules": {"type": "array", "items": {"type": "string"}},
+        "same_name_pairs": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+      }
+    },
+    "interface_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "source", "target"],
+      "properties": {
+        "channel": {"type": "string"},
+        "source": {"type": "string"},
+        "target": {"type": "string"}
+      }
+    },
+    "runtime_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "target", "ignored", "dockerignored"],
+      "properties": {
+        "source": {"type": "string"},
+        "target": {"type": "string"},
+        "ignored": {"type": "boolean"},
+        "dockerignored": {"type": "boolean"}
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["templates", "code_keys", "template_keys", "missing_in_template", "unused_template", "getenv_outside_config", "repeated_numeric_ids"],
+      "properties": {
+        "templates": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "code_keys": {"type": "array", "items": {"type": "string"}},
+        "template_keys": {"type": "array", "items": {"type": "string"}},
+        "missing_in_template": {"type": "array", "items": {"type": "string"}},
+        "unused_template": {"type": "array", "items": {"type": "string"}},
+        "getenv_outside_config": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "repeated_numeric_ids": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "lines", "collected", "collect_errors", "components_without_tests"],
+      "properties": {
+        "files": {"type": "integer", "minimum": 0},
+        "lines": {"type": "integer", "minimum": 0},
+        "collected": {"type": ["integer", "null"], "minimum": 0},
+        "collect_errors": {"type": "integer", "minimum": 0},
+        "components_without_tests": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}
