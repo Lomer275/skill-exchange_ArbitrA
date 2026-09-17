@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import unicodedata
 
+from envaudit.core import runner
 from envaudit.core.patterns import find
 from envaudit.core.redact import scan_file
 from envaudit.core.walk import EXCLUDED_DIRS
@@ -32,6 +33,7 @@ BLOCK_REASONS = {
     "secret_in_settings",
     "plugin_close",
     "no_canon",
+    "cross_tree",
 }
 
 _TRANSLIT = str.maketrans(
@@ -109,11 +111,86 @@ def _diff_stats(before: str, after: str) -> dict:
     }
 
 
+def _inside(path: Path, root: Path) -> bool:
+    try:
+        real_root = os.path.realpath(root)
+        return os.path.commonpath((os.path.realpath(path), real_root)) == real_root
+    except (OSError, ValueError):
+        return False
+
+
+def _git_path(directory: Path, raw: str) -> Path:
+    path = Path(raw)
+    return Path(os.path.realpath(path if path.is_absolute() else directory / path))
+
+
+def _linked_worktree_root(path: Path) -> Path | None:
+    directory = path if path.is_dir() else path.parent
+    while not directory.exists() and directory.parent != directory:
+        directory = directory.parent
+    result = runner.git(
+        directory,
+        "rev-parse",
+        "--show-toplevel",
+        "--git-dir",
+        "--git-common-dir",
+    )
+    if result.rc != 0:
+        return None
+    lines = result.stdout.decode("utf-8", errors="replace").splitlines()
+    if len(lines) != 3:
+        return None
+    git_dir = _git_path(directory, lines[1])
+    common_dir = _git_path(directory, lines[2])
+    return _git_path(directory, lines[0]) if git_dir != common_dir else None
+
+
+def _named_worktree_root(path: Path, root: Path | None) -> Path | None:
+    absolute = Path(os.path.abspath(path))
+    parts = absolute.parts
+    try:
+        marker = parts.index(".worktrees")
+    except ValueError:
+        marker = -1
+    if marker >= 0 and marker + 1 < len(parts):
+        return Path(*parts[: marker + 2])
+    if root is None:
+        return None
+    try:
+        relative = absolute.relative_to(Path(os.path.abspath(root)))
+    except ValueError:
+        return None
+    if relative.parts and relative.parts[0].startswith("wt-"):
+        return Path(os.path.abspath(root)) / relative.parts[0]
+    return None
+
+
+def _worktree_root(path: Path, root: Path | None) -> Path | None:
+    return _named_worktree_root(path, root) or _linked_worktree_root(path)
+
+
+def _same_project_tree(source: Path, target: Path, root: Path) -> bool:
+    return (
+        _inside(source, root)
+        and _inside(target, root)
+        and _worktree_root(source, root) is None
+        and _worktree_root(target, root) is None
+    )
+
+
 class _Builder:
     def __init__(self, output_dir: Path):
         self.output_dir = output_dir
         self.after_dir = output_dir / "after"
         self.items: list[dict] = []
+        self.skipped_worktrees: set[str] = set()
+
+    def skip_worktree(self, path: Path, root: Path | None = None) -> bool:
+        worktree = _worktree_root(path, root)
+        if worktree is None:
+            return False
+        self.skipped_worktrees.add(os.path.realpath(worktree))
+        return True
 
     def add(
         self,
@@ -128,7 +205,13 @@ class _Builder:
         root: Path | None = None,
         edit: dict | None = None,
         related: list[dict] | None = None,
-    ) -> dict:
+    ) -> dict | None:
+        if self.skip_worktree(path, root):
+            return None
+        for operation in related or []:
+            raw_path = operation.get("path")
+            if isinstance(raw_path, str) and self.skip_worktree(Path(raw_path), root):
+                return None
         if blocked is not None and blocked not in BLOCK_REASONS:
             raise ValueError(f"unknown block reason: {blocked}")
         if blocked is None:
@@ -208,6 +291,8 @@ def _claude_items(builder: _Builder, facts: dict) -> None:
             if not isinstance(rel, str):
                 continue
             path = root / rel
+            if builder.skip_worktree(path, root):
+                continue
             text = read_text(path)
             if text is None:
                 continue
@@ -235,6 +320,9 @@ def _claude_items(builder: _Builder, facts: dict) -> None:
                 elif found:
                     blocked = "secret"
                     summary = f"Раздел заблокирован; классы: {', '.join(found)}"
+                elif not _same_project_tree(path, guide, root):
+                    blocked = "cross_tree"
+                    summary = "Перенос заблокирован: источник и гайд в разных деревьях"
                 elif guide.exists():
                     blocked = "target_exists"
                 related = [
@@ -286,6 +374,8 @@ def _step_item(
     journals: list[dict],
     writes: list[dict],
 ) -> None:
+    if builder.skip_worktree(path, root):
+        return
     journal_write = next(
         (
             item
@@ -355,6 +445,8 @@ def _handoff_items(builder: _Builder, facts: dict, home: Path) -> None:
         if not isinstance(view, dict):
             continue
         root = Path(raw_root)
+        if builder.skip_worktree(root, root):
+            continue
         canon_view = view.get("canon")
         canon = canon_view.get("path") if isinstance(canon_view, dict) else None
         journals = view.get("journals") if isinstance(view.get("journals"), list) else []
@@ -394,32 +486,46 @@ def _handoff_items(builder: _Builder, facts: dict, home: Path) -> None:
 
         if not isinstance(canon, str):
             continue
+        canon_path = _resolved_path(canon, root, home)
+        if builder.skip_worktree(canon_path, root):
+            continue
+        canon_relative = Path(os.path.relpath(canon_path, root)).as_posix()
         journal_globs = {
             item["glob"]
             for item in journals
             if isinstance(item, dict) and isinstance(item.get("glob"), str)
         }
-        for path in _handoff_files(root):
+        for path in _handoff_files(root, builder):
+            if builder.skip_worktree(path, root):
+                continue
             rel = path.relative_to(root).as_posix()
-            if rel == canon or any(fnmatch.fnmatchcase(rel, glob) for glob in journal_globs):
+            if os.path.realpath(path) == os.path.realpath(canon_path):
+                continue
+            if any(fnmatch.fnmatchcase(rel, glob) for glob in journal_globs):
                 continue
             text = read_text(path)
             if text is None or text.startswith("> Архив. Текущее состояние — в `"):
                 continue
-            marker = f"> Архив. Текущее состояние — в `{canon}`.\n\n"
+            cross_tree = not _same_project_tree(path, canon_path, root)
+            marker = f"> Архив. Текущее состояние — в `{canon_relative}`.\n\n"
             builder.add(
                 kind="handoff_archive_mark",
                 path=path,
                 before=text,
                 after=marker + text,
                 selected=True,
-                summary="Пометить неканонический HANDOFF как архив",
+                blocked="cross_tree" if cross_tree else None,
+                summary=(
+                    "Архивная метка заблокирована: файлы в разных деревьях"
+                    if cross_tree
+                    else "Пометить неканонический HANDOFF как архив"
+                ),
                 root=root,
                 edit={"type": "prepend", "block": marker},
             )
 
 
-def _handoff_files(root: Path) -> list[Path]:
+def _handoff_files(root: Path, builder: _Builder) -> list[Path]:
     result = []
     for current, dirs, files in os.walk(root, followlinks=False):
         current_path = Path(current)
@@ -427,7 +533,15 @@ def _handoff_files(root: Path) -> list[Path]:
             depth = len(current_path.relative_to(root).parts)
         except ValueError:
             continue
-        dirs[:] = [name for name in dirs if name not in EXCLUDED_DIRS and depth < 3]
+        kept = []
+        for name in dirs:
+            candidate = current_path / name
+            if name in EXCLUDED_DIRS or depth >= 3:
+                continue
+            if builder.skip_worktree(candidate, root):
+                continue
+            kept.append(name)
+        dirs[:] = kept
         for name in files:
             if "handoff" in name.lower() and name.lower().endswith(".md"):
                 result.append(current_path / name)
@@ -615,8 +729,16 @@ def _skills_items(builder: _Builder, facts: dict, home: Path) -> None:
             _override_item(builder, path=path, name=name, action="restore", root=root)
 
 
-def _manual_items(facts: dict) -> list[dict]:
+def _manual_items(facts: dict, worktrees_skipped: int = 0) -> list[dict]:
     result = []
+    if worktrees_skipped:
+        result.append(
+            {
+                "kind": "worktrees_skipped",
+                "summary": f"Пропущено связанных рабочих копий: {worktrees_skipped}",
+                "why_not_me": "Рабочие копии не входят в разбор проектов",
+            }
+        )
     instructions = _facts_section(facts, "instructions")
     memory = instructions.get("memory")
     split = memory.get("roots_with_multiple_dirs") if isinstance(memory, dict) else None
@@ -770,15 +892,17 @@ def _write_plan(path: Path, plan: dict) -> None:
 def _render_loaded(plan_path: Path, plan: dict) -> int:
     directory = plan_path.parent
     running: dict[str, str] = {}
+    running_exists: dict[str, bool] = {}
     diff_parts = []
     for item in sorted(plan.get("items", []), key=lambda value: value.get("id", "")):
         if not isinstance(item, dict) or item.get("blocked") is not None or item.get("selected") is not True:
             continue
         path = Path(item["path"])
-        key = str(path)
+        key = os.path.realpath(path)
         if key not in running:
             current = read_text(path)
             running[key] = current if current is not None else ""
+            running_exists[key] = path.exists()
         before = running[key]
         artifact_path = directory / "after" / item["id"]
         artifact = artifact_path.read_text(encoding="utf-8")
@@ -786,14 +910,25 @@ def _render_loaded(plan_path: Path, plan: dict) -> int:
         running[key] = after
         item["before_sha1"] = sha1_bytes(before.encode("utf-8"))
         item["after_sha1"] = sha1_bytes(after.encode("utf-8"))
-        item["before_missing"] = not path.exists() and before == ""
+        item["before_missing"] = not running_exists[key]
         item["diff_stats"] = _diff_stats(before, after)
         write_private(artifact_path, after)
+        running_exists[key] = True
         diff_parts.extend(_diff_lines(before, after, path))
         for index, operation in enumerate(item.get("related", []), 1):
             related_path = Path(operation["path"])
+            related_key = os.path.realpath(related_path)
             related_after = (directory / operation["artifact"]).read_text(encoding="utf-8")
-            related_before = read_text(related_path) or ""
+            if related_key not in running:
+                current = read_text(related_path)
+                running[related_key] = current if current is not None else ""
+                running_exists[related_key] = related_path.exists()
+            related_before = running[related_key]
+            operation["before_sha1"] = sha1_bytes(related_before.encode("utf-8"))
+            operation["after_sha1"] = sha1_bytes(related_after.encode("utf-8"))
+            operation["created"] = not running_exists[related_key]
+            running[related_key] = related_after
+            running_exists[related_key] = True
             diff_parts.extend(_diff_lines(related_before, related_after, related_path))
 
     diff_path = directory / "plan.diff"
@@ -828,7 +963,7 @@ def build_plan(facts_path: Path, output_dir: Path) -> int:
         "home": str(home),
         "diff_blocked": False,
         "items": builder.items,
-        "manual": _manual_items(facts),
+        "manual": _manual_items(facts, len(builder.skipped_worktrees)),
     }
     plan_path = output_dir / "plan.json"
     _write_plan(plan_path, plan)

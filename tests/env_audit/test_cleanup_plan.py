@@ -7,6 +7,7 @@ from envaudit.cleanup.plan import build_plan
 from .arch_builders import isolated_runtime, write_crontab_stub, write_systemctl_stub
 from .canaries import canary, fragments
 from .cleanup_builders import (
+    add_linked_worktree,
     collect_facts,
     install_plugin,
     irina_like,
@@ -164,3 +165,50 @@ def test_plan_dir_modes(fake_home, monkeypatch, tmp_path):
     for path in output.rglob("*"):
         if path.is_file():
             assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+def test_linked_worktree_not_touched(fake_home, monkeypatch, tmp_path):
+    root = fake_home / "projects" / "linked"
+    root.mkdir()
+    worktree = add_linked_worktree(root, root / ".worktrees" / "feature")
+    write_large_claude(worktree)
+    (worktree / "SUP-HANDOFF.md").write_text("# Branch state\n", encoding="utf-8")
+    facts = collect_facts(fake_home, [root], monkeypatch)
+    output = tmp_path / "cleanup"
+
+    assert build_plan(write_facts(tmp_path / "facts.json", facts), output) == 0
+    plan = json.loads((output / "plan.json").read_text(encoding="utf-8"))
+
+    assert not any(
+        worktree == Path(item["path"]) or worktree in Path(item["path"]).parents
+        for item in plan["items"]
+    )
+    skipped = [item for item in plan["manual"] if item["kind"] == "worktrees_skipped"]
+    assert len(skipped) == 1
+    assert "1" in skipped[0]["summary"]
+    assert str(worktree) not in json.dumps(skipped, ensure_ascii=False)
+
+
+def test_archive_pointer_is_not_self(fake_home, monkeypatch, tmp_path):
+    root = fake_home / "projects" / "archive"
+    (root / "docs").mkdir(parents=True)
+    (root / "old").mkdir()
+    canon = root / "docs" / "SUP-HANDOFF.md"
+    canon.write_text("# Current\n", encoding="utf-8")
+    archive = root / "old" / "SUP-HANDOFF.md"
+    archive.write_text("# Old\n", encoding="utf-8")
+    alias = root / "SUP-HANDOFF.md"
+    alias.symlink_to(canon)
+    facts = collect_facts(fake_home, [root], monkeypatch)
+    view = facts["sections"]["handoff"]["roots"][str(root)]
+    view["canon"] = {"path": "docs/SUP-HANDOFF.md"}
+    view["journals"] = []
+    output = tmp_path / "cleanup"
+
+    assert build_plan(write_facts(tmp_path / "facts.json", facts), output) == 0
+    plan = json.loads((output / "plan.json").read_text(encoding="utf-8"))
+    items = _by_kind(plan, "handoff_archive_mark")
+
+    assert [Path(item["path"]) for item in items] == [archive]
+    marker = (output / "after" / items[0]["id"]).read_text(encoding="utf-8").splitlines()[0]
+    assert marker == "> Архив. Текущее состояние — в `docs/SUP-HANDOFF.md`."

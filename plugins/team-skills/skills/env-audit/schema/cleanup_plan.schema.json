@@ -68,7 +68,7 @@
         "after_sha1": {"$ref": "#/$defs/sha1"},
         "selected": {"type": "boolean"},
         "blocked": {
-          "enum": [null, "secret", "team_context", "target_exists", "cannot_fit", "secret_in_settings", "plugin_close", "no_canon"]
+          "enum": [null, "secret", "team_context", "target_exists", "cannot_fit", "secret_in_settings", "plugin_close", "no_canon", "cross_tree"]
         },
         "summary": {"type": "string"},
         "diff_stats": {

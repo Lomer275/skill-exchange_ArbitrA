@@ -13,6 +13,7 @@ from .cleanup_builders import (
     irina_like,
     write_facts,
     write_large_claude,
+    write_user_skill,
 )
 from .conftest import SKILL_DIR
 
@@ -141,3 +142,38 @@ def test_schema_valid(fake_home, monkeypatch, tmp_path):
     jsonschema.Draft202012Validator(plan_schema).validate(_document(output / "plan.json"))
     jsonschema.Draft202012Validator.check_schema(apply_schema)
     jsonschema.Draft202012Validator(apply_schema).validate(_document(output / "apply.json"))
+
+
+def test_render_rechains_after_deselect(fake_home, monkeypatch, tmp_path):
+    root = fake_home / "projects" / "rechain"
+    root.mkdir()
+    for name in ("old-one", "old-two", "old-three"):
+        write_user_skill(fake_home, name)
+    facts = collect_facts(fake_home, [root], monkeypatch)
+    output = tmp_path / "cleanup"
+    plan_path = output / "plan.json"
+
+    assert build_plan(write_facts(tmp_path / "facts.json", facts), output) == 0
+    plan = _document(plan_path)
+    items = [
+        item
+        for item in plan["items"]
+        if item["kind"] == "skill_override_off"
+        and item["edit"]["name"] in {"old-one", "old-two", "old-three"}
+    ]
+    assert len(items) == 3
+    items[1]["selected"] = False
+    plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    assert render_plan(plan_path) == 0
+    assert apply_plan(plan_path, confirmed=True) == 0
+
+    applied = _document(output / "apply.json")["items"]
+    results = [item for item in applied if item["id"] in {items[0]["id"], items[2]["id"]}]
+    assert len(results) == 2
+    assert all(item["status"] == "applied" for item in results)
+    settings = _document(fake_home / ".claude" / "settings.json")
+    assert settings["skillOverrides"] == {
+        items[0]["edit"]["name"]: "off",
+        items[2]["edit"]["name"]: "off",
+    }
