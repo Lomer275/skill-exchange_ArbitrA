@@ -53,6 +53,10 @@ def analyse(graph: Graph, assignment: dict[str, str]) -> tuple[dict, dict]:
                 orm_in_interface.append({"path": item.path, "calls": session_calls})
         if layer == "application" and any(value.startswith("django") for value in imported):
             application_framework.append(item.path)
+    http_exception.sort(
+        key=lambda item: (item["path"], item["non_http_callers"])
+    )
+    orm_in_interface.sort(key=lambda item: (item["path"], item["calls"]))
     metrics = {
         "http_exception": http_exception,
         "orm_in_interface": orm_in_interface,
@@ -66,4 +70,3 @@ def analyse(graph: Graph, assignment: dict[str, str]) -> tuple[dict, dict]:
         "application_framework_imports": len(application_framework),
     }
     return metrics, rule
-

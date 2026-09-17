@@ -314,7 +314,9 @@ def build(actx: ArchContext) -> Graph:
         return cached
     modules: dict[str, Module] = {}
     by_path: dict[str, str] = {}
-    for entry in actx.code_files(exts=frozenset({".py"})):
+    for entry in sorted(
+        actx.code_files(exts=frozenset({".py"})), key=lambda item: item.rel
+    ):
         name = module_name(entry.rel)
         if not name:
             continue
@@ -396,7 +398,15 @@ def build(actx: ArchContext) -> Graph:
         by_path=by_path,
         edges=sorted(
             edges,
-            key=lambda edge: (edge.source, edge.target, edge.line, edge.level),
+            key=lambda edge: (
+                edge.source,
+                edge.target,
+                edge.line,
+                edge.level,
+                edge.type_checking,
+                edge.in_ready,
+                edge.annotation_only,
+            ),
         ),
         package_nodes={name for name, item in modules.items() if item.package},
     )
@@ -487,6 +497,14 @@ def _component_record(
         and edge.source in members
         and edge.target in members
     ]
+    lazy.sort(
+        key=lambda item: (
+            item["source"],
+            item["target"],
+            item["line"],
+            item["comment_above"],
+        )
+    )
     return {
         "size": len(component),
         "members": [graph.modules[name].path for name in component[:20]],

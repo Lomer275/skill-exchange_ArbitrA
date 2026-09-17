@@ -70,6 +70,7 @@ def _templates(actx: ArchContext) -> tuple[list[dict], set[str]]:
             keys.add(name_value)
             records.append({"name": name_value, "class": value_class(value)})
         output.append({"path": entry.rel, "keys": records})
+    output.sort(key=lambda item: item["path"])
     return output, keys
 
 
@@ -126,6 +127,7 @@ def _code_keys(graph: Graph) -> tuple[dict[str, set[str]], list[dict], Counter[s
             stem = Path(item.path).stem.casefold()
             if stem not in {"config", "settings", "environment", "env"}:
                 outside.append({"path": item.path, "keys": sorted(found)})
+    outside.sort(key=lambda item: (item["path"], tuple(item["keys"])))
     return by_path, outside, numeric_names
 
 

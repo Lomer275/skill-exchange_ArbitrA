@@ -261,6 +261,7 @@ def _fn_layers(graph: Graph) -> dict | None:
                     "layer": "adapters" if external else "core",
                 }
             )
+    functions.sort(key=lambda item: (item["path"], item["name"], item["layer"]))
     return {"heuristic": True, "functions": functions[:200]}
 
 
@@ -289,7 +290,7 @@ def analyse(actx: ArchContext, graph: Graph) -> dict:
             remaining.remove(name)
 
     candidates = set(remaining)
-    for name in tuple(candidates):
+    for name in sorted(candidates):
         imported = direct[name]
         if imported & framework_names or imported & THIRD_PARTY_IO:
             candidates.remove(name)
@@ -310,14 +311,14 @@ def analyse(actx: ArchContext, graph: Graph) -> dict:
     }
     while changed:
         changed = False
-        for name in tuple(candidates):
+        for name in sorted(candidates):
             if edge_targets[name] - candidates:
                 candidates.remove(name)
                 changed = True
-    for name in candidates:
+    for name in sorted(candidates):
         assignment[name] = "core"
         remaining.discard(name)
-    for name in remaining:
+    for name in sorted(remaining):
         assignment[name] = "application"
 
     layer_edges = []
@@ -336,6 +337,14 @@ def analyse(actx: ArchContext, graph: Graph) -> dict:
                 "target_layer": target_layer,
             }
         )
+    layer_edges.sort(
+        key=lambda item: (
+            item["source"],
+            item["target"],
+            item["source_layer"],
+            item["target_layer"],
+        )
+    )
 
     core_io = []
     for name, layer in sorted(assignment.items()):
@@ -363,6 +372,9 @@ def analyse(actx: ArchContext, graph: Graph) -> dict:
                 )
                 if calls:
                     function_calls.append({"function": node.name, "calls": calls})
+        function_calls.sort(
+            key=lambda item: (item["function"], tuple(item["calls"]))
+        )
         if imports or function_calls:
             core_io.append(
                 {
@@ -371,6 +383,7 @@ def analyse(actx: ArchContext, graph: Graph) -> dict:
                     "functions": function_calls,
                 }
             )
+    core_io.sort(key=lambda item: item["path"])
 
     output = {
         "fn_layers": _fn_layers(graph),
