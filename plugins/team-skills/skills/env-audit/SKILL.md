@@ -1,37 +1,68 @@
 ---
 name: env-audit
-description: Audits and provisions a person's whole working setup against eleven team requirements — skill exchange, mandatory skills, project documentation layout, GitHub wiring, the three levels of Claude rules and memory, the Claude×Codex pairing, Docker, Bitrix task regulations, working principles, a user profile, and the superpowers plugin. Snapshots everything first, then fixes only what is on a closed whitelist, then reports. Use when the user says "/env-audit", "проведи аудит окружения", "проверь моё окружение", "прими рабочее место", "почему агент выдумывает", "агент не помнит", "audit my setup", "настрой моё окружение по стандарту", or hands over the audit brief to run.
+description: Audits and repairs a person's whole working setup — the skill exchange, mandatory skills, documentation layout, GitHub wiring, the three levels of Claude rules and memory, the Claude×Codex pairing, Docker, task regulations, secrets and 1Password, network reach, token spend, project architecture, plus a short interview. A collector gathers every fact first, the agent interprets them, a cleanup diff is applied only after an explicit yes, and a sandbox run proves that closing the day really writes where the skills claim. Use when the user says "/env-audit", "проведи аудит окружения", "проверь моё окружение", "прими рабочее место", "почему агент выдумывает", "агент не помнит", "audit my setup", "set up my machine to the team standard", or hands over the audit brief to run.
 ---
 
 # /env-audit — accept a working setup: measure, then fix what is allowed
 
-The full brief lives in **`audit-brief.md`** next to this file. It is written in Russian,
-addressed to you, and it is the authority: follow it step by step rather than improvising.
+Read **`audit-brief.md`** (Russian, under 20 KB) before touching anything: it is the
+authority on how to run. This file says what the pieces are and what may never happen.
 
-## How to run
+## Tools
 
-1. Read `audit-brief.md` completely before touching anything. Section 0 defines the role
-   and the whitelist, section 1 the protocol, **section 2.0 the eleven mandatory
-   requirements**, sections 3–7 and phases F–G the snapshot, phase H the allowed fixes,
-   section 9 the traps that make audits produce confident wrong answers.
-2. **Take the whole snapshot before changing anything.** A fix made before the measurement
-   destroys the "before" picture and invalidates the run.
-3. Only then run phase H, and only what its whitelist names. Everything else — deletions,
-   moves, rewrites, anything leaving the machine — goes into the plan for the human.
-4. **Run the critical pass over your own findings (step 8.0).** Mandatory: in the first
-   field run three of five findings collapsed on re-check.
-5. Produce both deliverables: the report file on the machine and the short chat summary.
-6. Run the self-check in section 12 before you hand anything over.
+| Command | What it does | Writes anything? |
+|---|---|---|
+| `python3 collect.py --output ~/audit-<date>/facts.json` | gathers every fact into one JSON: machine, instructions, handoff, skills, tokens, Codex config and memory, 1Password, network, secrets, regulations, architecture | only the output file |
+| `python3 collect.py --scan-file <file>` | checks a file you are about to show or save for secret values; exit code 3 means something matched | no |
+| `python3 collect.py --bundle \| ssh host python3 - --expect-user <name> …` | runs the collector on another machine of the same person without writing anything there | no |
+| `python3 cleanup.py plan / render / apply --confirmed / verify / rollback --confirmed` | produces a concrete diff of the allowed repairs, applies it after the person says yes, backs every file up, can undo | only after `--confirmed` |
+| `python3 reality_check.py estimate / prepare / command / run --confirmed / verdict / cleanup` | proves in an isolated sandbox whether `/close` and `/accept` really write to the canonical HANDOFF and CHANGELOG | inside the sandbox only |
+
+The collector needs python3.10 and the standard library — nothing else. Exit codes:
+0 done, 2 no project root found, 3 the self-check redacted a value, 4 wrong account.
+
+## The run, in nine steps
+
+0. **Consent #1** — one message listing the read-only actions, then one yes for the run.
+1. `collect.py` → `facts.json`. No model calls, no changes.
+2. Interpret the facts and run the critical pass over your own findings.
+3. Interview the person (`references/interview.md`).
+4. Build the plan: whitelist items plus the cleanup diff.
+5. **Consent #2** — show `plan.diff` in full, then `cleanup.py apply --confirmed`.
+6. **Consent #3** — show the cost estimate, then the sandbox run.
+7. `collect.py --scan-file` over the report, the chat summary, the evidence and every diff.
+8. Deliver `REPORT.md`, `facts.json`, a 10–15 line chat summary and an instruction list.
+
+The order is strict: a repair made before the snapshot destroys the "before" picture.
 
 ## Hard rules
 
-- **Measure first, fix second.** Never in the other order.
-- **The whitelist is closed.** Install plugins, apply the shared context, create missing
-  directories and memory cards, write the user profile — that is all. No deleting,
-  no moving, no rewriting existing files, no git history, no secrets, no pushing,
-  nothing sent outside.
-- **Never print secret values** anywhere: counts and key names only.
-- **A claim without command output is a hypothesis, not a finding.**
+- **Measure first, fix second.** Never the other way round.
+- **Never print secret values** — anywhere. Counts and key names only. A value that leaked
+  into output is never repeated; it is marked "requires rotation".
+- **Never log in over ssh to production or to anyone else's machine.** Reachability is
+  judged from local data only.
+- **The whitelist is closed.** Only `cleanup.py apply` and the items in
+  `references/whitelist.md`. Deleting files, moving them, rewriting git history, rotating
+  secrets, committing, pushing, creating anything on GitHub, messaging people — all of
+  that goes into the instruction list for the person, never into your hands.
+- **A claim without command output is a hypothesis, not a finding.** Sections marked
+  `truncated`, `skipped` or `positive_control: fail` are never reported as clean.
 - **Name your blind spots**, and label numbers from partial data as lower bounds.
+- One agent run in the sandbox is the only exception to "do not spawn agents", and only
+  after consent #3 with the cost shown.
 
-The report and the summary are written in Russian.
+## Reference modules — read on demand, not upfront
+
+`architecture.md` · `secrets.md` · `machine.md` · `process.md` · `whitelist.md` ·
+`interview.md` · `tokens.md` · `network.md` · `onepassword.md` · `cleanup.md` ·
+`reality.md` · `windows.md` · `traps.md` (read this one **before** you start).
+
+## Codex profile
+
+If the person works on Codex, the skill-exchange, the ten mandatory skills and the
+superpowers plugin are marked "not applicable", not "violated"; memory lives in
+`$CODEX_HOME/memories`; `approval_policy` and `sandbox_mode` are the Codex equivalent
+of the whitelist; skill cleanup and the sandbox check do not apply.
+
+The report, the summary and the reference modules are in Russian.
