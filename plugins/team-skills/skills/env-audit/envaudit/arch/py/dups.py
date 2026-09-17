@@ -153,11 +153,11 @@ def _callseq(records: list[dict], budget: list[int]) -> tuple[list[dict], bool]:
     eligible = [record for record in records if record["lines"] > 15 and record["calls"]]
     by_call: dict[str, list[int]] = defaultdict(list)
     for index, record in enumerate(eligible):
-        for called in set(record["calls"]):
+        for called in sorted(set(record["calls"])):
             by_call[called].append(index)
     candidates = set()
     candidate_truncated = False
-    for indexes in by_call.values():
+    for _, indexes in sorted(by_call.items()):
         for offset, left in enumerate(indexes):
             for right in indexes[offset + 1 :]:
                 if eligible[left]["path"] != eligible[right]["path"]:
