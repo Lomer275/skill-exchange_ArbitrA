@@ -1,5 +1,6 @@
 import importlib
 import pkgutil
+import time
 from types import ModuleType
 
 from .context import ArchContext
@@ -21,10 +22,14 @@ def discover_checks() -> list[ModuleType]:
 def run_checks(actx: ArchContext, checks: list[ModuleType]) -> None:
     cache_handle = pyast._set_cache(actx.cache)
     try:
+        timings = actx.out.setdefault("timings_s", {})
         for check in sorted(checks, key=lambda module: (module.ORDER, module.KEY)):
+            started = time.monotonic()
             try:
                 check.run(actx)
             except Exception as error:
                 actx.error(check.KEY, type(error).__name__)
+            finally:
+                timings[check.KEY] = round(time.monotonic() - started, 2)
     finally:
         pyast._reset_cache(cache_handle)
