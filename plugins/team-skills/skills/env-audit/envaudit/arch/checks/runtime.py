@@ -1,5 +1,6 @@
 import ast
 import getpass
+import json
 import os
 from pathlib import Path
 import re
@@ -989,13 +990,41 @@ def _docker_working_dirs(actx: ArchContext) -> list[str] | None:
     return sorted(paths)
 
 
+def _live_unit_key(record: dict) -> tuple[str, str]:
+    remaining = {key: value for key, value in record.items() if key != "name"}
+    return (
+        str(record.get("name", "")),
+        json.dumps(
+            remaining,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+    )
+
+
 def run(actx: ArchContext) -> None:
-    units = []
-    unit_meta = []
+    collected = []
     for collector in (_crontab, _systemctl_user, _system_units):
         records, meta = collector(actx)
-        units.extend(records)
-        unit_meta.extend(meta)
+        collected.extend(
+            (record, meta[index] if index < len(meta) else {})
+            for index, record in enumerate(records)
+        )
+    collected.sort(
+        key=lambda item: (
+            _live_unit_key(item[0]),
+            json.dumps(
+                item[1],
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+                separators=(",", ":"),
+            ),
+        )
+    )
+    units = [record for record, _ in collected]
+    unit_meta = [meta for _, meta in collected]
 
     actx.out[KEY] = {
         "anchors": [],
