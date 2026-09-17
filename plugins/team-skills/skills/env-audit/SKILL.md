@@ -1,6 +1,6 @@
 ---
 name: env-audit
-description: Audits and repairs a person's whole working setup — the skill exchange, mandatory skills, documentation layout, GitHub wiring, the three levels of Claude rules and memory, the Claude×Codex pairing, Docker, task regulations, secrets and 1Password, network reach, token spend, project architecture, plus a short interview. A collector gathers every fact first, the agent interprets them, a cleanup diff is applied only after an explicit yes, and a sandbox run proves that closing the day really writes where the skills claim. Use when the user says "/env-audit", "проведи аудит окружения", "проверь моё окружение", "прими рабочее место", "почему агент выдумывает", "агент не помнит", "audit my setup", "set up my machine to the team standard", or hands over the audit brief to run.
+description: Audits and repairs a person's working setup: a collector gathers the facts (rules and memory, skills, secrets and 1Password, network reach, token spend, documentation, project architecture), the agent interprets them, allowed repairs are applied only after an explicit yes, and a sandbox run proves that closing the day writes where the skills claim. Use when the user says "/env-audit", "проведи аудит окружения", "проверь моё окружение", "прими рабочее место", "почему агент выдумывает", "агент не помнит", "audit my setup", or hands over the audit brief to run.
 ---
 
 # /env-audit — accept a working setup: measure, then fix what is allowed

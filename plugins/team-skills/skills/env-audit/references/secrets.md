@@ -12,14 +12,17 @@
 
 | Поле | Что означает |
 |---|---|
-| `context_files[]` | файлы, которые агент читает каждой сессией (`CLAUDE.md`, `AGENTS.md`, `README.md`, глобальные правила): имя файла и классы найденного |
-| `patterns.<класс>.worktree_files` | сколько **трекаемых git** файлов содержит класс |
-| `patterns.<класс>.distinct` | сколько различных значений класса (нижняя граница) |
-| `patterns.<класс>.head_files[]` | первые несколько путей — для инструкции по ротации |
-| `home.*` | обход дома с исключением облачных каталогов; `scanned` — сколько файлов реально прочитано |
-| `agent_configs` | `env`, `permissions.allow`, `*.bak*` конфигов Claude и Codex |
-| `shell_history`, `storage`, `ssh_keys`, `external` | история shell; права хранилищ и `check-ignore`; права и парольные фразы ключей; `gh`, docker, aws, kube |
-| `positive_controls` | `pass`/`fail` по каждому сканеру |
+| `context_files[]` | файлы, которые агент читает каждой сессией (глобальные правила, `CLAUDE.md`, `AGENTS.md`, память, скиллы): `path`, `kind` и `classes` с числом совпадений, различных значений и `user_ids` |
+| `roots` | по каждому корню проекта: совпадения в **трекаемых git** файлах и в рабочем дереве, по классам, с первыми путями для инструкции по ротации |
+| `home` | обход дома: `files_scanned`, `files_with_matches`, `by_class`, `excluded` (облачные каталоги), `truncated`, `stopped_at` |
+| `agent_configs` | `env`, `permissions.allow` и `*.bak*` конфигов Claude и Codex; отдельно `agent_configs_generic_assignment` |
+| `shell_history` | история shell: файлы, `by_class`, `with_matches` |
+| `storage.secrets_dirs` | каталоги хранения и их права |
+| `ssh_keys`, `authorized_keys` | права и парольные фразы ключей, число записей |
+| `external_access` | `gh_hosts`, `docker_registries`, `aws_profiles`, `kube_contexts` |
+| `positive_controls` | `pass`/`fail` по каждому сканеру: дерево, git HEAD, история git, дом, конфиги |
+| `lower_bound` | признак, что счётчики неполны (исключения и пределы обхода) |
+| `timings_s` | сколько заняла каждая часть — для объяснения долгого прогона |
 
 ## Severity
 

@@ -8,14 +8,16 @@
 
 | Поле | Что означает |
 |---|---|
-| `tokens.by_model` | суммы `input`, `output`, `cache_creation`, `cache_read` по моделям за 14 и 30 дней; usage считается один раз на пару `(message.id, requestId)` |
-| `tokens.by_origin` | распределение расхода по источнику хода: человек, фоновые задачи, `/loop` |
-| `tokens.subagents` | расход саб-агентов отдельным полем |
-| `tokens.code_edits` | правки кодовых файлов Claude за 14 дней (по расширению) |
-| `tokens.codex` | сессии Codex за те же 14 дней и вызовы `/impl`, `/fix`, `/sprint-codex`, `codex:*` |
-| `instructions.start_context` | медиана стартового контекста по `entrypoint` и число исключённых сессий |
-| `instructions.memory` | размеры `MEMORY.md`, каталоги памяти, `unmapped_memory_dirs[]` |
-| `skills.listing_chars` | фактическая длина вложения со списком скиллов и её доля в старте |
+| `tokens.claude.periods` | суммы `input`, `output`, `cache_creation`, `cache_read` по моделям за 14 и 30 дней; usage считается один раз на пару `(message.id, requestId)`, дубли — в `duplicates_dropped` |
+| `tokens.claude.by_source` | распределение расхода по источнику хода: человек, фоновые задачи, `/loop`; `inferred_human_turns` — ходы старых клиентов без метки источника |
+| `tokens.claude.loop_invocations`, `loop_refires` | сколько раз запускалась петля и сколько было её тактов |
+| `tokens.codex` | `present`, `home`, `sessions` (по последней активности), `subagent_sessions`, `totals` (последний максимальный `total_token_usage` на сессию, не сумма событий) |
+| `tokens.codex_share_14` | за 14 дней: `claude_code_edits` (правки кодовых файлов Claude), `claude_other_edits`, `codex_sessions`, `codex_skill_invocations` |
+| `instructions.global` | размеры `claude_md` и `codex_agents_md` |
+| `instructions.projects` | размеры `CLAUDE.md`/`AGENTS.md` проектов и подпроектов |
+| `instructions.memory` | `dirs` (каталоги памяти с размерами индекса), `roots_with_multiple_dirs`, `unmapped_memory_dirs` |
+| `instructions.start_context` | по каждому корню: медиана стартового контекста по `entrypoint` и число исключённых сессий |
+| `skills.listing` | `actual` — фактическая длина вложения со списком скиллов, `formula` — оценка по формуле клиента, `raw_sum_chars` |
 
 ## Единственная норма (D8)
 

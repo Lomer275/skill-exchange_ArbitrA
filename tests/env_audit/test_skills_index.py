@@ -71,8 +71,8 @@ def test_frontmatter_multiline(fake_home, monkeypatch):
 
 def test_memory_dir_name_cyrillic():
     assert (
-        skills_index.memory_dir_name("/home/utkinais/projects/Битрикс")
-        == "-home-utkinais-projects--------"
+        skills_index.memory_dir_name("/home/example/projects/Битрикс")
+        == "-home-example-projects--------"
     )
 
 

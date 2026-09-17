@@ -20,7 +20,7 @@ permissions:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,7 +28,6 @@ jobs:
           python-version: "3.10"
       - name: Install dev dependencies
         run: python -m pip install -r requirements-dev.txt
-      - name: env-audit tests
-        run: python -m pytest tests/env_audit -q
-      - name: Full test suite
+      - name: Tests
+        # tests/env_audit входит в общий прогон — отдельным шагом он гонялся бы дважды
         run: python -m pytest -q
