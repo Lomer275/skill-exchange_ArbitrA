@@ -1,0 +1,860 @@
+{
+  "blind_spots": [
+    {
+      "language": "php",
+      "share_of_code": 0.963193,
+      "what": "dynamic_calls_host_runtime"
+    },
+    {
+      "language": "php",
+      "share_of_code": 0.963193,
+      "what": "graph_not_in_v3"
+    },
+    {
+      "language": "php",
+      "share_of_code": 0.963193,
+      "what": "majority_language_metrics_only"
+    },
+    {
+      "language": "js",
+      "share_of_code": 0.000387,
+      "what": "bundler_tsconfig_dynamic_import_voximplant"
+    },
+    {
+      "language": "js",
+      "share_of_code": 0.000387,
+      "what": "graph_not_in_v3"
+    }
+  ],
+  "classification": {
+    "calibrated": true,
+    "decision_trace": [
+      {
+        "condition": "code_files == 0 and anchors == 0",
+        "matched": false,
+        "step": 1,
+        "values": {
+          "anchors": 0,
+          "code_files": 29
+        }
+      },
+      {
+        "condition": "manifests == 0 and py_files >= 20 and dated_share >= 0.50 and main_guard_share >= 0.80",
+        "matched": true,
+        "step": 2,
+        "values": {
+          "dated_share": 0.909091,
+          "importlib_loaders": 1,
+          "init_dirs": 0,
+          "main_guard_share": 0.909091,
+          "manifests": 0,
+          "py_files": 22,
+          "static_edges": 0
+        }
+      }
+    ],
+    "dormant_repo": false,
+    "frozen_zones": [],
+    "groups": [],
+    "layers_declared": null,
+    "signals": {
+      "anchors": {
+        "count": 0,
+        "kinds": []
+      },
+      "scripts": {
+        "dated_share": 0.909091,
+        "importlib_loaders": 1,
+        "init_dirs": 0,
+        "main_guard_share": 0.909091,
+        "manifests": 0,
+        "py_files": 22,
+        "static_edges": 0
+      }
+    },
+    "size_tier": "M",
+    "subprojects": [],
+    "subtype": null,
+    "type": "integration-scripts",
+    "unattached_code_anchors": []
+  },
+  "definitions": {
+    "data_shaped": "at least 80 percent literal lines, sampled for files from 2 to 20 MB",
+    "dated_name": "a filename containing a valid YYYYMMDD-like date",
+    "dist_alias_table": "manifest distribution names mapped to import names",
+    "distinct_values": "distinct matches counted in memory without emitting values",
+    "edge": "a static import between local modules",
+    "edge_flags": "type-checking, function-local, lazy, and test/prod edge attributes",
+    "edge_level": "module, top-package, or second-package aggregation of an edge",
+    "fake_value": "a deterministic placeholder-value filter",
+    "fan_in": "distinct production importers excluding type-checking imports",
+    "interface_module": "a module that separates runtime code from an external client",
+    "io_builtin": "built-in calls that perform external I/O",
+    "lines": "number of newline bytes plus one for a non-terminated final line",
+    "live_unit": "a current-user cron or systemd unit whose resolved paths intersect the root",
+    "local_only": "a branch head absent from every remote ref",
+    "orphan": "a module outside runtime and framework auto-discovery closures",
+    "outside_git": "a file absent from HEAD and every remote ref",
+    "prod_scope": "code outside tests, migrations, virtualenvs, node_modules, build, and dist",
+    "scc": "a Tarjan component containing at least two nodes",
+    "sloc": "lines excluding blank lines and line comments",
+    "sloc_no_strings": "sloc excluding lines inside multiline Python literals",
+    "stdlib_io": "stdlib modules that perform external I/O",
+    "third_party_import": "top-level name outside sys.stdlib_module_names and local modules"
+  },
+  "definitions_version": "3.0.0",
+  "docs": {
+    "agent_files": [
+      "AGENTS.md",
+      "CLAUDE.md"
+    ],
+    "app_label_mismatches": [],
+    "doc_locations": {
+      "changelog_files": [],
+      "handoff_files": [],
+      "paths_named_in_agent_files": []
+    },
+    "freshness": [],
+    "md_code_copies": [],
+    "missing_paths": [],
+    "python_version_claims": [],
+    "specs": {
+      "active_with_all_done": [],
+      "by_status": {},
+      "draft_with_done_tasks": [],
+      "numbering_collisions": [],
+      "status_convention_declared": false,
+      "task_refs_without_file": [],
+      "tasks_inline_documented": false
+    },
+    "stack_contradictions": [],
+    "status_claims": []
+  },
+  "gates": {
+    "age_checks": false,
+    "dormant_repo": false,
+    "frozen_zones": [],
+    "layers_declared": null
+  },
+  "hygiene": {
+    "backups": null,
+    "broken_names": [],
+    "crlf_only_changes": null,
+    "data_vs_code": {
+      "dumps_over_1mb_outside_docs": [],
+      "tracked_code_bytes": 35089,
+      "tracked_data_bytes": 74385
+    },
+    "dependency_manifest": {
+      "present": false,
+      "third_party_imports_prod": 0
+    },
+    "doc_duplicates": {
+      "changelog_md": [],
+      "handoff_md": []
+    },
+    "gitattributes": false,
+    "root_files": {
+      "backup_patterns": null,
+      "large_over_10mb": [],
+      "not_allowlisted": [
+        "alembic.ini"
+      ],
+      "untracked_not_ignored": null
+    },
+    "tracked_but_ignored": null
+  },
+  "js": {
+    "dated_share": 0.0,
+    "files": 0,
+    "lines": 0,
+    "n8n_workflows": [
+      {
+        "node_types": [
+          {
+            "count": 1,
+            "type": "n8n-nodes-base.httpRequest"
+          }
+        ],
+        "nodes": 1,
+        "path": "workflows/export.json",
+        "url_hosts": [
+          "example.invalid"
+        ]
+      }
+    ],
+    "relative_import_edges": 0
+  },
+  "ops": {
+    "destructive_api_calls": 0,
+    "live_closure": [],
+    "log_lock_refusals": [],
+    "recently_modified_in_live_dirs": 0,
+    "shared_locks": []
+  },
+  "php": {
+    "bootstrap_single": false,
+    "entrypoints": [],
+    "files": 4,
+    "files_top": [
+      {
+        "churn": null,
+        "classes": 0,
+        "curl_calls": 0,
+        "data_shaped": false,
+        "functions": 1,
+        "host_markers": 0,
+        "lines": 832,
+        "methods": 0,
+        "path": "local/c/unique.php",
+        "share_of_prod": 0.33454,
+        "sql_calls": 0
+      },
+      {
+        "churn": null,
+        "classes": 0,
+        "curl_calls": 0,
+        "data_shaped": false,
+        "functions": 1,
+        "host_markers": 0,
+        "lines": 822,
+        "methods": 0,
+        "path": "local/a/hub.php",
+        "share_of_prod": 0.330519,
+        "sql_calls": 0
+      },
+      {
+        "churn": null,
+        "classes": 0,
+        "curl_calls": 0,
+        "data_shaped": false,
+        "functions": 1,
+        "host_markers": 0,
+        "lines": 822,
+        "methods": 0,
+        "path": "local/b/hub.php",
+        "share_of_prod": 0.330519,
+        "sql_calls": 0
+      },
+      {
+        "churn": null,
+        "classes": 1,
+        "curl_calls": 1,
+        "data_shaped": false,
+        "functions": 1,
+        "host_markers": 1,
+        "lines": 11,
+        "methods": 1,
+        "path": "web/widget.php",
+        "share_of_prod": 0.004423,
+        "sql_calls": 0
+      }
+    ],
+    "prod_lines": 2487,
+    "templates": []
+  },
+  "python": {
+    "channels": {
+      "applicable": false
+    },
+    "config": {
+      "applicable": false
+    },
+    "duplicates": {
+      "applicable": false
+    },
+    "edges": {
+      "applicable": false
+    },
+    "layers": {
+      "applicable": false
+    },
+    "modules": 24,
+    "modules_top": [
+      {
+        "lines": 9,
+        "path": "db/startup.py",
+        "sloc": 8,
+        "sloc_no_strings": 8
+      },
+      {
+        "lines": 7,
+        "path": "jobs/task_20260101_000.py",
+        "sloc": 5,
+        "sloc_no_strings": 5
+      },
+      {
+        "lines": 5,
+        "path": "db/models.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260113_012.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260202_001.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260214_013.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260303_002.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260315_014.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260404_003.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260416_015.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260505_004.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260517_016.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260606_005.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260618_017.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260707_006.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260719_018.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260808_007.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260820_019.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20260909_008.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20261010_009.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20261111_010.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 5,
+        "path": "jobs/task_20261212_011.py",
+        "sloc": 4,
+        "sloc_no_strings": 4
+      },
+      {
+        "lines": 2,
+        "path": "migrations/versions/0001_base.py",
+        "sloc": 2,
+        "sloc_no_strings": 2
+      },
+      {
+        "lines": 2,
+        "path": "migrations/versions/0002_next.py",
+        "sloc": 2,
+        "sloc_no_strings": 2
+      }
+    ],
+    "orphans": {
+      "applicable": false
+    },
+    "parse_errors": [],
+    "scc": {
+      "applicable": false
+    },
+    "tests": {
+      "collect_errors": 0,
+      "collected": null,
+      "components_without_tests": [
+        "db",
+        "jobs"
+      ],
+      "files": 0,
+      "lines": 0
+    }
+  },
+  "rule_inputs": {
+    "A1": {
+      "applicable": false
+    },
+    "A10": {
+      "applicable": false
+    },
+    "A11": {
+      "applicable": false,
+      "php": {
+        "candidates": [
+          "local/a/hub.php",
+          "local/b/hub.php",
+          "local/c/unique.php"
+        ]
+      },
+      "thin_module_claims": []
+    },
+    "A12": {
+      "applicable": false
+    },
+    "A13": {
+      "applicable": false
+    },
+    "A14": {
+      "applicable": false
+    },
+    "A15": {
+      "applicable": false
+    },
+    "A16": {
+      "applicable": false
+    },
+    "A17": {
+      "applicable": false
+    },
+    "A18": {
+      "applicable": false
+    },
+    "A19": {
+      "applicable": false
+    },
+    "A2": {
+      "applicable": false
+    },
+    "A20": {
+      "applicable": false
+    },
+    "A21": {
+      "ci": true,
+      "collect_errors": 0,
+      "collected": null,
+      "components_without_tests": 2,
+      "files": 0,
+      "lines": 0,
+      "live_or_deploy": false,
+      "manual_gate": false,
+      "repo_last_commit_at": null
+    },
+    "A3": {
+      "log_lock_refusals": [],
+      "shared_locks": []
+    },
+    "A4": {
+      "create_all_in_startup": true,
+      "orm_tables": 2,
+      "revisions": 2,
+      "sql_tables": 2,
+      "swallowed": 1,
+      "upgrade_invocations": 1
+    },
+    "A5": {
+      "app_label_mismatches": [],
+      "missing_paths": [],
+      "python_version_claims": [],
+      "stack_contradictions": [],
+      "status_claims": []
+    },
+    "A6": {
+      "freshness": []
+    },
+    "A7": {
+      "active_with_all_done": [],
+      "by_status": {},
+      "draft_with_done_tasks": [],
+      "numbering_collisions": [],
+      "status_convention_declared": false,
+      "task_refs_without_file": [],
+      "tasks_inline_documented": false
+    },
+    "A8": {
+      "md_code_copies": []
+    },
+    "A9": {
+      "applicable": false
+    },
+    "G1": {
+      "groups": 0,
+      "prod_sloc": 2581,
+      "size_tier": "M"
+    },
+    "G2": {
+      "age_checks": false,
+      "dormant_repo": false,
+      "frozen_zones": []
+    },
+    "G3": {
+      "layers_declared": null
+    },
+    "H1": {
+      "backup_patterns": null,
+      "large_over_10mb": 0,
+      "untracked_not_ignored": null
+    },
+    "H2": {
+      "count": 0
+    },
+    "H3": {
+      "count": null
+    },
+    "H4": {
+      "dumps_over_1mb_outside_docs": [],
+      "tracked_code_bytes": 35089,
+      "tracked_data_bytes": 74385
+    },
+    "H5": {
+      "count": 0,
+      "metric_only": true
+    },
+    "H6": {
+      "crlf_only_changes": null,
+      "gitattributes": false
+    },
+    "H7": {
+      "present": false,
+      "third_party_imports_prod": 0
+    },
+    "I1": {
+      "deployed_code_dirs": [],
+      "live_units": 0,
+      "reason": "absent",
+      "vcs_present": false
+    },
+    "I10": {
+      "applicable": true,
+      "count": 0,
+      "see": "hygiene.broken_names"
+    },
+    "I11": {
+      "applicable": true,
+      "code_bytes": 39325,
+      "data_bytes": 70149,
+      "data_shaped": [],
+      "n8n_workflows": [
+        "workflows/export.json"
+      ]
+    },
+    "I12": {
+      "applicable": true,
+      "count": 0
+    },
+    "I13": {
+      "applicable": true,
+      "count": 0,
+      "metric_only": true
+    },
+    "I14": {
+      "applicable": true,
+      "count": 0,
+      "metric_only": true
+    },
+    "I15": {
+      "applicable": true,
+      "count": 1
+    },
+    "I2": {
+      "destructive_calls": 0,
+      "live_units": 0,
+      "recent_files": 0,
+      "vcs_present": false
+    },
+    "I3": {
+      "groups": 28,
+      "hint_dirs": [],
+      "max_copies": 1
+    },
+    "I5": {
+      "applicable": true,
+      "count": 2
+    },
+    "I6": {
+      "applicable": true,
+      "live_loaders": 0,
+      "targets_missing": 0
+    },
+    "I7": {
+      "applicable": true,
+      "groups": 0
+    },
+    "I8": {
+      "applicable": true,
+      "count": 0
+    },
+    "I9": {
+      "applicable": true,
+      "broken_names": 0,
+      "large_over_10mb": 0,
+      "see": "hygiene"
+    }
+  },
+  "runtime": {
+    "anchors": [],
+    "ci": {
+      "files": [
+        ".github/workflows/migrate.yml"
+      ],
+      "has_deploy_job": false,
+      "mentions_host": false
+    },
+    "deploy_dirs": [],
+    "docker_working_dirs": null,
+    "live_units": [],
+    "manual_gate_doc": null
+  },
+  "schema": "env-audit/arch",
+  "schema_db": {
+    "ci_migration_guard": true,
+    "create_all_sites": [
+      {
+        "in_startup": true,
+        "in_startup_via": "lifespan->initialize",
+        "kind": "call",
+        "line": 7,
+        "path": "db/startup.py"
+      }
+    ],
+    "migration_dirs": [
+      {
+        "duplicate_numbers": [],
+        "found_by": "alembic_ini",
+        "merge_migrations": 0,
+        "path": "migrations",
+        "revisions": 2,
+        "tool": "alembic"
+      }
+    ],
+    "orm_only": [
+      "db_event"
+    ],
+    "orm_tables": [
+      "account",
+      "db_event"
+    ],
+    "sql_files": [
+      "db/schema.sql"
+    ],
+    "sql_only": [
+      "audit_event"
+    ],
+    "sql_tables": [
+      "account",
+      "audit_event"
+    ],
+    "swallowed_init_errors": [
+      {
+        "function": "initialize",
+        "line": 8,
+        "path": "db/startup.py"
+      }
+    ],
+    "upgrade_invocations": [
+      {
+        "line": 2,
+        "path": ".github/workflows/migrate.yml"
+      }
+    ]
+  },
+  "scripts_collection": {
+    "copies_by_relpath": [],
+    "data_vs_code": {
+      "code_bytes": 39325,
+      "data_bytes": 70149,
+      "data_shaped": [],
+      "n8n_workflows": [
+        "workflows/export.json"
+      ]
+    },
+    "dead_dirs": [],
+    "doc_duplicates_metric": {
+      "changelog_md": 0,
+      "handoff_md": 0,
+      "total": 0
+    },
+    "flat_dirs": [],
+    "god_files_deployed": [
+      {
+        "copies": 1,
+        "functions": 1,
+        "lines": 832,
+        "path": "local/c/unique.php"
+      },
+      {
+        "copies": 2,
+        "functions": 1,
+        "lines": 822,
+        "path": "local/a/hub.php"
+      }
+    ],
+    "infra_helper_defs": {
+      "groups": [],
+      "raw_defs_total": 0
+    },
+    "instruction_overlap": 1,
+    "loaders": {
+      "fan_in_top": [],
+      "live_loaders": 0,
+      "targets_missing": [],
+      "targets_total": 0
+    },
+    "self_nested_paths": []
+  },
+  "size": {
+    "by_language": {
+      "csharp": {
+        "files": 0,
+        "lines": 0,
+        "prod_sloc": 0,
+        "sloc": 0,
+        "test_files": 0,
+        "test_lines": 0
+      },
+      "js_ts": {
+        "files": 0,
+        "lines": 0,
+        "prod_sloc": 0,
+        "sloc": 0,
+        "test_files": 0,
+        "test_lines": 0
+      },
+      "php": {
+        "files": 4,
+        "lines": 2487,
+        "prod_sloc": 2486,
+        "sloc": 2486,
+        "test_files": 0,
+        "test_lines": 0
+      },
+      "python": {
+        "files": 24,
+        "lines": 120,
+        "prod_sloc": 93,
+        "sloc": 97,
+        "test_files": 2,
+        "test_lines": 4
+      },
+      "shell": {
+        "files": 0,
+        "lines": 0,
+        "prod_sloc": 0,
+        "sloc": 0,
+        "test_files": 0,
+        "test_lines": 0
+      },
+      "sql": {
+        "files": 1,
+        "lines": 2,
+        "prod_sloc": 2,
+        "sloc": 2,
+        "test_files": 0,
+        "test_lines": 0
+      }
+    },
+    "bytes": {
+      "ignored_dirs": [],
+      "on_disk": {
+        "code": 35163,
+        "data": 74311,
+        "documents": 62,
+        "other": 39
+      },
+      "tracked": null
+    },
+    "large_files": [],
+    "test_prod_ratio": 0.00155
+  },
+  "tree": {
+    "ahead": null,
+    "ahead_verified": null,
+    "analysed": [
+      {
+        "mode": "filesystem",
+        "reason": "1.2:no_vcs",
+        "sha": null,
+        "tree_id": "primary"
+      }
+    ],
+    "behind": null,
+    "branch": null,
+    "default_branch": null,
+    "dirty": {
+      "crlf_only_files": null,
+      "lines_add": null,
+      "lines_del": null,
+      "modified_files": null,
+      "untracked_files": null,
+      "untracked_lines": null
+    },
+    "head": null,
+    "local_branches": [],
+    "ls_remote": null,
+    "ls_remote_ok": null,
+    "origin_default_sha": null,
+    "origin_ref_stale": null,
+    "repo_first_commit_at": null,
+    "repo_last_commit_at": null,
+    "source_roots": [],
+    "vcs": {
+      "present": false,
+      "reason": "absent"
+    },
+    "worktrees": []
+  }
+}
+

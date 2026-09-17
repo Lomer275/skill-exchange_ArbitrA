@@ -39,69 +39,44 @@ LOADER_NAMES = frozenset(
         "__import__",
     }
 )
+LOADER_MARKERS = (b"importlib", b"spec_from_file_location", b"run_path", b"__import__")
 
 
-def _line_count(path: Path) -> int | None:
-    try:
-        size = path.stat().st_size
-        count = 0
-        last = b""
-        with path.open("rb") as stream:
-            while True:
-                chunk = stream.read(1024 * 1024)
-                if not chunk:
-                    break
-                count += chunk.count(b"\n")
-                last = chunk[-1:]
-        return count + (1 if size and last != b"\n" else 0)
-    except OSError:
-        return None
+def _line_count(data: bytes) -> int:
+    return data.count(b"\n") + (1 if data and not data.endswith(b"\n") else 0)
 
 
-def _digest(path: Path) -> str | None:
-    handle = hashlib.sha1()
-    try:
-        with path.open("rb") as stream:
-            while True:
-                chunk = stream.read(1024 * 1024)
-                if not chunk:
-                    break
-                handle.update(chunk)
-    except OSError:
-        return None
-    return handle.hexdigest()
+def _digest(data: bytes) -> str:
+    return hashlib.sha1(data).hexdigest()
 
 
-def _literal_line(line: bytes) -> bool:
-    stripped = line.strip()
-    if not stripped:
-        return False
-    return (
-        stripped[:1] in {b"'", b'"', b"[", b"{", b"(", b"]", b"}"}
-        or stripped[:1].isdigit()
-        or b"=>" in stripped
-    )
-
-
-def _data_shaped(path: Path, size: int) -> bool:
-    try:
-        with path.open("rb") as stream:
-            if size >= SAMPLE_MIN_BYTES:
-                window = 256 * 1024
-                blocks = []
-                for offset in (
-                    0,
-                    max(0, size // 2 - window // 2),
-                    max(0, size - window),
-                ):
-                    stream.seek(offset)
-                    blocks.append(stream.read(window))
-            else:
-                blocks = [stream.read(MAX_ANALYSED_BYTES)]
-    except OSError:
-        return False
-    lines = [line for block in blocks for line in block.splitlines() if line.strip()]
-    return bool(lines) and sum(_literal_line(line) for line in lines) / len(lines) >= 0.8
+def _data_shaped(data: bytes, size: int) -> bool:
+    if size >= SAMPLE_MIN_BYTES:
+        window = 256 * 1024
+        blocks = [
+            data[offset : offset + window]
+            for offset in (
+                0,
+                max(0, size // 2 - window // 2),
+                max(0, size - window),
+            )
+        ]
+    else:
+        blocks = [data]
+    lines = 0
+    literal = 0
+    for block in blocks:
+        for line in block.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            lines += 1
+            literal += int(
+                stripped[:1] in {b"'", b'"', b"[", b"{", b"(", b"]", b"}"}
+                or stripped[:1].isdigit()
+                or b"=>" in stripped
+            )
+    return bool(lines) and literal / lines >= 0.8
 
 
 def _function_count(data: bytes, suffix: str, rel: str) -> int:
@@ -217,34 +192,39 @@ def _deployed(rel: str, live_paths: set[str]) -> bool:
 
 
 def _god_files(actx: ArchContext, live_paths: set[str]) -> list[dict]:
-    groups: dict[str, list[tuple[object, int, int]]] = defaultdict(list)
+    candidates: dict[int, list[tuple[object, bytes, int]]] = defaultdict(list)
     for entry in actx.code_files(exts=CODE_EXTENSIONS):
         if not _deployed(entry.rel, live_paths) or DATED_NAME.search(Path(entry.rel).name):
             continue
-        lines = _line_count(entry.path)
-        if lines is None or lines <= GOD_LINES or entry.size > MAX_ANALYSED_BYTES:
-            continue
-        if _data_shaped(entry.path, entry.size):
-            continue
-        digest = _digest(entry.path)
-        if digest is None:
+        if entry.size > MAX_ANALYSED_BYTES:
             continue
         data = actx.read(entry, max_bytes=MAX_ANALYSED_BYTES)
-        functions = _function_count(data or b"", Path(entry.rel).suffix.lower(), entry.rel)
-        groups[digest].append((entry, lines, functions))
+        if data is None:
+            continue
+        lines = _line_count(data)
+        if lines <= GOD_LINES or _data_shaped(data, entry.size):
+            continue
+        candidates[entry.size].append((entry, data, lines))
 
     output = []
-    for digest in sorted(groups):
-        copies = sorted(groups[digest], key=lambda item: item[0].rel)
-        entry, lines, functions = copies[0]
-        output.append(
-            {
-                "path": entry.rel,
-                "lines": lines,
-                "functions": functions,
-                "copies": len(copies),
-            }
-        )
+    for same_size in candidates.values():
+        groups: dict[str | None, list[tuple[object, bytes, int]]] = defaultdict(list)
+        for candidate in same_size:
+            digest = _digest(candidate[1]) if len(same_size) >= 2 else None
+            groups[digest].append(candidate)
+        for copies in groups.values():
+            copies.sort(key=lambda item: item[0].rel)
+            entry, data, lines = copies[0]
+            output.append(
+                {
+                    "path": entry.rel,
+                    "lines": lines,
+                    "functions": _function_count(
+                        data, Path(entry.rel).suffix.lower(), entry.rel
+                    ),
+                    "copies": len(copies),
+                }
+            )
     return sorted(output, key=lambda item: (-item["lines"], item["path"]))
 
 
@@ -339,7 +319,7 @@ def _loaders(actx: ArchContext, live_paths: set[str]) -> tuple[dict, set[str]]:
     referenced = set()
     for entry in actx.code_files(exts=frozenset({".py"})):
         data = actx.read(entry)
-        if data is None:
+        if data is None or not any(marker in data for marker in LOADER_MARKERS):
             continue
         tree = pyast.parse(data, entry.rel)
         if tree is None:
@@ -467,6 +447,8 @@ def _flat_dirs(actx: ArchContext) -> list[dict]:
 
 
 def _n8n(data: bytes) -> bool:
+    if b'"nodes"' not in data or b'"connections"' not in data:
+        return False
     try:
         document = json.loads(data)
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -495,7 +477,12 @@ def _data_vs_code(actx: ArchContext) -> dict:
                 n8n_workflows.append(entry.rel)
                 continue
         if suffix in CODE_EXTENSIONS:
-            if entry.size <= MAX_ANALYSED_BYTES and _data_shaped(entry.path, entry.size):
+            content = (
+                actx.read(entry, max_bytes=MAX_ANALYSED_BYTES)
+                if entry.size <= MAX_ANALYSED_BYTES
+                else None
+            )
+            if content is not None and _data_shaped(content, entry.size):
                 data_bytes += entry.size
                 data_shaped.append(entry.rel)
             else:
@@ -562,17 +549,21 @@ def _dead_dirs(actx: ArchContext, referenced: set[str], live_paths: set[str]) ->
     return output
 
 
-def _normalized_lines(path: Path) -> set[str]:
-    try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
+def _normalized_lines(data: bytes | None) -> set[str]:
+    if data is None:
         return set()
+    lines = data.decode("utf-8", "replace").splitlines()
     return {" ".join(line.split()) for line in lines if line.strip()}
 
 
 def _instruction_overlap(actx: ArchContext) -> int:
-    view = actx.trees["primary"]
-    return len(_normalized_lines(view.path / "CLAUDE.md") & _normalized_lines(view.path / "AGENTS.md"))
+    entries = {entry.rel: entry for entry in actx.files()}
+    claude = entries.get("CLAUDE.md")
+    agents = entries.get("AGENTS.md")
+    return len(
+        _normalized_lines(actx.read(claude) if claude is not None else None)
+        & _normalized_lines(actx.read(agents) if agents is not None else None)
+    )
 
 
 def _defaults() -> dict:

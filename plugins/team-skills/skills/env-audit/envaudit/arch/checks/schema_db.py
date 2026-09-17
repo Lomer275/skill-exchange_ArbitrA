@@ -61,19 +61,34 @@ def _migration_dirs(actx: ArchContext) -> list[dict]:
             "merge_migrations": 0,
         }
 
+    sorted_alembic_roots = sorted(alembic_roots, key=len, reverse=True)
     for entry in entries:
         if Path(entry.rel).suffix.lower() != ".py":
             continue
-        text = _text(actx, entry)
-        if text is None:
+        parts = tuple(part.lower() for part in Path(entry.rel).parts[:-1])
+        in_migration_dir = (
+            "migrations" in parts
+            or "versions" in parts
+            or any(
+                entry.rel == root or entry.rel.startswith(root + "/")
+                for root in alembic_roots
+            )
+        )
+        data = actx.read(entry)
+        if data is None or not (
+            in_migration_dir
+            or b"revision" in data
+            or (b"Migration" in data and b"migrations.Migration" in data)
+        ):
             continue
+        text = data.decode("utf-8", "replace")
         revision = ALEMBIC_REVISION.search(text)
         down = ALEMBIC_DOWN.search(text)
         if revision and down:
             root = next(
                 (
                     candidate
-                    for candidate in sorted(alembic_roots, key=len, reverse=True)
+                    for candidate in sorted_alembic_roots
                     if entry.rel == candidate or entry.rel.startswith(candidate + "/")
                 ),
                 Path(entry.rel).parent.as_posix(),
@@ -186,38 +201,46 @@ def _create_all_and_swallowed(actx: ArchContext) -> tuple[list[dict], list[dict]
     swallowed = []
     for entry in actx.code_files(exts=frozenset({".py"})):
         data = actx.read(entry)
-        parsed = pyast.parse(data, entry.rel) if data is not None else None
+        if data is None:
+            continue
+        has_create_all = b"create_all" in data
+        has_swallowed = b"except" in data and b"Exception" in data
+        if not has_create_all and not has_swallowed:
+            continue
+        parsed = pyast.parse(data, entry.rel)
         if parsed is None:
             continue
         owners, startup_functions, via = _function_facts(parsed)
-        call_functions = {
-            id(node.func)
-            for node in ast.walk(parsed)
-            if isinstance(node, ast.Call)
-        }
-        for node in ast.walk(parsed):
-            if not isinstance(node, ast.Attribute) or node.attr != "create_all":
-                continue
-            owner = owners.get(id(node))
-            in_startup = owner in startup_functions
-            sites.append(
-                {
-                    "path": entry.rel,
-                    "line": node.lineno,
-                    "kind": "call" if id(node) in call_functions else "ref",
-                    "in_startup": in_startup,
-                    "in_startup_via": via.get(owner) if in_startup else None,
-                }
-            )
-        for node in ast.walk(parsed):
-            if not isinstance(node, ast.ExceptHandler) or _raises(node):
-                continue
-            caught = _call_name(node.type) if node.type is not None else None
-            owner = owners.get(id(node))
-            if caught == "Exception" and owner in startup_functions:
-                swallowed.append(
-                    {"path": entry.rel, "line": node.lineno, "function": owner}
+        if has_create_all:
+            call_functions = {
+                id(node.func)
+                for node in ast.walk(parsed)
+                if isinstance(node, ast.Call)
+            }
+            for node in ast.walk(parsed):
+                if not isinstance(node, ast.Attribute) or node.attr != "create_all":
+                    continue
+                owner = owners.get(id(node))
+                in_startup = owner in startup_functions
+                sites.append(
+                    {
+                        "path": entry.rel,
+                        "line": node.lineno,
+                        "kind": "call" if id(node) in call_functions else "ref",
+                        "in_startup": in_startup,
+                        "in_startup_via": via.get(owner) if in_startup else None,
+                    }
                 )
+        if has_swallowed:
+            for node in ast.walk(parsed):
+                if not isinstance(node, ast.ExceptHandler) or _raises(node):
+                    continue
+                caught = _call_name(node.type) if node.type is not None else None
+                owner = owners.get(id(node))
+                if caught == "Exception" and owner in startup_functions:
+                    swallowed.append(
+                        {"path": entry.rel, "line": node.lineno, "function": owner}
+                    )
     return (
         sorted(sites, key=lambda item: (item["path"], item["line"])),
         sorted(swallowed, key=lambda item: (item["path"], item["line"])),
@@ -279,14 +302,20 @@ def _tables_and_sql(actx: ArchContext) -> tuple[list[str], list[str], list[str]]
     sql_files = []
     for entry in actx.files():
         suffix = Path(entry.rel).suffix.lower()
+        if suffix not in {".sql", ".py"}:
+            continue
         data = actx.read(entry)
         if data is None:
             continue
         if suffix == ".sql":
             sql_files.append(entry.rel)
+            if b"create table" not in data.lower():
+                continue
             text = data.decode("utf-8", "replace")
             sql.update(match.group(1).lower() for match in CREATE_TABLE.finditer(text))
         elif suffix == ".py":
+            if b"__tablename__" not in data and b"Model" not in data:
+                continue
             parsed = pyast.parse(data, entry.rel)
             if parsed is None:
                 continue

@@ -20,13 +20,27 @@ DATED_NAME = re.compile(
     r"(?<!\d)20\d{2}[-_.]?(?:0[1-9]|1[0-2])[-_.]?(?:0[1-9]|[12]\d|3[01])(?!\d)"
 )
 HOST_MARKERS = (
-    rb"\bCCrmDeal\b",
-    rb"\\Bitrix\\Main\b",
-    rb"\bCModule\b",
-    rb"\$USER\b",
-    rb"\$DB\b",
-    rb"\bgetConnection\b",
-    rb"\bCIBlock\b",
+    (b"CCrmDeal", re.compile(rb"\bCCrmDeal\b")),
+    (b"\\Bitrix\\Main", re.compile(rb"\\Bitrix\\Main\b")),
+    (b"CModule", re.compile(rb"\bCModule\b")),
+    (b"$USER", re.compile(rb"\$USER\b")),
+    (b"$DB", re.compile(rb"\$DB\b")),
+    (b"getConnection", re.compile(rb"\bgetConnection\b")),
+    (b"CIBlock", re.compile(rb"\bCIBlock\b")),
+)
+PHP_FUNCTION_BYTES = re.compile(
+    rb"\bfunction\s+(?:&\s*)?[A-Za-z_]\w*\s*\(", re.IGNORECASE
+)
+PHP_FUNCTION_TEXT = re.compile(
+    r"\bfunction\s+(?:&\s*)?[A-Za-z_]\w*\s*\(", re.IGNORECASE
+)
+PHP_CLASS_TEXT = re.compile(r"\bclass\s+[A-Za-z_]\w*", re.IGNORECASE)
+PHP_CURL = re.compile(rb"\bcurl_init\s*\(", re.IGNORECASE)
+PHP_QUERY = re.compile(rb"->\s*query\s*\(", re.IGNORECASE)
+PHP_CONNECTION = re.compile(rb"\bgetConnection\s*\(")
+HTML_BLANK_TABLE = bytes.maketrans(
+    bytes(range(256)),
+    bytes(value if value in (10, 13) else 32 for value in range(256)),
 )
 PRIMITIVE_TYPES = frozenset(
     {
@@ -61,43 +75,38 @@ def _read(actx: ArchContext, entry, limit: int = 20 * 1024 * 1024) -> bytes | No
 
 
 def _literal_share(data: bytes) -> float:
-    lines = [line.strip() for line in data.splitlines() if line.strip()]
+    lines = 0
+    literal = 0
+    for line in data.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        lines += 1
+        literal += int(
+            stripped[:1] in {b"'", b'"', b"[", b"{", b"(", b"]", b"}"}
+            or stripped[:1].isdigit()
+            or b"=>" in stripped
+        )
     if not lines:
         return 0.0
-    literal = sum(
-        line[:1] in {b"'", b'"', b"[", b"{", b"(", b"]", b"}"}
-        or line[:1].isdigit()
-        or b"=>" in line
-        for line in lines
-    )
-    return literal / len(lines)
+    return literal / lines
 
 
 def _html_share(data: bytes) -> float:
-    html_lines = set()
-    nonempty_lines = {
-        index for index, line in enumerate(data.splitlines(), 1) if line.strip()
-    }
+    lines = data.splitlines()
+    nonempty_lines = sum(bool(line.strip()) for line in lines)
+    html = bytearray(data)
     position = 0
-    line = 1
-    in_php = False
     while position < len(data):
-        if data[position] == 10:
-            line += 1
-            position += 1
-            continue
-        if not in_php and data.startswith(b"<?", position):
-            in_php = True
-            position += 2
-            continue
-        if in_php and data.startswith(b"?>", position):
-            in_php = False
-            position += 2
-            continue
-        if not in_php and chr(data[position]).strip():
-            html_lines.add(line)
-        position += 1
-    return len(html_lines) / len(nonempty_lines) if nonempty_lines else 0.0
+        start = data.find(b"<?", position)
+        if start < 0:
+            break
+        end = data.find(b"?>", start + 2)
+        end = len(data) if end < 0 else end + 2
+        html[start:end] = data[start:end].translate(HTML_BLANK_TABLE)
+        position = end
+    html_lines = sum(bool(line.strip()) for line in bytes(html).splitlines())
+    return html_lines / nonempty_lines if nonempty_lines else 0.0
 
 
 def _component(rel: str) -> str:
@@ -157,32 +166,28 @@ def _php_metrics(actx: ArchContext) -> dict | None:
             prod_lines += lines
             prod_paths.add(entry.rel)
         stripped = strip_php(data)
-        all_functions = len(
-            re.findall(
-                rb"\bfunction\s+(?:&\s*)?[A-Za-z_]\w*\s*\(",
-                stripped,
-                re.IGNORECASE,
-            )
-        )
+        all_functions = len(PHP_FUNCTION_BYTES.findall(stripped))
         php_text = stripped.decode("utf-8", "replace")
-        class_matches = list(re.finditer(r"\bclass\s+[A-Za-z_]\w*", php_text, re.IGNORECASE))
+        class_matches = list(PHP_CLASS_TEXT.finditer(php_text))
         methods = 0
         for class_match in class_matches:
             brace = php_text.find("{", class_match.end())
             end = _matching_brace(php_text, brace) if brace >= 0 else len(php_text)
-            methods += len(
-                re.findall(
-                    r"\bfunction\s+(?:&\s*)?[A-Za-z_]\w*\s*\(",
-                    php_text[brace:end],
-                    re.IGNORECASE,
-                )
-            )
+            methods += len(PHP_FUNCTION_TEXT.findall(php_text[brace:end]))
         functions = max(0, all_functions - methods)
         classes = len(class_matches)
-        host_markers = sum(len(re.findall(pattern, stripped)) for pattern in HOST_MARKERS)
-        curl_calls = len(re.findall(rb"\bcurl_init\s*\(", stripped, re.IGNORECASE))
-        sql_calls = len(re.findall(rb"->\s*query\s*\(", stripped, re.IGNORECASE)) + len(
-            re.findall(rb"\bgetConnection\s*\(", stripped)
+        host_markers = sum(
+            len(pattern.findall(stripped))
+            for marker, pattern in HOST_MARKERS
+            if marker in stripped
+        )
+        curl_calls = len(PHP_CURL.findall(stripped)) if b"curl_init" in stripped else 0
+        sql_calls = (
+            len(PHP_QUERY.findall(stripped)) if b"query" in stripped else 0
+        ) + (
+            len(PHP_CONNECTION.findall(stripped))
+            if b"getConnection" in stripped
+            else 0
         )
         data_shaped = _literal_share(stripped) >= 0.8
         if _html_share(data) >= 0.5:
@@ -277,6 +282,8 @@ def _n8n_workflows(actx: ArchContext) -> list[dict]:
             continue
         data = _read(actx, entry)
         if data is None:
+            continue
+        if b'"nodes"' not in data or b'"connections"' not in data:
             continue
         try:
             document = json.loads(data)
