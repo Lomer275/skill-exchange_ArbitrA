@@ -1,0 +1,100 @@
+{
+  "$id": "urn:env-audit:schema:arch:tree",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "vcs", "head", "branch", "default_branch", "origin_default_sha",
+    "ls_remote_ok", "ls_remote", "origin_ref_stale", "ahead", "behind",
+    "ahead_verified", "dirty", "worktrees", "local_branches",
+    "repo_first_commit_at", "repo_last_commit_at", "analysed", "source_roots"
+  ],
+  "properties": {
+    "vcs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "reason"],
+      "properties": {
+        "present": {"type": ["boolean", "null"]},
+        "reason": {"type": ["string", "null"], "enum": ["stub_git_dir", "absent", "not_measured", null]}
+      }
+    },
+    "head": {"type": ["string", "null"]},
+    "branch": {"type": ["string", "null"]},
+    "default_branch": {"type": ["string", "null"]},
+    "origin_default_sha": {"type": ["string", "null"]},
+    "ls_remote_ok": {"type": ["boolean", "null"]},
+    "ls_remote": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "default": {"type": ["string", "null"]},
+        "current": {"type": ["string", "null"]}
+      }
+    },
+    "origin_ref_stale": {"type": ["boolean", "null"]},
+    "ahead": {"type": ["integer", "null"], "minimum": 0},
+    "behind": {"type": ["integer", "null"], "minimum": 0},
+    "ahead_verified": {"type": ["boolean", "null"]},
+    "dirty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modified_files", "lines_add", "lines_del", "crlf_only_files", "untracked_files", "untracked_lines"],
+      "properties": {
+        "modified_files": {"type": ["integer", "null"], "minimum": 0},
+        "lines_add": {"type": ["integer", "null"], "minimum": 0},
+        "lines_del": {"type": ["integer", "null"], "minimum": 0},
+        "crlf_only_files": {"type": ["integer", "null"], "minimum": 0},
+        "untracked_files": {"type": ["integer", "null"], "minimum": 0},
+        "untracked_lines": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "worktrees": {"type": "array", "items": {"$ref": "#/$defs/ref"}},
+    "local_branches": {"type": "array", "items": {"$ref": "#/$defs/ref"}},
+    "repo_first_commit_at": {"type": ["string", "null"]},
+    "repo_last_commit_at": {"type": ["string", "null"]},
+    "analysed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tree_id", "mode", "sha", "reason"],
+        "properties": {
+          "tree_id": {"enum": ["primary", "alt", "worktree"]},
+          "mode": {"enum": ["archive", "worktree", "filesystem"]},
+          "sha": {"type": ["string", "null"]},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "source_roots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "language", "found_by"],
+        "properties": {
+          "path": {"type": "string"},
+          "language": {"type": "string"},
+          "found_by": {"type": "string"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["head", "local_only", "merged", "code_lines", "delta_pct_vs_default", "last_commit_at"],
+      "properties": {
+        "path": {"type": "string"},
+        "name": {"type": ["string", "null"]},
+        "head": {"type": ["string", "null"]},
+        "local_only": {"type": "boolean"},
+        "merged": {"type": ["boolean", "null"]},
+        "code_lines": {"type": ["integer", "null"], "minimum": 0},
+        "delta_pct_vs_default": {"type": ["number", "null"]},
+        "last_commit_at": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

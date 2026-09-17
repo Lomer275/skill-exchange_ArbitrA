@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["frozen_zones", "dormant_repo", "age_checks", "layers_declared"],
+  "properties": {
+    "frozen_zones": {"type": "array", "items": {"type": "string"}},
+    "dormant_repo": {"type": "boolean"},
+    "age_checks": {"type": "boolean"},
+    "layers_declared": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["source", "path"],
+      "properties": {
+        "source": {"enum": ["audit_json", "architecture_md", "claude_md"]},
+        "path": {"type": "string"}
+      }
+    }
+  }
+}
