@@ -107,15 +107,20 @@ def _date(value: float | None) -> str | None:
 
 def _invocations(entry: SkillEntry, records: list[Record]) -> tuple[int, str | None]:
     timestamps = []
+    seen_tool_uses: set[str] = set()
     for record in records:
         names = []
-        if record.command_name:
+        if record.command_name and not record.is_meta:
             names.append(record.command_name)
-        names.extend(
-            tool.skill
-            for tool in record.tool_uses
-            if tool.name == "Skill" and tool.skill
-        )
+        for tool in record.tool_uses:
+            if tool.name != "Skill" or not tool.skill:
+                continue
+            # A streamed assistant message is written as several lines carrying the same tool_use.
+            if tool.tool_use_id is not None:
+                if tool.tool_use_id in seen_tool_uses:
+                    continue
+                seen_tool_uses.add(tool.tool_use_id)
+            names.append(tool.skill)
         expected = entry.qualified if entry.source == "plugin" else entry.name
         if expected in names and record.timestamp is not None:
             timestamps.append(record.timestamp)
