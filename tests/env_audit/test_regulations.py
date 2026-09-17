@@ -269,28 +269,71 @@ def test_r7_code_without_container(fake_home):
     assert facts["container_files"] == []
 
 
-def test_r8_r10_cards(fake_home):
+def test_r8_exact_by_frontmatter_name(fake_home):
     memory = fake_home / ".claude" / "projects" / "-home-u-projects-x" / "memory"
     memory.mkdir(parents=True)
-    (memory / "bitrix_task_rules.md").write_text(
-        "# Регламент задач Битрикс на 2026-08-13\n", encoding="utf-8"
-    )
-    (memory / "principles.md").write_text(
-        "# Принципы\nЧестность важнее удобства, документация обязательна.\n",
+    (memory / "arbitrary-note.md").write_text(
+        "---\nname: BiTrIx_task-Regulations\n---\n"
+        "# Регламент на 2026-08-13\n",
         encoding="utf-8",
     )
-    (memory / "user_profile.md").write_text(
-        "---\ntype: user\n---\n# Профиль\n", encoding="utf-8"
-    )
-    (memory / "other.md").write_text("# Другое\n", encoding="utf-8")
-    (memory / "MEMORY.md").write_text("bitrix task регламент\n", encoding="utf-8")
 
     cards = regulations.collect(_context(fake_home))["r8_r10_memory"]
-    assert [item["file"] for item in cards["bitrix_regulation"]] == ["bitrix_task_rules.md"]
-    assert [item["file"] for item in cards["principles"]] == ["principles.md"]
-    assert [item["file"] for item in cards["user_profile"]] == ["user_profile.md"]
-    assert cards["bitrix_regulation"][0]["date"] == "2026-08-13"
-    assert cards["bitrix_regulation"][0]["date_source"] == "header"
+    matches = cards["bitrix_regulation"]
+    assert [item["file"] for item in matches["exact"]] == ["arbitrary-note.md"]
+    assert matches["exact"][0]["name"] == "BiTrIx_task-Regulations"
+    assert matches["exact"][0]["date"] == "2026-08-13"
+    assert matches["exact"][0]["date_source"] == "header"
+    assert matches["candidates"] == []
+    assert matches["candidates_truncated"] is False
+
+
+def test_r8_noise_files_are_candidates_only(fake_home):
+    memory = fake_home / ".claude" / "projects" / "-home-u-projects-x" / "memory"
+    memory.mkdir(parents=True)
+    for name in (
+        "bitrix_box_bak_files_served_as_source.md",
+        "bitrix_call_unwraps_result_envelope.md",
+        "bitrix_disk_upload_access_denied_per_folder_acl.md",
+    ):
+        (memory / name).write_text("# Обычная заметка\n", encoding="utf-8")
+
+    matches = regulations.collect(_context(fake_home))["r8_r10_memory"][
+        "bitrix_regulation"
+    ]
+    assert matches["exact"] == []
+    assert [item["file"] for item in matches["candidates"]] == [
+        "bitrix_box_bak_files_served_as_source.md",
+        "bitrix_call_unwraps_result_envelope.md",
+        "bitrix_disk_upload_access_denied_per_folder_acl.md",
+    ]
+    assert {item["why"] for item in matches["candidates"]} == {
+        "имя начинается с bitrix_"
+    }
+    assert len(matches["candidates"]) <= 5
+    assert matches["candidates_truncated"] is False
+
+
+def test_r9_r10_same_rule(fake_home):
+    memory = fake_home / ".codex" / "memories"
+    memory.mkdir(parents=True)
+    (memory / "notes.md").write_text(
+        "---\nname: WORK_principles\n---\n# Принципы\n", encoding="utf-8"
+    )
+    (memory / "USER-PROFILE.MD").write_text("# Анкета\n", encoding="utf-8")
+
+    cards = regulations.collect(_context(fake_home, profile="codex"))["r8_r10_memory"]
+    assert [item["file"] for item in cards["principles"]["exact"]] == ["notes.md"]
+    assert cards["principles"]["exact"][0]["name"] == "WORK_principles"
+    assert [item["file"] for item in cards["user_profile"]["exact"]] == [
+        "USER-PROFILE.MD"
+    ]
+    assert cards["user_profile"]["exact"][0]["name"] is None
+    assert {
+        item["memory_dir"]
+        for group in (cards["principles"], cards["user_profile"])
+        for item in group["exact"]
+    } == {"$CODEX_HOME/memories"}
 
 
 def test_r11_version_and_enabled(fake_home):

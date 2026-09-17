@@ -197,9 +197,9 @@
       "additionalProperties": false,
       "required": ["bitrix_regulation", "principles", "user_profile"],
       "properties": {
-        "bitrix_regulation": {"$ref": "#/properties/sections/properties/regulations/$defs/cards"},
-        "principles": {"$ref": "#/properties/sections/properties/regulations/$defs/cards"},
-        "user_profile": {"$ref": "#/properties/sections/properties/regulations/$defs/cards"}
+        "bitrix_regulation": {"$ref": "#/properties/sections/properties/regulations/$defs/card_matches"},
+        "principles": {"$ref": "#/properties/sections/properties/regulations/$defs/card_matches"},
+        "user_profile": {"$ref": "#/properties/sections/properties/regulations/$defs/card_matches"}
       }
     },
     "r11_superpowers": {
@@ -225,19 +225,42 @@
     }
   },
   "$defs": {
-    "cards": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["memory_dir", "file", "date", "date_source", "date_trust"],
-        "properties": {
-          "memory_dir": {"type": "string"},
-          "file": {"type": "string"},
-          "date": {"type": ["string", "null"], "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"},
-          "date_source": {"enum": ["name", "header", "mtime", null]},
-          "date_trust": {"enum": ["high", "medium", "low", null]}
-        }
+    "card_matches": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact", "candidates", "candidates_truncated"],
+      "properties": {
+        "exact": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["memory_dir", "file", "date", "date_source", "date_trust", "name"],
+            "properties": {
+              "memory_dir": {"type": "string"},
+              "file": {"type": "string"},
+              "date": {"type": ["string", "null"], "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"},
+              "date_source": {"enum": ["name", "header", "mtime", null]},
+              "date_trust": {"enum": ["high", "medium", "low", null]},
+              "name": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["memory_dir", "file", "why"],
+            "properties": {
+              "memory_dir": {"type": "string"},
+              "file": {"type": "string"},
+              "why": {"type": "string"}
+            }
+          }
+        },
+        "candidates_truncated": {"type": "boolean"}
       }
     }
   }
