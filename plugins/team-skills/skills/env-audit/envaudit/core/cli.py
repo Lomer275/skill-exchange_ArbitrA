@@ -4,12 +4,13 @@ import json
 import os
 from pathlib import Path
 import pwd
+import sys
 import time
 
 from envaudit.core.bundle import build_bundle
 from envaudit.core.context import Context, Flags
 from envaudit.core.host import collect_host
-from envaudit.core.output import build_document, emit, finalize
+from envaudit.core.output import build_document, emit, finalize, prepare_output
 from envaudit.core.redact import scan_file
 from envaudit.core.runner import run, which
 from envaudit.sections import discover, run_sections
@@ -116,6 +117,14 @@ def main(argv: list[str]) -> int:
     if args.expect_user is not None and not _expect_user(args.expect_user):
         print("{}")
         return 4
+    try:
+        prepare_output(args.output)
+    except OSError as error:
+        print(
+            f"не удаётся писать в {args.output}: {error}",
+            file=sys.stderr,
+        )
+        return 2
 
     _lower_priority()
     home = Path(os.path.realpath(Path.home()))
@@ -145,5 +154,13 @@ def main(argv: list[str]) -> int:
         ctx, host, sections, durations, roots_view, _flags_view(flags)
     )
     doc, exit_code = finalize(doc, ctx)
-    emit(doc, args.output)
+    try:
+        emit(doc, args.output)
+    except OSError as error:
+        emit(doc, None)
+        print(
+            f"не удаётся писать в {args.output}: {error}",
+            file=sys.stderr,
+        )
+        return 2
     return exit_code
