@@ -156,10 +156,21 @@ def install_fake_tools(monkeypatch, tmp_path: Path) -> Path:
     return binary_dir
 
 
-def write_run(path: Path, *, started_at: float, subtype: str = "success", denials: int = 0) -> Path:
+def write_run(
+    path: Path,
+    *,
+    started_at: float,
+    finished_at: float | None = None,
+    subtype: str = "success",
+    denials: int = 0,
+) -> Path:
     document = {
         "started_at": started_at,
-        "finished_at": datetime.now(timezone.utc).timestamp(),
+        "finished_at": (
+            datetime.now(timezone.utc).timestamp()
+            if finished_at is None
+            else finished_at
+        ),
         "rc": 0,
         "timed_out": False,
         "parse_error": False,

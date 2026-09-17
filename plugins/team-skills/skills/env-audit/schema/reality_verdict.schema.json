@@ -7,6 +7,7 @@
     "handoff",
     "changelog",
     "outside_changes",
+    "outside_changes_out_of_window",
     "sandbox_changes",
     "run",
     "readme_typo_fixed",
@@ -93,6 +94,11 @@
     "handoff": {"$ref": "#/$defs/verdict"},
     "changelog": {"$ref": "#/$defs/verdict"},
     "outside_changes": {"$ref": "#/$defs/changes"},
+    "outside_changes_out_of_window": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
     "sandbox_changes": {"$ref": "#/$defs/changes"},
     "run": {
       "anyOf": [

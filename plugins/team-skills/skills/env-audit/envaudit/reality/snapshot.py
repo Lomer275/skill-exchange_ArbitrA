@@ -227,19 +227,23 @@ def take(
     return dict(sorted(result.items()))
 
 
-def diff(before: dict, after: dict, *, run_started: float) -> dict:
+def diff(before: dict, after: dict, *, run_started: float | None) -> dict:
     before_paths = set(before)
     after_paths = set(after)
     created = [
         path
         for path in after_paths - before_paths
-        if float(after[path].get("mtime", 0.0)) >= run_started
+        if run_started is None
+        or float(after[path].get("mtime", 0.0)) >= run_started
     ]
     modified = [
         path
         for path in before_paths & after_paths
         if before[path] != after[path]
-        and float(after[path].get("mtime", 0.0)) >= run_started
+        and (
+            run_started is None
+            or float(after[path].get("mtime", 0.0)) >= run_started
+        )
     ]
     return {
         "created": sorted(created),
