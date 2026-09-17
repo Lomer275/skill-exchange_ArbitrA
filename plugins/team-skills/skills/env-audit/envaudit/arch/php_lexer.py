@@ -5,12 +5,16 @@ _HEREDOC = re.compile(
     rb"<<<[ \t]*(?P<quote>['\"]?)(?P<label>[A-Za-z_][A-Za-z0-9_]*)"
     rb"(?P=quote)[ \t]*(?:\r?\n|$)"
 )
+_PHP_SPECIAL = re.compile(rb"\?>|//|/\*|['\"]|#|<<<")
+_BLANK_TABLE = bytes.maketrans(
+    bytes(range(256)),
+    bytes(value if value in (10, 13) else 32 for value in range(256)),
+)
 
 
 def _blank(output: bytearray, data: bytes, start: int, end: int) -> None:
-    for index in range(start, min(end, len(output))):
-        if data[index] not in (10, 13):
-            output[index] = 32
+    bounded_end = min(end, len(output))
+    output[start:bounded_end] = data[start:bounded_end].translate(_BLANK_TABLE)
 
 
 def _line_end(data: bytes, start: int) -> int:
@@ -19,16 +23,28 @@ def _line_end(data: bytes, start: int) -> int:
 
 
 def _heredoc_end(data: bytes, start: int, label: bytes) -> int:
-    position = start
     terminator = re.compile(
-        rb"^[ \t]*" + re.escape(label) + rb";?[ \t]*(?:\r?\n|$)"
+        rb"^[ \t]*" + re.escape(label) + rb";?[ \t]*(?:\r?\n|$)",
+        re.MULTILINE,
     )
-    while position < len(data):
-        end = _line_end(data, position)
-        if terminator.match(data[position:end]):
-            return end
-        position = end
-    return len(data)
+    match = terminator.search(data, start)
+    return match.end() if match is not None else len(data)
+
+
+def _quoted_end(data: bytes, start: int, quote: bytes) -> int:
+    search_from = start + 1
+    while True:
+        close = data.find(quote, search_from)
+        if close < 0:
+            return len(data)
+        backslashes = 0
+        position = close - 1
+        while position > start and data[position] == 92:
+            backslashes += 1
+            position -= 1
+        if backslashes % 2 == 0:
+            return close + 1
+        search_from = close + 1
 
 
 def strip_php(data: bytes) -> bytes:
@@ -57,14 +73,20 @@ def strip_php(data: bytes) -> bytes:
             in_php = True
             continue
 
-        if data.startswith(b"?>", position):
+        special = _PHP_SPECIAL.search(data, position)
+        if special is None:
+            break
+        position = special.start()
+        token = special.group()
+
+        if token == b"?>":
             _blank(output, data, position, position + 2)
             position += 2
             in_php = False
             continue
 
-        if data.startswith(b"//", position) or (
-            data[position : position + 1] == b"#"
+        if token == b"//" or (
+            token == b"#"
             and data[position : position + 2] != b"#["
         ):
             end = _line_end(data, position)
@@ -78,29 +100,20 @@ def strip_php(data: bytes) -> bytes:
                 position = end
             continue
 
-        if data.startswith(b"/*", position):
+        if token == b"/*":
             close = data.find(b"*/", position + 2)
             end = len(data) if close < 0 else close + 2
             _blank(output, data, position, end)
             position = end
             continue
 
-        quote = data[position : position + 1]
-        if quote in {b"'", b'"'}:
-            end = position + 1
-            while end < len(data):
-                if data[end : end + 1] == b"\\":
-                    end += 2
-                    continue
-                if data[end : end + 1] == quote:
-                    end += 1
-                    break
-                end += 1
+        if token in {b"'", b'"'}:
+            end = _quoted_end(data, position, token)
             _blank(output, data, position, end)
             position = end
             continue
 
-        if data.startswith(b"<<<", position):
+        if token == b"<<<":
             declaration_end = _line_end(data, position)
             match = _HEREDOC.match(data[position:declaration_end])
             if match is not None:
@@ -109,6 +122,6 @@ def strip_php(data: bytes) -> bytes:
                 position = end
                 continue
 
-        position += 1
+        position = special.end()
 
     return bytes(output)

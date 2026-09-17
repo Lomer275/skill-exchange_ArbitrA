@@ -86,6 +86,43 @@ def test_js_n8n_hosts_only(tmp_path: Path, run_collect) -> None:
     assert all(item not in result.stdout for item in fragments(probe))
 
 
+def test_n8n_prefilter_keeps_large_workflow(tmp_path: Path, run_collect) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    nodes = [
+        {
+            "type": (
+                "n8n-nodes-base.httpRequest"
+                if index % 4
+                else "n8n-nodes-base.set"
+            ),
+            "parameters": {"padding": "x" * 256},
+        }
+        for index in range(400)
+    ]
+    workflow_data = json.dumps({"nodes": nodes, "connections": {}})
+    assert workflow_data.index('"connections"') > 64 * 1024
+    (root / "large-workflow.json").write_text(workflow_data, encoding="utf-8")
+    (root / "large-non-workflow.json").write_text(
+        json.dumps({"nodes": nodes}),
+        encoding="utf-8",
+    )
+
+    arch = _arch(run_collect("--only", "architecture", "--root", root), root)
+
+    assert arch["js"]["n8n_workflows"] == [
+        {
+            "path": "large-workflow.json",
+            "nodes": 400,
+            "node_types": [
+                {"type": "n8n-nodes-base.httpRequest", "count": 300},
+                {"type": "n8n-nodes-base.set", "count": 100},
+            ],
+            "url_hosts": [],
+        }
+    ]
+
+
 def _class_source(revision: int) -> str:
     lines = [
         "public class MainViewModel",

@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from dataclasses import dataclass, field
 import os
 from pathlib import Path
@@ -6,6 +7,9 @@ import re
 from envaudit.core.context import Context
 from envaudit.core.runner import git
 from envaudit.core.walk import EXCLUDED_DIRS, FileEntry, iter_files, read_limited
+
+
+READ_CACHE_LIMIT = 256 * 1024 * 1024
 
 
 @dataclass
@@ -26,6 +30,13 @@ class ArchContext:
     rule_inputs: dict[str, dict]
     trees: dict[str, TreeView] = field(default_factory=dict)
     cache: dict[str, object] = field(default_factory=dict)
+    _read_cache: OrderedDict[tuple[str, str], bytes] = field(
+        default_factory=OrderedDict, init=False, repr=False
+    )
+    _read_cache_size: int = field(default=0, init=False, repr=False)
+    _entry_tree_ids: dict[int, str] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def _nested_worktrees(self, root: Path) -> tuple[Path, ...]:
         key = f"nested_worktrees:{root}"
@@ -106,26 +117,50 @@ class ArchContext:
             )
         )
         files.sort(key=lambda entry: entry.rel)
+        for entry in files:
+            self._entry_tree_ids[id(entry)] = tree_id
         self.cache[key] = files
         return files
+
+    def _entry_tree_id(self, entry: FileEntry) -> str | None:
+        tree_id = self._entry_tree_ids.get(id(entry))
+        if tree_id is not None:
+            return tree_id
+        absolute_path = Path(os.path.abspath(entry.path))
+        for candidate, view in self.trees.items():
+            absolute_root = Path(os.path.abspath(view.path))
+            if path_inside(absolute_path, absolute_root):
+                return candidate
+        return None
 
     def read(
         self, entry: FileEntry, max_bytes: int | None = None
     ) -> bytes | None:
-        limit = (
-            self.ctx.flags.max_text_mb * 1024 * 1024
-            if max_bytes is None
-            else max_bytes
-        )
-        cached = self.cache.setdefault("read_bytes", {})
-        key = str(entry.path)
-        if isinstance(cached, dict):
-            value = cached.get(key)
-            if isinstance(value, bytes):
+        text_limit = self.ctx.flags.max_text_mb * 1024 * 1024
+        limit = text_limit if max_bytes is None else max_bytes
+        if entry.size > limit or entry.is_symlink:
+            return None
+
+        tree_id = self._entry_tree_id(entry)
+        cacheable = tree_id is not None and entry.size <= text_limit
+        key = (tree_id, entry.rel) if tree_id is not None else None
+        if cacheable and key is not None:
+            value = self._read_cache.get(key)
+            if value is not None:
+                self._read_cache.move_to_end(key)
                 return value if len(value) <= limit else None
+
         value = read_limited(entry, limit)
-        if value is not None and isinstance(cached, dict):
-            cached[key] = value
+        if value is not None and cacheable and key is not None:
+            while (
+                self._read_cache
+                and self._read_cache_size + len(value) > READ_CACHE_LIMIT
+            ):
+                _, evicted = self._read_cache.popitem(last=False)
+                self._read_cache_size -= len(evicted)
+            if len(value) <= READ_CACHE_LIMIT:
+                self._read_cache[key] = value
+                self._read_cache_size += len(value)
         return value
 
     def code_files(
