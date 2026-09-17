@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:env-audit:section:machine",
-  "type": "object",
+  "type": ["object", "null"],
   "additionalProperties": false,
   "required": [
     "os",
