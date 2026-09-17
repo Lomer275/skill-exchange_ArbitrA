@@ -1,3 +1,4 @@
+from bisect import bisect_left
 from dataclasses import dataclass
 import re
 
@@ -95,20 +96,68 @@ class Match:
     end: int
 
 
+def _tg_matches(data: bytes, item: SecretClass):
+    colon = data.find(b":")
+    while colon >= 0:
+        if colon >= 8 and data[colon - 8 : colon].isdigit():
+            start = colon - 8
+            if start > 0 and 48 <= data[start - 1] <= 57:
+                start -= 1
+            if start > 0 and 48 <= data[start - 1] <= 57:
+                start -= 1
+            match = item.regex.match(data, start)
+            if match is not None and data.find(b":", start, match.end()) == colon:
+                yield match
+        colon = data.find(b":", colon + 1)
+
+
+def _basic_auth_matches(data: bytes, item: SecretClass):
+    if b"@" not in data:
+        return
+    separator = data.find(b"://")
+    scheme_chars = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+.-"
+    letters = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    while separator >= 0:
+        start = separator - 1
+        while start >= 0 and data[start] in scheme_chars:
+            start -= 1
+        start += 1
+        while start < separator and data[start] not in letters:
+            start += 1
+        if start < separator:
+            match = item.regex.match(data, start)
+            if match is not None:
+                yield match
+        separator = data.find(b"://", separator + 3)
+
+
+def _matches(data: bytes, item: SecretClass):
+    if item.name == "tg_bot_token":
+        return _tg_matches(data, item)
+    if item.name == "basic_auth_url":
+        return _basic_auth_matches(data, item)
+    return item.regex.finditer(data)
+
+
 def find(data: bytes, *, self_check_only: bool = False) -> list[Match]:
     matches = []
-    for secret_class in CLASSES:
-        if self_check_only and not secret_class.self_check:
+    newline_positions: list[int] | None = None
+    for item in CLASSES:
+        if self_check_only and not item.self_check:
             continue
-        if secret_class.prefilter and not any(
-            marker in data for marker in secret_class.prefilter
-        ):
+        if item.prefilter and not any(marker in data for marker in item.prefilter):
             continue
-        for match in secret_class.regex.finditer(data):
+        for match in _matches(data, item):
+            if newline_positions is None:
+                newline_positions = []
+                position = data.find(b"\n")
+                while position >= 0:
+                    newline_positions.append(position)
+                    position = data.find(b"\n", position + 1)
             matches.append(
                 Match(
-                    secret_class.name,
-                    data.count(b"\n", 0, match.start()) + 1,
+                    item.name,
+                    bisect_left(newline_positions, match.start()) + 1,
                     match.start(),
                     match.end(),
                 )
