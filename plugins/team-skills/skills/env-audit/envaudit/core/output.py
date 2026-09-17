@@ -76,9 +76,48 @@ def _serialize(doc: dict) -> str:
     return json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=1)
 
 
+def prepare_directory(directory: Path) -> None:
+    missing = []
+    current = directory
+    while not current.exists():
+        missing.append(current)
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+
+    for path in reversed(missing):
+        try:
+            path.mkdir(mode=0o700)
+        except FileExistsError:
+            if not path.is_dir():
+                raise
+        else:
+            path.chmod(0o700)
+
+    if not directory.is_dir():
+        raise NotADirectoryError(directory)
+    mode = directory.stat().st_mode
+    if mode & 0o222 == 0 or mode & 0o111 == 0:
+        raise PermissionError(f"нет прав на запись в каталог {directory}")
+    if not os.access(directory, os.W_OK | os.X_OK):
+        raise PermissionError(f"нет прав на запись в каталог {directory}")
+
+
+def prepare_output(output: Path | None) -> None:
+    if output is None or output == Path("-"):
+        return
+    prepare_directory(output.parent)
+    if output.is_dir():
+        raise IsADirectoryError(output)
+    if output.exists():
+        if output.stat().st_mode & 0o222 == 0 or not os.access(output, os.W_OK):
+            raise PermissionError(f"нет прав на запись в файл {output}")
+
+
 def emit(doc: dict, output: Path | None) -> None:
     serialized = _serialize(doc) + "\n"
-    if output is None:
+    if output is None or output == Path("-"):
         print(serialized, end="")
         return
     descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

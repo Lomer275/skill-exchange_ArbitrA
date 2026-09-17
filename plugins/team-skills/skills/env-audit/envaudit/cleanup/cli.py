@@ -2,6 +2,8 @@ import argparse
 from pathlib import Path
 import sys
 
+from envaudit.core.output import prepare_directory
+
 from .apply import apply_plan, rollback_plan
 from .plan import build_plan, render_plan
 from .verify import verify_plan
@@ -33,6 +35,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "plan":
+        try:
+            prepare_directory(args.out_dir)
+        except OSError as error:
+            print(
+                f"не удаётся писать в {args.out_dir}: {error}",
+                file=sys.stderr,
+            )
+            return 2
     try:
         if args.command == "plan":
             return build_plan(args.facts, args.out_dir)

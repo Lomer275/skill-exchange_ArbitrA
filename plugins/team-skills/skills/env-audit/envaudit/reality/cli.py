@@ -4,9 +4,11 @@ import os
 from pathlib import Path
 import shlex
 import shutil
+import sys
 import time
 
 from envaudit.core import redact, runner
+from envaudit.core.output import prepare_directory
 from envaudit.core.patterns import find
 from envaudit.core.resources import read_data
 from envaudit.reality.estimate import estimate
@@ -236,6 +238,15 @@ def _sandbox_file(path: Path) -> Path | None:
 
 def main(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "prepare":
+        try:
+            prepare_directory(args.out_dir)
+        except OSError as error:
+            print(
+                f"не удаётся писать в {args.out_dir}: {error}",
+                file=sys.stderr,
+            )
+            return 2
     if args.command in ("estimate", "prepare"):
         facts = read_json(args.facts)
         if args.command == "estimate":
