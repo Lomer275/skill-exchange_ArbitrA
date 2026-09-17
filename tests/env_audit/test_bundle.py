@@ -20,7 +20,8 @@ def _without_times(doc):
 def test_bundle_runs_from_stdin(run_collect, fake_home, tmp_path):
     root = tmp_path / "root"
     root.mkdir()
-    direct = run_collect("--root", root)
+    # Live sections (network latency, /proc, disk) differ between two runs; compare the envelope with no sections selected.
+    direct = run_collect("--root", root, "--only", "no-such-section")
     bundle = subprocess.run(
         [sys.executable, str(SKILL_DIR / "collect.py"), "--bundle"],
         check=True,
@@ -31,7 +32,7 @@ def test_bundle_runs_from_stdin(run_collect, fake_home, tmp_path):
     env["HOME"] = str(fake_home)
     env.pop("CODEX_HOME", None)
     bundled = subprocess.run(
-        [sys.executable, "-", "--root", str(root)],
+        [sys.executable, "-", "--root", str(root), "--only", "no-such-section"],
         input=bundle,
         check=False,
         capture_output=True,
@@ -41,6 +42,17 @@ def test_bundle_runs_from_stdin(run_collect, fake_home, tmp_path):
     )
     assert bundled.returncode == 0
     assert _without_times(json.loads(bundled.stdout)) == _without_times(direct.data)
+    sectioned = subprocess.run(
+        [sys.executable, "-", "--root", str(root), "--only", "tokens"],
+        input=bundle,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=300,
+    )
+    assert sectioned.returncode == 0
+    assert isinstance(json.loads(sectioned.stdout)["sections"]["tokens"], dict)
 
 
 def test_bundle_reads_data(tmp_path):

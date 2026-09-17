@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:env-audit:section:tokens",
-  "type": "object",
+  "type": ["object", "null"],
   "additionalProperties": false,
   "required": ["window_days", "claude", "codex", "codex_share_14"],
   "$defs": {
