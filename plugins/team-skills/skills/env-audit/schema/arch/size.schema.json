@@ -1,0 +1,71 @@
+{
+  "$id": "urn:env-audit:schema:arch:size",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["by_language", "bytes", "test_prod_ratio", "large_files"],
+  "properties": {
+    "by_language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "php", "js_ts", "csharp", "sql", "shell"],
+      "properties": {
+        "python": {"$ref": "#/$defs/language"},
+        "php": {"$ref": "#/$defs/language"},
+        "js_ts": {"$ref": "#/$defs/language"},
+        "csharp": {"$ref": "#/$defs/language"},
+        "sql": {"$ref": "#/$defs/language"},
+        "shell": {"$ref": "#/$defs/language"}
+      }
+    },
+    "bytes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tracked", "on_disk", "ignored_dirs"],
+      "properties": {
+        "tracked": {"oneOf": [{"$ref": "#/$defs/bytes"}, {"type": "null"}]},
+        "on_disk": {"$ref": "#/$defs/bytes"},
+        "ignored_dirs": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "test_prod_ratio": {"type": ["number", "null"], "minimum": 0},
+    "large_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "data_shaped", "reason"],
+        "properties": {
+          "path": {"type": "string"},
+          "data_shaped": {"type": "boolean"},
+          "reason": {"type": ["string", "null"], "enum": ["size_cap", null]}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "lines", "sloc", "prod_sloc", "test_files", "test_lines"],
+      "properties": {
+        "files": {"type": "integer", "minimum": 0},
+        "lines": {"type": "integer", "minimum": 0},
+        "sloc": {"type": "integer", "minimum": 0},
+        "prod_sloc": {"type": "integer", "minimum": 0},
+        "test_files": {"type": "integer", "minimum": 0},
+        "test_lines": {"type": "integer", "minimum": 0}
+      }
+    },
+    "bytes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "data", "documents", "other"],
+      "properties": {
+        "code": {"type": "integer", "minimum": 0},
+        "data": {"type": "integer", "minimum": 0},
+        "documents": {"type": "integer", "minimum": 0},
+        "other": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

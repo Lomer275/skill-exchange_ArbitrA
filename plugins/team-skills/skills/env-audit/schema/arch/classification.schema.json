@@ -1,0 +1,53 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "subtype", "calibrated", "decision_trace", "signals", "groups", "unattached_code_anchors", "subprojects", "size_tier", "frozen_zones", "dormant_repo", "layers_declared"],
+  "properties": {
+    "type": {"enum": ["docs", "integration-scripts", "application", "library", "mixed"]},
+    "subtype": {"type": ["string", "null"], "enum": ["plugin-in-host", "cron-agent", "client-server", "multi-app", "service", null]},
+    "calibrated": {"type": "boolean"},
+    "decision_trace": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "condition", "values", "matched"],
+        "properties": {
+          "step": {"type": ["integer", "string"]},
+          "condition": {"type": "string"},
+          "values": {"type": "object", "additionalProperties": true},
+          "matched": {"type": "boolean"}
+        }
+      }
+    },
+    "signals": {"type": "object", "additionalProperties": true},
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "anchors", "packages", "edges_to_other_groups"],
+        "properties": {
+          "id": {"type": "string"},
+          "anchors": {"type": "array", "items": {"type": "string"}},
+          "packages": {"type": "array", "items": {"type": "string"}},
+          "edges_to_other_groups": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "unattached_code_anchors": {"type": "array", "items": {"type": "string"}},
+    "subprojects": {"type": "array", "items": {"type": "string"}},
+    "size_tier": {"type": ["string", "null"], "enum": ["S", "M", "L", null]},
+    "frozen_zones": {"type": "array", "items": {"type": "string"}},
+    "dormant_repo": {"type": "boolean"},
+    "layers_declared": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["source", "path"],
+      "properties": {
+        "source": {"enum": ["audit_json", "architecture_md", "claude_md"]},
+        "path": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["anchors", "live_units", "ci", "deploy_dirs", "docker_working_dirs", "manual_gate_doc"],
+  "properties": {
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "file", "line", "entry", "image_group", "schedule", "live"],
+        "properties": {
+          "kind": {"type": "string"},
+          "file": {"type": ["string", "null"]},
+          "line": {"type": ["integer", "null"], "minimum": 1},
+          "entry": {"type": ["string", "null"]},
+          "image_group": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "array",
+                "prefixItems": [{"type": "string"}, {"type": "string"}],
+                "minItems": 2,
+                "maxItems": 2
+              },
+              {"type": "null"}
+            ]
+          },
+          "schedule": {"type": ["string", "null"]},
+          "live": {"type": "boolean"}
+        }
+      }
+    },
+    "live_units": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "name", "schedule", "entry", "entry_parse", "installed", "active", "closure_has_code", "intersects_groups", "intersects_root"],
+        "properties": {
+          "source": {"enum": ["crontab", "user_unit", "system_unit"]},
+          "name": {"type": "string"},
+          "schedule": {"type": ["string", "null"]},
+          "entry": {"type": ["string", "null"]},
+          "entry_parse": {"enum": ["resolved", "unresolved"]},
+          "installed": {"type": "boolean"},
+          "active": {"type": ["boolean", "null"]},
+          "closure_has_code": {"type": ["boolean", "null"]},
+          "intersects_groups": {"type": ["array", "null"], "items": {"type": "string"}},
+          "intersects_root": {"type": "boolean"}
+        }
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files", "has_deploy_job", "mentions_host"],
+      "properties": {
+        "files": {"type": "array", "items": {"type": "string"}},
+        "has_deploy_job": {"type": "boolean"},
+        "mentions_host": {"type": "boolean"}
+      }
+    },
+    "deploy_dirs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "matched_repo_unit", "is_git_checkout", "files_compared", "files_drift", "lines_drift", "drift_matches_commit"],
+        "properties": {
+          "path": {"type": "string"},
+          "matched_repo_unit": {"type": "boolean"},
+          "is_git_checkout": {"type": "boolean"},
+          "files_compared": {"type": ["integer", "null"]},
+          "files_drift": {"type": ["integer", "null"]},
+          "lines_drift": {"type": ["integer", "null"]},
+          "drift_matches_commit": {"type": ["boolean", "null"]}
+        }
+      }
+    },
+    "docker_working_dirs": {"type": ["array", "null"], "items": {"type": "string"}},
+    "manual_gate_doc": {"type": ["string", "null"]}
+  }
+}
