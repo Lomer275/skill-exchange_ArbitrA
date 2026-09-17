@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:env-audit:reality:verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "handoff",
+    "changelog",
+    "outside_changes",
+    "sandbox_changes",
+    "run",
+    "readme_typo_fixed",
+    "snapshot_skipped",
+    "snapshot_truncated"
+  ],
+  "$defs": {
+    "verdict": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {"status": {"const": "works"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "written_to"],
+          "properties": {
+            "status": {"const": "not_working"},
+            "written_to": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reason"],
+          "properties": {
+            "status": {"const": "not_checked"},
+            "reason": {
+              "enum": [
+                "max_turns",
+                "max_budget",
+                "permission_denied",
+                "nothing_to_record",
+                "no_run",
+                "no_changelog_path",
+                "snapshot_truncated",
+                "unknown"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "paths"],
+          "properties": {
+            "status": {"const": "not_isolated"},
+            "paths": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          }
+        }
+      ]
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created", "modified", "deleted"],
+      "properties": {
+        "created": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "modified": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "deleted": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "started_at": {"type": "number"},
+        "finished_at": {"type": "number"},
+        "rc": {"type": ["integer", "null"]},
+        "timed_out": {"type": "boolean"},
+        "parse_error": {"type": "boolean"},
+        "subtype": {"type": ["string", "null"]},
+        "is_error": {"type": ["boolean", "null"]},
+        "num_turns": {"type": ["integer", "null"]},
+        "total_cost_usd": {"type": ["number", "null"]},
+        "permission_denials_count": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "properties": {
+    "handoff": {"$ref": "#/$defs/verdict"},
+    "changelog": {"$ref": "#/$defs/verdict"},
+    "outside_changes": {"$ref": "#/$defs/changes"},
+    "sandbox_changes": {"$ref": "#/$defs/changes"},
+    "run": {
+      "anyOf": [
+        {"$ref": "#/$defs/run"},
+        {"type": "null"}
+      ]
+    },
+    "readme_typo_fixed": {"type": "boolean"},
+    "snapshot_skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "reason"],
+        "properties": {
+          "path": {"type": "string"},
+          "reason": {"type": "string"},
+          "path_sanitized": {"const": true}
+        }
+      }
+    },
+    "snapshot_truncated": {"type": "boolean"},
+    "path_sanitized": {"const": true}
+  }
+}
