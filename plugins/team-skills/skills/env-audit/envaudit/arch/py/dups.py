@@ -77,7 +77,18 @@ def _function_records(graph: Graph) -> list[dict]:
                     "calls": calls,
                 }
             )
-    return output
+    return sorted(
+        output,
+        key=lambda item: (
+            item["path"],
+            item["name"],
+            item["line"],
+            item["lines"],
+            item["body_lines"],
+            item["digest"],
+            tuple(item["calls"]),
+        ),
+    )
 
 
 def _same_basename(
@@ -92,6 +103,7 @@ def _same_basename(
     for basename, items in sorted(groups.items()):
         if len(items) < 2:
             continue
+        items.sort(key=lambda item: item.path)
         for left_index, left in enumerate(items):
             for right in items[left_index + 1 :]:
                 if budget[0] >= PAIR_LIMIT:
@@ -125,6 +137,15 @@ def _same_basename(
                 break
         if truncated:
             break
+    output.sort(
+        key=lambda item: (
+            item["left"],
+            item["right"],
+            item["ratio"] is None,
+            item["ratio"] or 0.0,
+            item["excluded_reason"] or "",
+        )
+    )
     return output, truncated
 
 
@@ -196,6 +217,18 @@ def _callseq(records: list[dict], budget: list[int]) -> tuple[list[dict], bool]:
                     "ratio": round(ratio, 6),
                 }
             )
+    output.sort(
+        key=lambda item: (
+            item["left"]["path"],
+            item["left"]["name"],
+            item["left"]["line"],
+            item["right"]["path"],
+            item["right"]["name"],
+            item["right"]["line"],
+            item["jaccard"],
+            item["ratio"],
+        )
+    )
     return output, truncated
 
 

@@ -156,7 +156,7 @@ def _constants_only(tree: ast.Module | None) -> bool:
 
 def _functions(graph: Graph, names: set[str]) -> dict[str, list[dict]]:
     output: dict[str, list[dict]] = defaultdict(list)
-    for name in names:
+    for name in sorted(names):
         item = graph.modules[name]
         if item.tree is None:
             continue
@@ -233,7 +233,18 @@ def _same_name_pairs(
                                 "excluded_kind": excluded,
                             }
                         )
-    return output
+    return sorted(
+        output,
+        key=lambda item: (
+            item["left"],
+            item["right"],
+            item["name"],
+            item["ratio"],
+            item["diff_lines"],
+            item["both_call_client"],
+            item["excluded_kind"] or "",
+        ),
+    )
 
 
 def _git_ignored(actx: ArchContext, path: str) -> bool:
@@ -281,6 +292,14 @@ def _runtime_tools(actx: ArchContext) -> tuple[list[dict], bool]:
                 "dockerignored": docker_ignored,
             }
         )
+    output.sort(
+        key=lambda item: (
+            item["source"],
+            item["target"],
+            item["ignored"],
+            item["dockerignored"],
+        )
+    )
     return output, unsupported
 
 
@@ -343,8 +362,8 @@ def analyse(
     interfaces = _interface_modules(actx, graph, packages, assignment)
     targets = _external_targets(graph, packages, direct_io)
     interface_edges = []
-    for package, names in interfaces.items():
-        for source in names:
+    for package, names in sorted(interfaces.items()):
+        for source in sorted(names):
             for edge in graph.edges:
                 if edge.source == source and edge.target in targets:
                     if edge.type_checking:
@@ -356,6 +375,23 @@ def analyse(
                             "target": graph.modules[edge.target].path,
                         }
                     )
+    cross.sort(
+        key=lambda item: (
+            item["source"],
+            item["target"],
+            tuple(item["target_sdk_imports"]),
+        )
+    )
+    shared.sort(
+        key=lambda item: (
+            item["source"],
+            item["target"],
+            tuple(item["target_sdk_imports"]),
+        )
+    )
+    interface_edges.sort(
+        key=lambda item: (item["source"], item["target"], item["channel"])
+    )
     pairs = _same_name_pairs(graph, interfaces, targets)
     channel_data = {
         "packages": sorted(packages),
