@@ -1,0 +1,127 @@
+{
+  "type": "object",
+  "required": ["loaders", "infra_helper_defs", "god_files_deployed", "data_vs_code", "instruction_overlap", "flat_dirs", "self_nested_paths", "dead_dirs", "doc_duplicates_metric"],
+  "properties": {
+    "loaders": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targets_total", "targets_missing", "live_loaders", "fan_in_top"],
+      "properties": {
+        "targets_total": {"type": "integer", "minimum": 0},
+        "targets_missing": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["loader", "line", "target", "live"],
+            "properties": {
+              "loader": {"type": "string"},
+              "line": {"type": "integer", "minimum": 1},
+              "target": {"type": "string"},
+              "live": {"type": "boolean"}
+            }
+          }
+        },
+        "live_loaders": {"type": "integer", "minimum": 0},
+        "fan_in_top": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["target", "loaders", "live_loaders"],
+            "properties": {
+              "target": {"type": "string"},
+              "loaders": {"type": "integer", "minimum": 2},
+              "live_loaders": {"type": "integer", "minimum": 0}
+            }
+          }
+        }
+      }
+    },
+    "infra_helper_defs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["groups", "raw_defs_total"],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "copies"],
+            "properties": {
+              "name": {"type": "string"},
+              "copies": {"type": "integer", "minimum": 3}
+            }
+          }
+        },
+        "raw_defs_total": {"type": "integer", "minimum": 0}
+      }
+    },
+    "god_files_deployed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "lines", "functions", "copies"],
+        "properties": {
+          "path": {"type": "string"},
+          "lines": {"type": "integer", "minimum": 801},
+          "functions": {"type": "integer", "minimum": 0},
+          "copies": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "data_vs_code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data_bytes", "code_bytes", "data_shaped", "n8n_workflows"],
+      "properties": {
+        "data_bytes": {"type": "integer", "minimum": 0},
+        "code_bytes": {"type": "integer", "minimum": 0},
+        "data_shaped": {"type": "array", "items": {"type": "string"}},
+        "n8n_workflows": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "instruction_overlap": {"type": "integer", "minimum": 0},
+    "flat_dirs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "direct_files", "bytes", "has_code_files", "newest_mtime_days"],
+        "properties": {
+          "path": {"type": "string"},
+          "direct_files": {"type": "integer", "minimum": 1001},
+          "bytes": {"type": "integer", "minimum": 0},
+          "has_code_files": {"type": "boolean"},
+          "newest_mtime_days": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "self_nested_paths": {"type": "array", "items": {"type": "string"}},
+    "dead_dirs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "newest_change_days", "importers"],
+        "properties": {
+          "path": {"type": "string"},
+          "newest_change_days": {"type": "integer", "minimum": 181},
+          "importers": {"const": 0}
+        }
+      }
+    },
+    "doc_duplicates_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handoff_md", "changelog_md", "total"],
+      "properties": {
+        "handoff_md": {"type": "integer", "minimum": 0},
+        "changelog_md": {"type": "integer", "minimum": 0},
+        "total": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

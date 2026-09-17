@@ -1,0 +1,85 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "files",
+    "lines",
+    "dated_share",
+    "relative_import_edges",
+    "n8n_workflows"
+  ],
+  "properties": {
+    "files": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lines": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dated_share": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "relative_import_edges": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "n8n_workflows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "nodes",
+          "node_types",
+          "url_hosts"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "nodes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "node_types": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "count"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "url_hosts": {
+            "$ref": "#/$defs/paths"
+          }
+        }
+      }
+    }
+  },
+  "$id": "urn:env-audit:arch:js",
+  "$defs": {
+    "paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
