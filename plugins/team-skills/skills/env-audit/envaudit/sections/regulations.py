@@ -17,6 +17,21 @@ ORDER = 90
 _SUPERPOWERS = "superpowers@claude-plugins-official"
 _SERVICE_DOCS = ("ACCEPTANCE.md", "ADMIN-RUNBOOK.md", "USER-GUIDE.md")
 _FILE_COUNT_CAP = 10_000
+_MEMORY_CANDIDATE_CAP = 5
+_MEMORY_RULES = {
+    "bitrix_regulation": {
+        "file": "bitrix_task_regulations",
+        "names": {"bitrix-task-regulations"},
+    },
+    "principles": {
+        "file": "work_principles",
+        "names": {"work-principles"},
+    },
+    "user_profile": {
+        "file": "user_profile",
+        "names": {"user-profile", "user_profile"},
+    },
+}
 
 
 def _read_json(path: Path) -> dict:
@@ -464,7 +479,7 @@ def _card_text(path: Path) -> tuple[str, list[str]] | None:
     return "".join(head), frontmatter
 
 
-def _card_view(path: Path, memory_dir: str, head: str) -> dict:
+def _card_view(path: Path, memory_dir: str, head: str, name: str | None) -> dict:
     date = status_date(path, head)
     return {
         "memory_dir": memory_dir,
@@ -472,46 +487,92 @@ def _card_view(path: Path, memory_dir: str, head: str) -> dict:
         "date": date.date,
         "date_source": date.source,
         "date_trust": date.trust,
+        "name": name,
     }
 
 
-def _r8_r10_memory(ctx: Context) -> dict:
-    groups = {"bitrix_regulation": [], "principles": [], "user_profile": []}
-    base = ctx.home / ".claude" / "projects"
+def _normalized_memory_name(value: str) -> str:
+    return re.sub(r"[-_]", "", value.casefold())
+
+
+def _candidate_reason(group: str, path: Path) -> str | None:
+    name = path.name.casefold()
+    if group == "bitrix_regulation" and name.startswith(("bitrix_", "bitrix-")):
+        return "имя начинается с bitrix_"
+    if group == "principles" and re.search(r"(?:^|[-_])principles?(?:[-_.]|$)", name):
+        return "имя содержит principles"
+    if group == "user_profile" and re.search(r"(?:^|[-_])profile(?:[-_.]|$)", name):
+        return "имя содержит profile"
+    return None
+
+
+def _claude_memory_dirs(home: Path) -> list[tuple[Path, str]]:
+    base = home / ".claude" / "projects"
     try:
         project_dirs = sorted(
             (path for path in base.iterdir() if path.is_dir()),
             key=lambda path: path.name,
         )
     except OSError:
-        return groups
-    for project_dir in project_dirs:
-        memory = project_dir / "memory"
+        return []
+    return [(project_dir / "memory", project_dir.name) for project_dir in project_dirs]
+
+
+def _r8_r10_memory(ctx: Context, codex_home: Path) -> dict:
+    groups = {
+        name: {"exact": [], "candidates": [], "candidates_truncated": False}
+        for name in _MEMORY_RULES
+    }
+    host = ctx.shared.get("host")
+    profile = host.get("profile") if isinstance(host, dict) else None
+    memory_dirs = [] if profile == "codex" else _claude_memory_dirs(ctx.home)
+    if profile in {"codex", "both"}:
+        memory_dirs.append((codex_home / "memories", "$CODEX_HOME/memories"))
+
+    for memory, memory_dir in memory_dirs:
         try:
-            cards = sorted(memory.glob("*.md"), key=lambda path: path.name)
+            cards = sorted(
+                (
+                    path
+                    for path in memory.iterdir()
+                    if path.name.casefold().endswith(".md")
+                ),
+                key=lambda path: (path.name.casefold(), path.name),
+            )
         except OSError:
             continue
         for path in cards:
-            if path.name == "MEMORY.md" or not path.is_file():
+            if path.name.casefold() == "memory.md" or not path.is_file():
                 continue
             content = _card_text(path)
             if content is None:
                 continue
             head, frontmatter_lines = content
-            name, top_type, metadata_type = _frontmatter(frontmatter_lines)
-            lowered_head = head.casefold()
-            identity = f"{name or ''}\n{path.name}".casefold()
-            card = _card_view(path, project_dir.name, head)
-            if ("bitrix" in identity or "битрикс" in identity) and re.search(
-                r"регламент|задач|task", lowered_head
-            ):
-                groups["bitrix_regulation"].append(card)
-            if "честност" in lowered_head and "документ" in lowered_head:
-                groups["principles"].append(card)
-            if (top_type or "").casefold() == "user" or (
-                metadata_type or ""
-            ).casefold() == "user":
-                groups["user_profile"].append(card)
+            name, _top_type, _metadata_type = _frontmatter(frontmatter_lines)
+            file_identity = _normalized_memory_name(path.stem)
+            name_identity = _normalized_memory_name(name) if name is not None else None
+            for group, rule in _MEMORY_RULES.items():
+                exact_names = {
+                    _normalized_memory_name(value) for value in rule["names"]
+                }
+                exact = file_identity == _normalized_memory_name(rule["file"]) or (
+                    name_identity in exact_names
+                )
+                if exact:
+                    groups[group]["exact"].append(
+                        _card_view(path, memory_dir, head, name)
+                    )
+                    continue
+                why = _candidate_reason(group, path)
+                if why is None:
+                    continue
+                candidates = groups[group]["candidates"]
+                if len(candidates) < _MEMORY_CANDIDATE_CAP:
+                    candidates.append(
+                        {"memory_dir": memory_dir, "file": path.name, "why": why}
+                    )
+                else:
+                    groups[group]["candidates_truncated"] = True
     return groups
 
 
@@ -591,7 +652,7 @@ def collect(ctx: Context) -> dict:
         "r5_levels": _r5_levels(ctx, codex_home),
         "r6_codex": _r6_codex(ctx, codex_home, host),
         "r7_docker": _r7_docker(ctx),
-        "r8_r10_memory": _r8_r10_memory(ctx),
+        "r8_r10_memory": _r8_r10_memory(ctx, codex_home),
         "r11_superpowers": r11_superpowers,
         "r3_sources": r3_sources,
     }
