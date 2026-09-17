@@ -1,0 +1,55 @@
+{
+  "$id": "urn:env-audit:schema:arch:hygiene",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["root_files", "backups", "broken_names", "tracked_but_ignored", "data_vs_code", "doc_duplicates", "crlf_only_changes", "gitattributes", "dependency_manifest"],
+  "properties": {
+    "root_files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backup_patterns", "not_allowlisted", "untracked_not_ignored", "large_over_10mb"],
+      "properties": {
+        "backup_patterns": {"oneOf": [{"$ref": "#/$defs/paths"}, {"type": "null"}]},
+        "not_allowlisted": {"$ref": "#/$defs/paths"},
+        "untracked_not_ignored": {"oneOf": [{"$ref": "#/$defs/paths"}, {"type": "null"}]},
+        "large_over_10mb": {"$ref": "#/$defs/paths"}
+      }
+    },
+    "backups": {"oneOf": [{"$ref": "#/$defs/paths"}, {"type": "null"}]},
+    "broken_names": {"$ref": "#/$defs/paths"},
+    "tracked_but_ignored": {"oneOf": [{"$ref": "#/$defs/paths"}, {"type": "null"}]},
+    "data_vs_code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tracked_data_bytes", "tracked_code_bytes", "dumps_over_1mb_outside_docs"],
+      "properties": {
+        "tracked_data_bytes": {"type": "integer", "minimum": 0},
+        "tracked_code_bytes": {"type": "integer", "minimum": 0},
+        "dumps_over_1mb_outside_docs": {"$ref": "#/$defs/paths"}
+      }
+    },
+    "doc_duplicates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handoff_md", "changelog_md"],
+      "properties": {
+        "handoff_md": {"$ref": "#/$defs/paths"},
+        "changelog_md": {"$ref": "#/$defs/paths"}
+      }
+    },
+    "crlf_only_changes": {"type": ["integer", "null"], "minimum": 0},
+    "gitattributes": {"type": "boolean"},
+    "dependency_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "third_party_imports_prod"],
+      "properties": {
+        "present": {"type": "boolean"},
+        "third_party_imports_prod": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "$defs": {
+    "paths": {"type": "array", "items": {"type": "string"}}
+  }
+}

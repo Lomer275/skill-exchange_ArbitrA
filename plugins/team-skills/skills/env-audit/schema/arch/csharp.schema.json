@@ -1,0 +1,131 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "solutions",
+    "projects",
+    "classes_top",
+    "xaml"
+  ],
+  "properties": {
+    "solutions": {
+      "$ref": "#/$defs/paths"
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "output_type",
+          "use_wpf",
+          "target_framework",
+          "package_references",
+          "test_sdk"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "output_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "use_wpf": {
+            "type": "boolean"
+          },
+          "target_framework": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "package_references": {
+            "$ref": "#/$defs/paths"
+          },
+          "test_sdk": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "classes_top": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "class",
+          "lines",
+          "methods_approx",
+          "ctor_params_nonprimitive",
+          "bindables",
+          "churn"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "methods_approx": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ctor_params_nonprimitive": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bindables": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "churn": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "xaml": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "resource_dictionaries"
+      ],
+      "properties": {
+        "files": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resource_dictionaries": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "$id": "urn:env-audit:arch:csharp",
+  "$defs": {
+    "paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
