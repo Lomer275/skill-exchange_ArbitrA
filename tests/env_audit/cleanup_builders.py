@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import subprocess
 import time
 
 from envaudit.core import skills_index
@@ -114,6 +115,20 @@ def write_large_claude(root: Path, *, body: str | None = None) -> Path:
     path = root / "CLAUDE.md"
     path.write_text("# Project\n\n## Большой раздел\n" + text, encoding="utf-8")
     return path
+
+
+def add_linked_worktree(root: Path, worktree: Path) -> Path:
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(root), "config", "user.name", "Test"], check=True)
+    (root / "seed.txt").write_text("seed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "seed.txt"], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-qm", "seed"], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "-qb", "test-worktree", str(worktree)],
+        check=True,
+    )
+    return worktree
 
 
 def collect_facts(home: Path, roots: list[Path], monkeypatch) -> dict:
