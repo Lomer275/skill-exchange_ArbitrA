@@ -229,6 +229,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _sandbox_file(path: Path) -> Path | None:
+    candidate = path / "sandbox.json" if path.is_dir() else path
+    return candidate if candidate.is_file() else None
+
+
 def main(argv: list[str]) -> int:
     args = build_parser().parse_args(argv)
     if args.command in ("estimate", "prepare"):
@@ -243,6 +248,11 @@ def main(argv: list[str]) -> int:
             return error.code
         _emit(document)
         return 0
+    sandbox_file = _sandbox_file(args.sandbox)
+    if sandbox_file is None:
+        _emit({"error": f"не найден sandbox.json по пути {args.sandbox}"})
+        return 2
+    args.sandbox = sandbox_file
     if args.command == "command":
         _emit(
             command_view(

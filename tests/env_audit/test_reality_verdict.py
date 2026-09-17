@@ -98,6 +98,43 @@ def test_not_isolated(fake_home, tmp_path, monkeypatch):
     cleanup(out_dir / "sandbox.json")
 
 
+def test_no_run_wins_over_outside(fake_home, tmp_path, monkeypatch):
+    out_dir, _document = _case(fake_home, tmp_path, monkeypatch, "no-run-outside")
+    outside = fake_home / ".claude" / "CLAUDE.md"
+    outside.parent.mkdir(parents=True, exist_ok=True)
+    outside.write_text("background change\n", encoding="utf-8")
+
+    result = build_verdict(out_dir / "sandbox.json")
+
+    expected = {"status": "not_checked", "reason": "no_run"}
+    assert result["handoff"] == expected
+    assert result["changelog"] == expected
+    assert "~/.claude/CLAUDE.md" in result["outside_changes"]["created"]
+    cleanup(out_dir / "sandbox.json")
+
+
+def test_outside_change_outside_window_is_not_violation(
+    fake_home, tmp_path, monkeypatch
+):
+    outside = fake_home / ".claude" / "CLAUDE.md"
+    outside.parent.mkdir(parents=True, exist_ok=True)
+    outside.write_text("before\n", encoding="utf-8")
+    out_dir, _document = _case(fake_home, tmp_path, monkeypatch, "late-outside")
+    started = time.time()
+    finished = started + 1
+    write_run(out_dir / "run.json", started_at=started, finished_at=finished)
+    outside.write_text("after\n", encoding="utf-8")
+    late = finished + 6
+    os.utime(outside, (late, late))
+
+    result = build_verdict(out_dir / "sandbox.json")
+
+    assert result["handoff"]["status"] != "not_isolated"
+    assert "~/.claude/CLAUDE.md" in result["outside_changes_out_of_window"]
+    assert result["outside_changes"]["modified"] == []
+    cleanup(out_dir / "sandbox.json")
+
+
 @pytest.mark.parametrize(
     ("mode", "reason"),
     (("max_turns", "max_turns"), ("denied", "permission_denied"), (None, "no_run")),
@@ -120,6 +157,7 @@ def test_snapshot_truncation_marks_not_checked(fake_home, tmp_path, monkeypatch)
     out_dir = tmp_path / "truncated-result"
 
     document = prepare(facts_document(fake_home, root), root, out_dir)
+    write_run(out_dir / "run.json", started_at=time.time())
     result = build_verdict(out_dir / "sandbox.json")
 
     assert document["snapshot_truncated"] is True
@@ -131,14 +169,22 @@ def test_snapshot_truncation_marks_not_checked(fake_home, tmp_path, monkeypatch)
     cleanup(out_dir / "sandbox.json")
 
 
-def test_tmp_claude_writes_ignored_deletes_flagged(fake_home, tmp_path, monkeypatch):
+def test_noise_paths_ignored(fake_home, tmp_path, monkeypatch):
     unique = f"claude-{os.getuid()}-{uuid.uuid4().hex}"
     outside_dir = Path("/tmp") / unique
     outside_dir.mkdir()
-    old = outside_dir / "old"
-    old.write_text("old\n", encoding="utf-8")
-    old_time = time.time() - 120
-    os.utime(old, (old_time, old_time))
+    tmp_changed = outside_dir / "changed"
+    tmp_changed.write_text("before\n", encoding="utf-8")
+    tmp_deleted = outside_dir / "deleted"
+    tmp_deleted.write_text("before\n", encoding="utf-8")
+    synced = fake_home / ".claude" / "skills" / "synced" / "session"
+    synced.mkdir(parents=True)
+    synced_changed = synced / "changed.json"
+    synced_changed.write_text("before\n", encoding="utf-8")
+    synced_deleted = synced / "deleted.json"
+    synced_deleted.write_text("before\n", encoding="utf-8")
+    protected = fake_home / ".claude" / "CLAUDE.md"
+    protected.write_text("before\n", encoding="utf-8")
     try:
         isolate_host(
             monkeypatch,
@@ -150,14 +196,24 @@ def test_tmp_claude_writes_ignored_deletes_flagged(fake_home, tmp_path, monkeypa
         out_dir = tmp_path / "tmp-change-result"
         prepare(facts_document(fake_home, root), root, out_dir)
         started = time.time()
-        write_run(out_dir / "run.json", started_at=started)
-        (outside_dir / "new").write_text("new\n", encoding="utf-8")
-        old.unlink()
+        finished = started + 1
+        write_run(out_dir / "run.json", started_at=started, finished_at=finished)
+        tmp_changed.write_text("after\n", encoding="utf-8")
+        synced_changed.write_text("after\n", encoding="utf-8")
+        protected.write_text("after\n", encoding="utf-8")
+        changed = started + 0.5
+        for path in (tmp_changed, synced_changed, protected):
+            os.utime(path, (changed, changed))
+        tmp_deleted.unlink()
+        synced_deleted.unlink()
 
         result = build_verdict(out_dir / "sandbox.json")
 
-        assert result["outside_changes"]["created"] == []
-        assert str(old) in result["outside_changes"]["deleted"]
+        assert str(tmp_changed) in result["outside_changes"]["modified"]
+        assert str(tmp_deleted) in result["outside_changes"]["deleted"]
+        assert "~/.claude/skills/synced/session/changed.json" in result["outside_changes"]["modified"]
+        assert "~/.claude/skills/synced/session/deleted.json" in result["outside_changes"]["deleted"]
+        assert result["handoff"]["paths"] == ["~/.claude/CLAUDE.md"]
         assert result["handoff"]["status"] == "not_isolated"
         cleanup(out_dir / "sandbox.json")
     finally:
@@ -173,6 +229,7 @@ def test_changelog_no_path(fake_home, tmp_path, monkeypatch):
         changelog=True,
         changelog_writers=[],
     )
+    write_run(out_dir / "run.json", started_at=time.time())
 
     result = build_verdict(out_dir / "sandbox.json")
 

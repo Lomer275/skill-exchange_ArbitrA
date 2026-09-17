@@ -183,6 +183,30 @@ def test_command_argv(fake_home, tmp_path, monkeypatch):
     cleanup(out_dir / "sandbox.json")
 
 
+def test_sandbox_arg_accepts_dir_and_file(
+    fake_home, tmp_path, monkeypatch, capsys
+):
+    _root, out_dir, document = _prepared(fake_home, tmp_path, monkeypatch)
+
+    file_code = main(["command", "--sandbox", str(out_dir / "sandbox.json")])
+    file_output = json.loads(capsys.readouterr().out)
+    dir_code = main(["command", "--sandbox", str(out_dir)])
+    dir_output = json.loads(capsys.readouterr().out)
+    missing = tmp_path / "missing"
+    missing_code = main(["command", "--sandbox", str(missing)])
+    missing_output = json.loads(capsys.readouterr().out)
+
+    assert file_code == 0
+    assert dir_code == 0
+    assert file_output["cwd"] == document["sandbox"]
+    assert dir_output == file_output
+    assert missing_code == 2
+    assert missing_output == {
+        "error": f"не найден sandbox.json по пути {missing}"
+    }
+    cleanup(out_dir / "sandbox.json")
+
+
 def test_run_requires_confirmed(fake_home, tmp_path, monkeypatch, capsys):
     _root, out_dir, _document = _prepared(fake_home, tmp_path, monkeypatch)
     marker = tmp_path / "called"
