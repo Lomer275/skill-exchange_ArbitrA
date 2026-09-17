@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:env-audit:section:instructions",
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": ["global", "projects", "memory", "start_context"],
+  "$defs": {
+    "instruction_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "exists", "bytes", "lines", "team_context_blocks"],
+      "properties": {
+        "path": {"type": "string"},
+        "exists": {"type": "boolean"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "lines": {"type": "integer", "minimum": 0},
+        "team_context_blocks": {"type": "integer", "minimum": 0}
+      }
+    },
+    "last_instructions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["length", "file_types", "date"],
+      "properties": {
+        "length": {"type": "integer", "minimum": 0},
+        "file_types": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "date": {"type": ["string", "null"], "format": "date"}
+      }
+    }
+  },
+  "properties": {
+    "global": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claude_md", "codex_agents_md"],
+      "properties": {
+        "claude_md": {"$ref": "#/$defs/instruction_file"},
+        "codex_agents_md": {"$ref": "#/$defs/instruction_file"}
+      }
+    },
+    "projects": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["files", "total_bytes"],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["rel", "kind", "bytes", "lines"],
+              "properties": {
+                "rel": {"type": "string"},
+                "kind": {"enum": ["claude_md", "agents_md", "claude_local_md"]},
+                "bytes": {"type": "integer", "minimum": 0},
+                "lines": {"type": "integer", "minimum": 0}
+              }
+            }
+          },
+          "total_bytes": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dirs", "unmapped_memory_dirs", "roots_with_multiple_dirs"],
+      "properties": {
+        "dirs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "root", "matched_by", "cards", "index_exists", "index_lines", "index_bytes", "index_over_lines", "index_over_bytes"],
+            "properties": {
+              "name": {"type": "string"},
+              "root": {"type": "string"},
+              "matched_by": {"enum": ["root", "worktree", "cwd", "prefix"]},
+              "cards": {"type": "integer", "minimum": 0},
+              "index_exists": {"type": "boolean"},
+              "index_lines": {"type": "integer", "minimum": 0},
+              "index_bytes": {"type": "integer", "minimum": 0},
+              "index_over_lines": {"type": "boolean"},
+              "index_over_bytes": {"type": "boolean"}
+            }
+          }
+        },
+        "unmapped_memory_dirs": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "roots_with_multiple_dirs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2,
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "start_context": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sessions_considered", "excluded", "excluded_started_before_window", "history_marked", "by_entrypoint", "by_entrypoint_fresh", "last_instructions"],
+        "properties": {
+          "sessions_considered": {"type": "integer", "minimum": 0, "maximum": 40},
+          "excluded": {"type": "integer", "minimum": 0},
+          "excluded_started_before_window": {"type": "integer", "minimum": 0},
+          "history_marked": {"type": "integer", "minimum": 0},
+          "by_entrypoint": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["n", "median", "min", "max"],
+              "properties": {
+                "n": {"type": "integer", "minimum": 1},
+                "median": {"type": "number", "minimum": 0},
+                "min": {"type": "integer", "minimum": 0},
+                "max": {"type": "integer", "minimum": 0}
+              }
+            }
+          },
+          "by_entrypoint_fresh": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["n", "median", "min", "max"],
+              "properties": {
+                "n": {"type": "integer", "minimum": 1},
+                "median": {"type": "number", "minimum": 0},
+                "min": {"type": "integer", "minimum": 0},
+                "max": {"type": "integer", "minimum": 0}
+              }
+            }
+          },
+          "last_instructions": {
+            "anyOf": [
+              {"$ref": "#/$defs/last_instructions"},
+              {"type": "null"}
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:env-audit:section:skills",
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": ["managed_dirs_checked", "entries", "roots", "overrides_user", "mandatory", "superpowers", "listing", "window_days"],
+  "$defs": {
+    "overrides": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "resolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qualified", "source", "path_rel"],
+      "properties": {
+        "qualified": {"type": "string"},
+        "source": {"enum": ["managed", "user", "project", "user_command", "project_command"]},
+        "path_rel": {"type": "string"}
+      }
+    }
+  },
+  "properties": {
+    "managed_dirs_checked": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["qualified", "name", "namespace", "source", "plugin_version", "description_len", "when_to_use_len", "has_cyrillic", "override", "override_effective", "protected", "protected_reasons", "invocations_window", "last_invoked_at", "skill_usage"],
+        "properties": {
+          "qualified": {"type": "string"},
+          "name": {"type": "string"},
+          "namespace": {"type": ["string", "null"]},
+          "source": {"enum": ["managed", "user", "project", "user_command", "project_command", "plugin"]},
+          "plugin_version": {"type": ["string", "null"]},
+          "description_len": {"type": "integer", "minimum": 0},
+          "when_to_use_len": {"type": "integer", "minimum": 0},
+          "has_cyrillic": {"type": "boolean"},
+          "override": {"type": ["string", "null"]},
+          "override_effective": {"type": "boolean"},
+          "protected": {"type": "boolean"},
+          "protected_reasons": {
+            "type": "array",
+            "items": {"enum": ["mandatory", "superpowers", "env_audit", "referenced"]},
+            "uniqueItems": true
+          },
+          "invocations_window": {"type": "integer", "minimum": 0},
+          "last_invoked_at": {"type": ["string", "null"], "format": "date"},
+          "skill_usage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["usage_count", "last_used_at"],
+            "properties": {
+              "usage_count": {"type": "integer", "minimum": 0},
+              "last_used_at": {"type": ["string", "null"], "format": "date"}
+            }
+          }
+        }
+      }
+    },
+    "roots": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resolved", "shadowed_non_plugin", "plugin_twins", "overrides", "referenced_in_instructions"],
+        "properties": {
+          "resolved": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {"$ref": "#/$defs/resolved"},
+                {"type": "null"}
+              ]
+            }
+          },
+          "shadowed_non_plugin": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "sources"],
+              "properties": {
+                "name": {"type": "string"},
+                "sources": {
+                  "type": "array",
+                  "items": {"enum": ["managed", "user", "project", "user_command", "project_command"]},
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              }
+            }
+          },
+          "plugin_twins": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {"type": "string"},
+              "uniqueItems": true
+            }
+          },
+          "overrides": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["project", "project_local"],
+            "properties": {
+              "project": {"$ref": "#/$defs/overrides"},
+              "project_local": {"$ref": "#/$defs/overrides"}
+            }
+          },
+          "referenced_in_instructions": {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "overrides_user": {"$ref": "#/$defs/overrides"},
+    "mandatory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "missing", "disabled"],
+      "properties": {
+        "present": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "missing": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "disabled": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "superpowers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["installed", "enabled", "disabled_by_override"],
+      "properties": {
+        "installed": {"type": "boolean"},
+        "enabled": {"type": "boolean"},
+        "disabled_by_override": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "listing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actual", "raw_sum_chars", "formula"],
+      "properties": {
+        "actual": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["root", "length", "skill_count", "date"],
+            "properties": {
+              "root": {"type": "string"},
+              "length": {"type": "integer", "minimum": 0},
+              "skill_count": {"type": ["integer", "null"], "minimum": 0},
+              "date": {"type": ["string", "null"], "format": "date"}
+            }
+          }
+        },
+        "raw_sum_chars": {"type": "integer", "minimum": 0},
+        "formula": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model_window_tokens", "budget_chars", "max_desc_chars", "budget_fraction", "source"],
+          "properties": {
+            "model_window_tokens": {"enum": [200000, 1000000]},
+            "budget_chars": {"type": "integer", "minimum": 0},
+            "max_desc_chars": {"type": "integer", "minimum": 1},
+            "budget_fraction": {"type": "number", "exclusiveMinimum": 0},
+            "source": {"enum": ["defaults", "settings"]}
+          }
+        }
+      }
+    },
+    "window_days": {"type": "integer", "minimum": 1}
+  }
+}
