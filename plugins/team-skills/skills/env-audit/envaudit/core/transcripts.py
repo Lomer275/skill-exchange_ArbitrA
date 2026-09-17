@@ -290,7 +290,7 @@ def project_line(
         is_sidechain=obj.get("isSidechain") is True,
         is_meta=obj.get("isMeta") is True,
         is_compact_summary=obj.get("isCompactSummary") is True,
-        has_parent="parentUuid" in obj,
+        has_parent=obj.get("parentUuid") is not None,
         origin_kind=_string(origin.get("kind")),
         is_tool_result=is_tool_result,
         message_id=_string(message.get("id")),
