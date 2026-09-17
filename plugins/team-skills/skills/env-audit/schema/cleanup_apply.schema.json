@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:env-audit:cleanup-apply",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "plan_path", "backup_root", "delete_backup_after", "items"],
+  "properties": {
+    "schema": {"const": "env-audit/cleanup-apply"},
+    "plan_path": {"type": "string"},
+    "backup_root": {"type": "string"},
+    "delete_backup_after": {"type": "string", "format": "date"},
+    "items": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/result"}
+    }
+  },
+  "$defs": {
+    "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "backup_path", "rollback_backup_path", "created", "original_mode", "after_sha1"],
+      "properties": {
+        "path": {"type": "string"},
+        "backup_path": {"type": ["string", "null"]},
+        "rollback_backup_path": {"type": ["string", "null"]},
+        "created": {"type": "boolean"},
+        "original_mode": {"type": "integer", "minimum": 0},
+        "after_sha1": {"$ref": "#/$defs/sha1"}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "path", "status", "backup_path", "created", "files"],
+      "properties": {
+        "id": {"type": "string"},
+        "kind": {"type": "string"},
+        "path": {"type": "string"},
+        "status": {"enum": ["applied", "stale", "error"]},
+        "backup_path": {"type": ["string", "null"]},
+        "created": {"type": "boolean"},
+        "error_kind": {"type": "string"},
+        "files": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/file"}
+        }
+      }
+    }
+  }
+}
