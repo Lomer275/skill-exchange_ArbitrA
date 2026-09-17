@@ -1,0 +1,69 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["create_all_sites", "migration_dirs", "upgrade_invocations", "sql_files", "orm_tables", "sql_tables", "orm_only", "sql_only", "swallowed_init_errors", "ci_migration_guard"],
+  "properties": {
+    "create_all_sites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "line", "kind", "in_startup", "in_startup_via"],
+        "properties": {
+          "path": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "kind": {"enum": ["call", "ref"]},
+          "in_startup": {"type": "boolean"},
+          "in_startup_via": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "migration_dirs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "tool", "found_by", "revisions", "duplicate_numbers", "merge_migrations"],
+        "properties": {
+          "path": {"type": "string"},
+          "tool": {"enum": ["alembic", "django"]},
+          "found_by": {"enum": ["content", "alembic_ini", "pattern"]},
+          "revisions": {"type": "integer", "minimum": 0},
+          "duplicate_numbers": {"type": "array", "items": {"type": "string"}},
+          "merge_migrations": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "upgrade_invocations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "line"],
+        "properties": {
+          "path": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "sql_files": {"type": "array", "items": {"type": "string"}},
+    "orm_tables": {"type": "array", "items": {"type": "string"}},
+    "sql_tables": {"type": "array", "items": {"type": "string"}},
+    "orm_only": {"type": "array", "items": {"type": "string"}},
+    "sql_only": {"type": "array", "items": {"type": "string"}},
+    "swallowed_init_errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "line", "function"],
+        "properties": {
+          "path": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "function": {"type": "string"}
+        }
+      }
+    },
+    "ci_migration_guard": {"type": "boolean"}
+  }
+}

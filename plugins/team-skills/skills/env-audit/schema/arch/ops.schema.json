@@ -1,0 +1,59 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["live_closure", "shared_locks", "log_lock_refusals", "recently_modified_in_live_dirs", "destructive_api_calls"],
+  "properties": {
+    "live_closure": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["unit", "entry", "modules", "outside_git_lines", "ignored_lines", "uncommitted_add", "uncommitted_del", "ahead_closure", "ahead_verified"],
+        "properties": {
+          "unit": {"type": "string"},
+          "entry": {"type": "string"},
+          "modules": {"type": "integer", "minimum": 0},
+          "outside_git_lines": {"type": "integer", "minimum": 0},
+          "ignored_lines": {"type": "integer", "minimum": 0},
+          "uncommitted_add": {"type": "integer", "minimum": 0},
+          "uncommitted_del": {"type": "integer", "minimum": 0},
+          "ahead_closure": {"type": "integer", "minimum": 0},
+          "ahead_verified": {"type": "boolean"}
+        }
+      }
+    },
+    "shared_locks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lock_key_id", "defined_at", "cron_entries", "distinct_args"],
+        "properties": {
+          "lock_key_id": {"type": "integer", "minimum": 1},
+          "defined_at": {"type": "string"},
+          "cron_entries": {"type": "array", "items": {"type": "string"}},
+          "distinct_args": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "log_lock_refusals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["log", "mode", "runs", "refusals", "successes", "share", "heuristic"],
+        "properties": {
+          "log": {"type": "string"},
+          "mode": {"type": "string"},
+          "runs": {"type": "integer", "minimum": 0},
+          "refusals": {"type": "integer", "minimum": 0},
+          "successes": {"type": "integer", "minimum": 0},
+          "share": {"type": ["number", "null"], "minimum": 0},
+          "heuristic": {"const": true}
+        }
+      }
+    },
+    "recently_modified_in_live_dirs": {"type": "integer", "minimum": 0},
+    "destructive_api_calls": {"type": "integer", "minimum": 0}
+  }
+}
