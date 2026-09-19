@@ -1,6 +1,6 @@
 ---
 name: sprint
-description: "Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from the spec, groups them into waves by dependencies, and runs each wave in parallel. Supports a headless `/sprint --yes <Sxx>` mode: at each checkpoint it consults `scripts/autopilot/check_authz.py` (which reads the ```yaml autopilot``` block from SUP-HANDOFF.md) and decides auto-go vs TG-ask-and-wait instead of waiting on stdin. Use when the user says '/sprint S02', 'прогони спринт', 'выполни спеку', '/sprint --yes S14', 'запусти спринт в cron-режиме', 'автономный спринт'."
+description: "Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from the spec, groups them into waves by dependencies, and runs each wave in parallel. Supports a headless `/sprint --yes <Sxx>` mode: at each checkpoint it consults `scripts/autopilot/check_authz.py` (which reads the ```yaml autopilot``` block from <ПРЕФИКС>-HANDOFF.md) and decides auto-go vs TG-ask-and-wait instead of waiting on stdin. Use when the user says '/sprint S02', 'прогони спринт', 'выполни спеку', '/sprint --yes S14', 'запусти спринт в cron-режиме', 'автономный спринт'."
 ---
 
 # Sprint Skill (project-local with --yes mode)
@@ -15,7 +15,7 @@ Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from
 
 - `/sprint S02` — interactive mode: show the plan, wait for "да/ок/go" from the user at each checkpoint
 - `/sprint S02 --dry-run` — only show the wave plan, execute nothing
-- `/sprint --yes S14` — **headless mode for cron/auto-pilot.** The plan is auto-confirmed; at checkpoints, instead of stdin, the pre-authorization is read from SUP-HANDOFF.md (see the "Headless --yes mode" section). When pre-auth does not permit auto-go, `/sprint` pings TG via `scripts/autopilot/tg_ask.sh` and waits for a human click for up to 2 hours via `tg_wait_answer.sh`. For design docs and the checkpoint contract, see `.claude/skills/auto-pilot/SKILL.md`.
+- `/sprint --yes S14` — **headless mode for cron/auto-pilot.** The plan is auto-confirmed; at checkpoints, instead of stdin, the pre-authorization is read from <ПРЕФИКС>-HANDOFF.md (see the "Headless --yes mode" section). When pre-auth does not permit auto-go, `/sprint` pings TG via `scripts/autopilot/tg_ask.sh` and waits for a human click for up to 2 hours via `tg_wait_answer.sh`. For design docs and the checkpoint contract, see `.claude/skills/auto-pilot/SKILL.md`.
 
 If no spec number is passed — report an error and stop:
 
@@ -106,14 +106,14 @@ Extract:
 Run the search:
 
 ```text
-glob docs/2. SUP-specifications/SNN_*.md
+glob docs/2. <ПРЕФИКС>-specifications/SNN_*.md
 ```
 
-If the file is not found — check `docs/backlog/` and `docs/2. SUP-specifications/*_done.md`.
+If the file is not found — check `docs/backlog/` and `docs/2. <ПРЕФИКС>-specifications/*_done.md`.
 If still not found → STOP:
 
 ```text
-❌ Спецификация S02 не найдена в docs/2. SUP-specifications/
+❌ Спецификация S02 не найдена в docs/2. <ПРЕФИКС>-specifications/
 ```
 
 ### 0.2 — Collect tasks with status 🟡
@@ -252,7 +252,7 @@ Output the final report. In `--yes`: TG summary `✅ Sprint <Spec> законч�
 
 Read in parallel:
 
-- The task file: `docs/3. SUP-tasks/TNN_*.md`
+- The task file: `docs/3. <ПРЕФИКС>-tasks/TNN_*.md`
 - The spec file (already read in Phase 0 — reuse it)
 - All code files mentioned in the task
 - Related files (imports, configs) if mentioned

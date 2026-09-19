@@ -6,7 +6,7 @@ description: >
   required fields. Use when the user says "/codex-setup", "поставь codex",
   "установи codex cli", "настрой codex", "init codex", "включи кодекс". The skill
   is idempotent — a repeat run updates cli_version with a warning on mismatch.
-  Part of spec S11 (docs/2. SUP-specifications/S11_claude_codex_orchestration_done.md), Phase 1.
+  Part of spec S11 (docs/2. <ПРЕФИКС>-specifications/S11_claude_codex_orchestration_done.md), Phase 1.
 ---
 
 # /codex-setup — Install and verify the Codex CLI
@@ -264,10 +264,10 @@ Overwrite **only** this block. If the file does not exist — create it with the
 
 ## Гайды (читай по необходимости)
 
-- [docs/4. SUP-guides/doc_conventions.md](docs/4.%20SUP-guides/doc_conventions.md) — правила именования файлов.
-- [docs/4. SUP-guides/specifications_guide.md](docs/4.%20SUP-guides/specifications_guide.md) — структура спек.
-- [docs/4. SUP-guides/task_decomposition_guide.md](docs/4.%20SUP-guides/task_decomposition_guide.md) — структура задач.
-- [docs/4. SUP-guides/versioning_guidelines.md](docs/4.%20SUP-guides/versioning_guidelines.md) — SemVer + Conventional Commits.
+- [docs/4. <ПРЕФИКС>-guides/doc_conventions.md](docs/4.%20<ПРЕФИКС>-guides/doc_conventions.md) — правила именования файлов.
+- [docs/4. <ПРЕФИКС>-guides/specifications_guide.md](docs/4.%20<ПРЕФИКС>-guides/specifications_guide.md) — структура спек.
+- [docs/4. <ПРЕФИКС>-guides/task_decomposition_guide.md](docs/4.%20<ПРЕФИКС>-guides/task_decomposition_guide.md) — структура задач.
+- [docs/4. <ПРЕФИКС>-guides/versioning_guidelines.md](docs/4.%20<ПРЕФИКС>-guides/versioning_guidelines.md) — SemVer + Conventional Commits.
 
 ## Запреты
 
@@ -275,8 +275,8 @@ Overwrite **only** this block. If the file does not exist — create it with the
 
 1. **Не делать `git commit` или `git push`** — коммиты делает оркестратор Claude через `/sup-push`.
 2. **Не трогать секреты:** `.env*`, `.servers`, любые токены/ключи.
-3. **Не править `SUP-CHANGELOG.md` и `SUP-HANDOFF.md`** — это шаги `/accept` (оркестратор).
-4. **Не лезть в `docs/3. SUP-tasks/Done/`** — там завершённые задачи, их трогать нельзя.
+3. **Не править `<ПРЕФИКС>-CHANGELOG.md` и `<ПРЕФИКС>-HANDOFF.md`** — это шаги `/accept` (оркестратор).
+4. **Не лезть в `docs/3. <ПРЕФИКС>-tasks/Done/`** — там завершённые задачи, их трогать нельзя.
 5. **Не спавнить других Codex-воркеров** — оркестрацию ведёт только Claude.
 6. Использовать `python` из `$VIRTUAL_ENV/bin/python` для всех запусков (если работаешь в worktree).
 
