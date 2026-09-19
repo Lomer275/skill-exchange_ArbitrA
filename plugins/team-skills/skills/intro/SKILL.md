@@ -2,7 +2,7 @@
 name: intro
 description: >
   Loads the project context at the start of a session — the paired opener for /close.
-  Reads SUP-HANDOFF.md (RESUME-PROMPT), the open tasks and the current branch state,
+  Reads the project's canonical HANDOFF (RESUME-PROMPT), the open tasks and the current branch state,
   then reports where we stopped, the next step and the open blockers. Use when the user
   says "/intro", "продолжаем", "что у нас", "с чего начинаем", "загрузи контекст",
   "что вчера делали".
@@ -14,9 +14,18 @@ description: >
 
 ## Что прочитать (в этом порядке)
 
-1. **`SUP-HANDOFF.md`** — RESUME-PROMPT наверху, ⚠️ незавершённое, блокеры, git-состояние.
-2. **`SUP-CHANGELOG.md`**, секция «Не выпущено» — что закрыто, но ещё не в релизе.
-3. **Открытые задачи** `docs/3. SUP-tasks/T*.md` — какие 🟡 и по каким спекам.
+**Адаптация под проект.** Скилл не знает заранее, в каком проекте запущен. Сначала определи:
+
+- **Префикс** — из имён корневых файлов (`<ПРЕФИКС>-HANDOFF.md`, `<ПРЕФИКС>-CHANGELOG.md`)
+  или из объявленного в `CLAUDE.md` / `AGENTS.md`. Не нашёл — **спроси человека**.
+- **Канон состояния** — один файл текущего состояния: объявленный в `CLAUDE.md`/`AGENTS.md`
+  → `<ПРЕФИКС>-HANDOFF.md` в корне → `docs/<ПРЕФИКС>-HANDOFF.md`. Датированная серия
+  `handoffs/HANDOFF_<дата>.md` — журнал, а не канон.
+
+1. **Канон состояния** (`<ПРЕФИКС>-HANDOFF.md` или объявленный путь) — RESUME-PROMPT наверху,
+   ⚠️ незавершённое, блокеры, git-состояние.
+2. **`<ПРЕФИКС>-CHANGELOG.md`**, секция «Не выпущено» — что закрыто, но ещё не в релизе.
+3. **Открытые задачи** `docs/3. <ПРЕФИКС>-tasks/T*.md` — какие 🟡 и по каким спекам.
 4. **Git**: `git status --short` + `git log --oneline -5` + текущая ветка.
    Расхождение с хендоффом (незакоммиченное, о котором он молчит; ветка не та) — сигнал, назови его.
 5. **`docs/backlog/skill_candidates.md`** — если есть очередь построенных/непостроенных навыков.

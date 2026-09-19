@@ -1,7 +1,7 @@
 ---
 name: spec-writer
 description: >
-  Creates SUP-project documents: specifications (S), tasks (T), and business requirements (BR)
+  Creates project documents: specifications (S), tasks (T), and business requirements (BR)
   following all project conventions. Reads guides at runtime — does not rely on memory.
   Use when the user says "/sup-spec-writer", "создай спеку", "создай задачу",
   "новая спека", "новая задача", "напиши спецификацию", "создай BR",
@@ -34,9 +34,9 @@ If the type is not explicitly specified — **ask one question**:
 
 ```
 Какой документ создать?
-1. Спецификация (S) — docs/2. SUP-specifications/
-2. Задача (T) — docs/3. SUP-tasks/
-3. Бизнес-требование (BR) — docs/1. SUP-business requirements/
+1. Спецификация (S) — docs/2. <ПРЕФИКС>-specifications/
+2. Задача (T) — docs/3. <ПРЕФИКС>-tasks/
+3. Бизнес-требование (BR) — docs/1. <ПРЕФИКС>-business requirements/
 ```
 
 Do not proceed until the user answers.
@@ -45,13 +45,13 @@ Do not proceed until the user answers.
 
 **Always read** (regardless of type):
 ```
-docs/4. SUP-guides/doc_conventions.md
+docs/4. <ПРЕФИКС>-guides/doc_conventions.md
 ```
 
 **Additionally, depending on the type:**
-- If type=S → read `docs/4. SUP-guides/specifications_guide.md`
-- If type=T → read `docs/4. SUP-guides/task_decomposition_guide.md`
-- If type=BR → read `docs/4. SUP-guides/business_requirements_template.md`
+- If type=S → read `docs/4. <ПРЕФИКС>-guides/specifications_guide.md`
+- If type=T → read `docs/4. <ПРЕФИКС>-guides/task_decomposition_guide.md`
+- If type=BR → read `docs/4. <ПРЕФИКС>-guides/business_requirements_template.md`
 
 **Never skip this step** — do not rely on cached knowledge.
 
@@ -61,7 +61,7 @@ docs/4. SUP-guides/doc_conventions.md
 
 Run a glob over both directories:
 ```
-glob docs/2. SUP-specifications/S*.md
+glob docs/2. <ПРЕФИКС>-specifications/S*.md
 glob docs/backlog/S*.md
 ```
 
@@ -74,7 +74,7 @@ Example: if S01, S02, S05, S06 are found → next = S07.
 
 Run a recursive glob:
 ```
-glob docs/3. SUP-tasks/**/T*.md
+glob docs/3. <ПРЕФИКС>-tasks/**/T*.md
 ```
 
 This covers both current tasks and files in `Done/` (nested folders).
@@ -87,7 +87,7 @@ Example: if T01..T55 are found including Done/ → next = T56.
 
 Run a glob:
 ```
-glob docs/1. SUP-business requirements/SUP-BR*.md
+glob docs/1. <ПРЕФИКС>-business requirements/<ПРЕФИКС>-BR*.md
 ```
 
 From the file names, extract the numbers after `BR`.
@@ -125,9 +125,9 @@ Convert the title into `snake_case`:
 
 | Type | Path |
 |-----|------|
-| S | `docs/2. SUP-specifications/SNN_<snake_case>.md` |
-| T | `docs/3. SUP-tasks/TNN_<snake_case>.md` |
-| BR | `docs/1. SUP-business requirements/SUP-BRNN_<snake_case>.md` |
+| S | `docs/2. <ПРЕФИКС>-specifications/SNN_<snake_case>.md` |
+| T | `docs/3. <ПРЕФИКС>-tasks/TNN_<snake_case>.md` |
+| BR | `docs/1. <ПРЕФИКС>-business requirements/<ПРЕФИКС>-BRNN_<snake_case>.md` |
 
 ### Step 7 — Create the skeleton file
 
@@ -182,7 +182,7 @@ The status of a new document is always = `draft`.
 ```markdown
 # TNN. <Название>
 
-**Спецификация:** docs/2. SUP-specifications/SNN_<spec_name>.md
+**Спецификация:** docs/2. <ПРЕФИКС>-specifications/SNN_<spec_name>.md
 **Статус:** draft
 **Дата:** YYYY-MM-DD
 
@@ -208,7 +208,7 @@ The status of a new document is always = `draft`.
 #### Skeleton for a business requirement (BR):
 
 ```markdown
-# SUP-BRNN. <Название>
+# <ПРЕФИКС>-BRNN. <Название>
 
 **Статус:** draft
 **Дата:** YYYY-MM-DD
@@ -252,7 +252,7 @@ The status of a new document is always = `draft`.
 After creating the file, output a summary in the format:
 
 ```
-✅ Создан файл: docs/2. SUP-specifications/S07_my_feature.md
+✅ Создан файл: docs/2. <ПРЕФИКС>-specifications/S07_my_feature.md
 
 Структура:
   - Статус: draft

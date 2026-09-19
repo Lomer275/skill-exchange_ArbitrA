@@ -29,7 +29,7 @@ No questions — do everything in a single pass.
 - Find the file: `glob docs/3. *tasks/T07_*.md`
 
 **If no number is passed**:
-- Read `*HANDOFF.md` (adapt to the project prefix: SUP-, CLB-, ARP-, etc.)
+- Read the project's canonical HANDOFF (prefix discovered from root files or CLAUDE.md/AGENTS.md; ask if absent)
 - Find the first task with status 🟡 in any table
 - Use it — no clarification
 
@@ -44,8 +44,8 @@ Read the task file. Extract:
 ### Step 3 — Determine the Done path
 
 ```
-Done-папка:  docs/3. SUP-tasks/Done/SNN_<spec_name>_done/
-Новый файл:  docs/3. SUP-tasks/Done/SNN_<spec_name>_done/TNN_<task_name>_done.md
+Done-папка:  docs/3. <ПРЕФИКС>-tasks/Done/SNN_<spec_name>_done/
+Новый файл:  docs/3. <ПРЕФИКС>-tasks/Done/SNN_<spec_name>_done/TNN_<task_name>_done.md
 ```
 
 If the Done folder does not exist — create it.
@@ -62,7 +62,7 @@ Add to the top of the task file (after the `# ...` heading):
 ### Step 5 — Move the task file
 
 1. Write the updated content to the new path: `Done/SNN_<spec_name>_done/TNN_<task_name>_done.md`
-2. Delete the source file: `docs/3. SUP-tasks/TNN_<task_name>.md`
+2. Delete the source file: `docs/3. <ПРЕФИКС>-tasks/TNN_<task_name>.md`
 3. If the source task folder has become empty — delete it
 
 ### Step 6 — Update the specification
@@ -80,8 +80,8 @@ Example:
 
 **If all tasks of the specification now have status ✅** — add the suffix `_done` to the spec file name:
 ```
-docs/2. SUP-specifications/S02_hypothesis_prototyping.md
-→ docs/2. SUP-specifications/S02_hypothesis_prototyping_done.md
+docs/2. <ПРЕФИКС>-specifications/S02_hypothesis_prototyping.md
+→ docs/2. <ПРЕФИКС>-specifications/S02_hypothesis_prototyping_done.md
 ```
 
 ### Step 7 — Update HANDOFF.md
@@ -106,12 +106,12 @@ The short description is the first 1–2 sentences from the task description.
 
 Search for the old task path across all `.md` files:
 ```
-grep -r "docs/3. SUP-tasks/TNN_<task_name>.md"
+grep -r "docs/3. <ПРЕФИКС>-tasks/TNN_<task_name>.md"
 ```
 
 For each file found — replace the old path with the new one:
 ```
-docs/3. SUP-tasks/Done/SNN_<spec_name>_done/TNN_<task_name>_done.md
+docs/3. <ПРЕФИКС>-tasks/Done/SNN_<spec_name>_done/TNN_<task_name>_done.md
 ```
 
 If the spec was renamed in step 6 — likewise update all references to it.
@@ -124,11 +124,11 @@ Output a summary:
 ✅ Задача T07 закрыта (2026-03-24)
 
 Файл перенесён:
-  docs/3. SUP-tasks/T07_s02_test_instance_setup.md
-  → docs/3. SUP-tasks/Done/S02_hypothesis_prototyping_done/T07_s02_test_instance_setup_done.md
+  docs/3. <ПРЕФИКС>-tasks/T07_s02_test_instance_setup.md
+  → docs/3. <ПРЕФИКС>-tasks/Done/S02_hypothesis_prototyping_done/T07_s02_test_instance_setup_done.md
 
 Обновлено:
-  ✅ docs/2. SUP-specifications/S02_hypothesis_prototyping.md — статус T07
+  ✅ docs/2. <ПРЕФИКС>-specifications/S02_hypothesis_prototyping.md — статус T07
   ✅ *HANDOFF.md — статус T07
   ✅ *CHANGELOG.md — добавлена запись
 
@@ -145,4 +145,5 @@ If the spec was renamed or HANDOFF was compactified — add a separate line to t
 - Never delete a task without an entry in CHANGELOG
 - If the task file is not found — report an error, do not proceed
 - If the Done folder for this spec already exists — just use it
-- Adapt to the project prefixes (SUP-, CLB-, ARP-, etc.) — take them from HANDOFF/task files
+- The prefix is discovered, never assumed: take it from the root HANDOFF/CHANGELOG file names,
+  from CLAUDE.md/AGENTS.md, or ask the person
