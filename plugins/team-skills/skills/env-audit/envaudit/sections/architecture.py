@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import shutil
 import time
@@ -10,12 +11,16 @@ from envaudit.arch.registry import (
     discover_checks,
     run_checks,
 )
+from envaudit.core.budget import allocate_root_budget
 from envaudit.core.context import Context
 from envaudit.core.runner import is_git_repo
+from envaudit.core.walk import EXCLUDED_DIRS
+from envaudit.core.worktrees import is_linked_worktree
 
 
 NAME = "architecture"
 ORDER = 80
+ROOT_ESTIMATE_DEPTH = 2
 
 DEFINITIONS = {
     "lines": "number of newline bytes plus one for a non-terminated final line",
@@ -85,20 +90,59 @@ def _checks_not_run(document: dict, checks: list) -> list[str]:
     ]
 
 
+def _estimate_root_files(root: Path) -> int:
+    files = 0
+    pending = [(root, 0)]
+    while pending:
+        directory, depth = pending.pop()
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    try:
+                        if entry.is_file(follow_symlinks=False):
+                            files += 1
+                            continue
+                        if (
+                            depth >= ROOT_ESTIMATE_DEPTH
+                            or entry.name in EXCLUDED_DIRS
+                            or not entry.is_dir(follow_symlinks=False)
+                        ):
+                            continue
+                    except OSError:
+                        continue
+                    path = Path(entry.path)
+                    if not is_linked_worktree(path):
+                        pending.append((path, depth + 1))
+        except OSError:
+            continue
+    return files
+
+
+def _root_order(root: Path) -> tuple[int, str, str]:
+    return (_estimate_root_files(root), root.name, str(root))
+
+
+def _output_order(root: Path) -> tuple[str, str]:
+    return (root.name, str(root))
+
+
 def collect(ctx: Context) -> dict:
-    result = {}
+    result: dict[str, dict | None] = {}
     checks = discover_checks()
     root_count = len(ctx.roots)
-    for offset, root in enumerate(ctx.roots):
+    ordered_roots = sorted(ctx.roots, key=_root_order)
+    for offset, root in enumerate(ordered_roots):
         roots_remaining = root_count - offset
         section_remaining = ctx.remaining_seconds()
-        return_reserve = min(1.0, section_remaining * 0.05)
-        root_seconds = min(
+        root_seconds = allocate_root_budget(
+            section_remaining,
+            roots_remaining,
             ctx.flags.arch_root_seconds,
-            max(0.0, section_remaining - return_reserve) / roots_remaining,
         )
         root_deadline = time.monotonic() + root_seconds
         document = _document()
+        if root_count > 1:
+            document["root_budget_seconds"] = round(root_seconds, 6)
         actx = ArchContext(
             ctx=ctx,
             root=root,
@@ -140,4 +184,7 @@ def collect(ctx: Context) -> dict:
             result[str(root.resolve())] = None
         finally:
             _cleanup(actx)
-    return result
+    return {
+        str(root.resolve()): result[str(root.resolve())]
+        for root in sorted(ctx.roots, key=_output_order)
+    }

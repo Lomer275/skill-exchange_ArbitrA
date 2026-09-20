@@ -14,6 +14,9 @@ SECTION_WEIGHTS = {
     "skills": 2,
     "tokens": 2,
 }
+MIN_ROOT_SECONDS = 3.0
+# Root timeouts return partial documents and need a moment to unwind.
+ARCHITECTURE_RETURN_GRACE_SECONDS = 0.1
 
 
 class _SectionBudgetExpired(BaseException):
@@ -22,6 +25,20 @@ class _SectionBudgetExpired(BaseException):
 
 def _weight(module: ModuleType) -> int:
     return SECTION_WEIGHTS.get(module.NAME, 1)
+
+
+def allocate_root_budget(
+    section_remaining: float,
+    roots_remaining: int,
+    root_cap: float,
+    min_root_seconds: float = MIN_ROOT_SECONDS,
+) -> float:
+    if roots_remaining <= 0 or root_cap <= 0 or section_remaining <= 0:
+        return 0.0
+    fair_share = section_remaining / roots_remaining
+    reserve_per_root = min(min_root_seconds, fair_share)
+    reserve = reserve_per_root * (roots_remaining - 1)
+    return min(root_cap, max(0.0, section_remaining - reserve))
 
 
 def _run_with_timeout(function, timeout: float):
@@ -96,7 +113,13 @@ def run_sections(
                 raise _SectionBudgetExpired
             try:
                 sections[module.NAME] = _run_with_timeout(
-                    lambda: module.collect(ctx), section_budget
+                    lambda: module.collect(ctx),
+                    section_budget
+                    + (
+                        ARCHITECTURE_RETURN_GRACE_SECONDS
+                        if module.NAME == "architecture"
+                        else 0.0
+                    ),
                 )
             except Exception as error:
                 ctx.error(module.NAME, type(error).__name__)
