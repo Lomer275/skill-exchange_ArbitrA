@@ -5,13 +5,14 @@ from types import SimpleNamespace
 from envaudit.arch.context import ArchContext, TreeView
 from envaudit.core.context import Context, Flags
 from envaudit.core.worktrees import is_linked_worktree, linked_worktree_children
-from envaudit.sections import architecture
+from envaudit.sections import architecture, secrets
 
 from .arch_builders import (
     isolated_runtime,
     make_linked_worktrees,
     write_systemctl_stub,
 )
+from .canaries import canary
 
 
 def _context(home: Path, roots: list[Path], *, arch_seconds: int = 90) -> Context:
@@ -105,6 +106,23 @@ def test_walks_skip_worktrees(tmp_path):
     assert [entry.rel for entry in entries] == ["outside.canary"]
 
 
+def test_home_walk_skips_worktrees(fake_home, tmp_path):
+    _, worktrees = make_linked_worktrees(
+        tmp_path / "source", fake_home / "linked", count=1
+    )
+    probe = canary("github_token")
+    (fake_home / "outside.canary").write_text(probe, encoding="utf-8")
+    (worktrees[0] / "inside.canary").write_text(probe, encoding="utf-8")
+    ctx = _context(fake_home, [])
+
+    home, _shell, _config = secrets._scan_home_blocks(
+        ctx, fake_home / ".codex"
+    )
+
+    assert home["files_with_matches"] == 1
+    assert home["excluded_worktrees"] == 1
+
+
 def test_runtime_unit_in_worktree_still_reported(
     fake_home, tmp_path, run_collect, isolated_runtime
 ):
@@ -155,8 +173,38 @@ def test_arch_per_root_budget(tmp_path, monkeypatch):
 
     result = architecture.collect(ctx)
 
-    assert "final_check_finished" not in result[str(first.resolve())]
+    assert str(first.resolve()) not in result
     assert result[str(second.resolve())]["final_check_finished"] is True
+    assert {
+        "section": "architecture",
+        "reason": "budget",
+        "details": str(first),
+    } in ctx.skipped
+
+
+def test_arch_budget_starts_before_repo_check(tmp_path, monkeypatch):
+    first = tmp_path / "slow"
+    second = tmp_path / "fast"
+    first.mkdir()
+    second.mkdir()
+
+    def slow_repo_check(root):
+        if root == first:
+            time.sleep(5)
+        return False
+
+    def finish(actx):
+        actx.out["finished"] = True
+
+    checks = [SimpleNamespace(KEY="finish", ORDER=1, run=finish)]
+    monkeypatch.setattr(architecture, "discover_checks", lambda: checks)
+    monkeypatch.setattr(architecture, "is_git_repo", slow_repo_check)
+    ctx = _context(tmp_path, [first, second], arch_seconds=1)
+
+    result = architecture.collect(ctx)
+
+    assert str(first.resolve()) not in result
+    assert result[str(second.resolve())]["finished"] is True
     assert {
         "section": "architecture",
         "reason": "budget",

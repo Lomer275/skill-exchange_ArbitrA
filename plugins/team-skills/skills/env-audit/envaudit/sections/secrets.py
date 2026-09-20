@@ -12,7 +12,7 @@ import tarfile
 import time
 import zipfile
 
-from envaudit.core import patterns
+from envaudit.core import patterns, worktrees
 from envaudit.core.context import Context
 from envaudit.core.controls import positive_control
 from envaudit.core.dockerignore import load_matcher
@@ -873,6 +873,7 @@ def _summary_entries(
     *,
     exclude_dirs: frozenset[str],
     exclude_paths: tuple[Path, ...],
+    excluded_worktrees: list[Path] | None,
     max_depth: int | None,
 ):
     root = Path(os.path.abspath(root))
@@ -899,6 +900,12 @@ def _summary_entries(
         for dirname in sorted(dirs):
             candidate = Path(os.path.abspath(current_path / dirname))
             if dirname in exclude_dirs or candidate in blocked:
+                continue
+            if (
+                excluded_worktrees is not None
+                and worktrees.is_linked_worktree(candidate)
+            ):
+                excluded_worktrees.append(candidate)
                 continue
             kept_dirs.append(dirname)
         dirs[:] = kept_dirs if max_depth is None or depth < max_depth else []
@@ -939,6 +946,7 @@ def _scan_tree_summary(
     max_depth: int | None = None,
     home_prefix: bool = False,
     include_generic: bool,
+    exclude_worktrees: bool = False,
     budget_deadline: float | None = None,
     budget_details: str | None = None,
 ) -> dict:
@@ -946,13 +954,17 @@ def _scan_tree_summary(
     files_scanned = 0
     matched_files = 0
     truncated = False
+    excluded_worktrees: list[Path] | None = [] if exclude_worktrees else None
     if not root.is_dir():
-        return {
+        result = {
             "files_scanned": 0,
             "files_with_matches": 0,
             "by_class": {},
             "truncated": False,
         }
+        if excluded_worktrees is not None:
+            result["excluded_worktrees"] = 0
+        return result
 
     def budget_expired() -> bool:
         now = time.time()
@@ -966,6 +978,7 @@ def _scan_tree_summary(
         ctx,
         exclude_dirs=HOME_EXCLUDED_DIRS,
         exclude_paths=exclude_paths,
+        excluded_worktrees=excluded_worktrees,
         max_depth=max_depth,
     ):
         stopped_at = current_dir
@@ -1010,6 +1023,8 @@ def _scan_tree_summary(
         "by_class": by_class,
         "truncated": truncated,
     }
+    if excluded_worktrees is not None:
+        result["excluded_worktrees"] = len(excluded_worktrees)
     if truncated:
         result["stopped_at"] = stopped_at
     return result
@@ -1030,6 +1045,7 @@ def _scan_home_blocks(
         max_depth=6,
         home_prefix=True,
         include_generic=False,
+        exclude_worktrees=True,
         budget_deadline=home_deadline,
         budget_details="home" if home_deadline is not None else None,
     )

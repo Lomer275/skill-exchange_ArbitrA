@@ -1,9 +1,15 @@
 from pathlib import Path
 import shutil
+import time
 
 from envaudit import DEFINITIONS_VERSION
 from envaudit.arch.context import ArchContext
-from envaudit.arch.registry import discover_checks, run_checks
+from envaudit.arch.registry import (
+    _RootBudgetExpired,
+    _run_with_timeout,
+    discover_checks,
+    run_checks,
+)
 from envaudit.core.context import Context
 from envaudit.core.runner import is_git_repo
 
@@ -57,21 +63,58 @@ def _cleanup(actx: ArchContext) -> None:
             shutil.rmtree(path, ignore_errors=True)
 
 
+def _detect_vcs(actx: ArchContext) -> None:
+    actx.vcs = is_git_repo(actx.root)
+
+
+def _root_budget_skipped(ctx: Context, offset: int, root: Path) -> bool:
+    expected = {
+        "section": NAME,
+        "reason": "budget",
+        "details": str(root),
+    }
+    return expected in ctx.skipped[offset:]
+
+
 def collect(ctx: Context) -> dict:
     result = {}
     checks = discover_checks()
     for root in ctx.roots:
+        root_deadline = time.monotonic() + ctx.flags.arch_root_seconds
         document = _document()
         actx = ArchContext(
             ctx=ctx,
             root=root,
-            vcs=is_git_repo(root),
+            vcs=False,
             out=document,
             rule_inputs=document["rule_inputs"],
         )
+        skipped_offset = len(ctx.skipped)
         try:
-            run_checks(actx, checks)
-            result[str(root.resolve())] = document
+            _run_with_timeout(
+                _detect_vcs,
+                actx,
+                root_deadline - time.monotonic(),
+            )
+            configured_seconds = ctx.flags.arch_root_seconds
+            ctx.flags.arch_root_seconds = max(
+                0.0, root_deadline - time.monotonic()
+            )
+            try:
+                run_checks(actx, checks)
+            finally:
+                ctx.flags.arch_root_seconds = configured_seconds
+            if (
+                not _root_budget_skipped(ctx, skipped_offset, root)
+                and time.monotonic() >= root_deadline
+            ):
+                ctx.skip(NAME, "budget", details=str(root))
+                ctx.mark_truncated()
+            if not _root_budget_skipped(ctx, skipped_offset, root):
+                result[str(root.resolve())] = document
+        except _RootBudgetExpired:
+            ctx.skip(NAME, "budget", details=str(root))
+            ctx.mark_truncated()
         except Exception as error:
             ctx.error(NAME, type(error).__name__)
             result[str(root.resolve())] = None
