@@ -1,0 +1,5 @@
+{
+  "$id": "urn:env-audit:arch:checks_not_run",
+  "type": "array",
+  "items": {"type": "string"}
+}

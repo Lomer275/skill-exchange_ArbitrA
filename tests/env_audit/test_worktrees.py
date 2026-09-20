@@ -150,11 +150,14 @@ def test_runtime_unit_in_worktree_still_reported(
     assert arch["runtime"]["live_units"][0]["entry"].endswith("app.py")
 
 
-def test_arch_per_root_budget(tmp_path, monkeypatch):
+def test_budget_keeps_partial_document(tmp_path, monkeypatch):
     first = tmp_path / "slow"
     second = tmp_path / "fast"
     first.mkdir()
     second.mkdir()
+
+    def early_check(actx):
+        actx.out["early_check_finished"] = True
 
     def slow_check(actx):
         if actx.root == first:
@@ -165,15 +168,20 @@ def test_arch_per_root_budget(tmp_path, monkeypatch):
         actx.out["final_check_finished"] = True
 
     checks = [
-        SimpleNamespace(KEY="slow", ORDER=1, run=slow_check),
-        SimpleNamespace(KEY="final", ORDER=2, run=final_check),
+        SimpleNamespace(KEY="early", ORDER=1, run=early_check),
+        SimpleNamespace(KEY="slow", ORDER=2, run=slow_check),
+        SimpleNamespace(KEY="final", ORDER=3, run=final_check),
     ]
     monkeypatch.setattr(architecture, "discover_checks", lambda: checks)
     ctx = _context(tmp_path, [first, second], arch_seconds=1)
 
     result = architecture.collect(ctx)
 
-    assert str(first.resolve()) not in result
+    partial = result[str(first.resolve())]
+    assert partial["early_check_finished"] is True
+    assert "slow_check_finished" not in partial
+    assert "final_check_finished" not in partial
+    assert partial["checks_not_run"] == ["final"]
     assert result[str(second.resolve())]["final_check_finished"] is True
     assert {
         "section": "architecture",
@@ -203,7 +211,7 @@ def test_arch_budget_starts_before_repo_check(tmp_path, monkeypatch):
 
     result = architecture.collect(ctx)
 
-    assert str(first.resolve()) not in result
+    assert result[str(first.resolve())]["checks_not_run"] == ["finish"]
     assert result[str(second.resolve())]["finished"] is True
     assert {
         "section": "architecture",

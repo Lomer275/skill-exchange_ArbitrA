@@ -25,7 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--scan-file", type=Path)
     parser.add_argument("--budget-seconds", type=int, default=300)
-    parser.add_argument("--arch-root-seconds", type=int, default=90)
+    # Measured on 20.09: a 99k-line project takes ~115s; allow for slower machines.
+    parser.add_argument("--arch-root-seconds", type=int, default=240)
     parser.add_argument("--max-text-mb", type=int, default=2)
     parser.add_argument("--max-hash-mb", type=int, default=20)
     parser.add_argument("--pytest-collect", action="store_true")

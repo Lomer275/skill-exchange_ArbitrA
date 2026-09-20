@@ -76,6 +76,15 @@ def _root_budget_skipped(ctx: Context, offset: int, root: Path) -> bool:
     return expected in ctx.skipped[offset:]
 
 
+def _checks_not_run(document: dict, checks: list) -> list[str]:
+    timings = document.get("timings_s", {})
+    return [
+        check.KEY
+        for check in sorted(checks, key=lambda item: (item.ORDER, item.KEY))
+        if check.KEY not in timings
+    ]
+
+
 def collect(ctx: Context) -> dict:
     result = {}
     checks = discover_checks()
@@ -110,11 +119,14 @@ def collect(ctx: Context) -> dict:
             ):
                 ctx.skip(NAME, "budget", details=str(root))
                 ctx.mark_truncated()
-            if not _root_budget_skipped(ctx, skipped_offset, root):
-                result[str(root.resolve())] = document
+            if _root_budget_skipped(ctx, skipped_offset, root):
+                document["checks_not_run"] = _checks_not_run(document, checks)
+            result[str(root.resolve())] = document
         except _RootBudgetExpired:
             ctx.skip(NAME, "budget", details=str(root))
             ctx.mark_truncated()
+            document["checks_not_run"] = _checks_not_run(document, checks)
+            result[str(root.resolve())] = document
         except Exception as error:
             ctx.error(NAME, type(error).__name__)
             result[str(root.resolve())] = None
