@@ -88,8 +88,16 @@ def _checks_not_run(document: dict, checks: list) -> list[str]:
 def collect(ctx: Context) -> dict:
     result = {}
     checks = discover_checks()
-    for root in ctx.roots:
-        root_deadline = time.monotonic() + ctx.flags.arch_root_seconds
+    root_count = len(ctx.roots)
+    for offset, root in enumerate(ctx.roots):
+        roots_remaining = root_count - offset
+        section_remaining = ctx.remaining_seconds()
+        return_reserve = min(1.0, section_remaining * 0.05)
+        root_seconds = min(
+            ctx.flags.arch_root_seconds,
+            max(0.0, section_remaining - return_reserve) / roots_remaining,
+        )
+        root_deadline = time.monotonic() + root_seconds
         document = _document()
         actx = ArchContext(
             ctx=ctx,

@@ -382,6 +382,18 @@ def load_index(ctx: Context) -> TranscriptIndex:
     if isinstance(cached, TranscriptIndex):
         return cached
 
+    build_started = time.perf_counter()
+    try:
+        return _build_index(ctx)
+    finally:
+        elapsed = time.perf_counter() - build_started
+        previous = ctx.shared.get("index_build_seconds", 0.0)
+        if not isinstance(previous, (int, float)):
+            previous = 0.0
+        ctx.shared["index_build_seconds"] = previous + elapsed
+
+
+def _build_index(ctx: Context) -> TranscriptIndex:
     window_days = window_days_effective(ctx.home)
     now = time.time()
     since = now - window_days * _DAY

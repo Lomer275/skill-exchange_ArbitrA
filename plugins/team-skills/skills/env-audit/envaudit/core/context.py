@@ -20,7 +20,7 @@ SKIP_REASONS = (
 
 @dataclass
 class Flags:
-    budget_seconds: int = 300
+    budget_seconds: int = 900
     arch_root_seconds: int = 90
     max_text_mb: int = 2
     max_hash_mb: int = 20
@@ -42,6 +42,8 @@ class Context:
     errors: list[dict] = field(default_factory=list)
     truncated: bool = False
     shared: dict[str, object] = field(default_factory=dict)
+    section_deadline: float | None = None
+    section_budget_seconds: float | None = None
 
     def skip(self, section: str, reason: str, details: str | None = None) -> None:
         if reason not in SKIP_REASONS:
@@ -54,7 +56,13 @@ class Context:
         self.errors.append({"section": section, "kind": kind})
 
     def expired(self) -> bool:
-        return time.time() >= self.deadline
+        return self.remaining_seconds() <= 0
+
+    def remaining_seconds(self) -> float:
+        deadline = self.deadline
+        if self.section_deadline is not None:
+            deadline = min(deadline, self.section_deadline)
+        return max(0.0, deadline - time.time())
 
     def mark_truncated(self) -> None:
         self.truncated = True

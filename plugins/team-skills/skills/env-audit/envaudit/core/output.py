@@ -19,6 +19,11 @@ def build_document(
     roots: list[dict],
     flags_view: dict,
 ) -> dict:
+    duration = round(max(0.0, time.time() - ctx.started_at), 6)
+    budget_spent = duration if durations else 0.0
+    index_build_seconds = ctx.shared.get("index_build_seconds", 0.0)
+    if not isinstance(index_build_seconds, (int, float)):
+        index_build_seconds = 0.0
     return {
         "collector_version": COLLECTOR_VERSION,
         "definitions_version": DEFINITIONS_VERSION,
@@ -26,11 +31,15 @@ def build_document(
             "started_at": datetime.fromtimestamp(
                 ctx.started_at, timezone.utc
             ).isoformat().replace("+00:00", "Z"),
-            "duration_s": round(max(0.0, time.time() - ctx.started_at), 6),
+            "duration_s": duration,
             "python": platform.python_version(),
             "flags": flags_view,
             "section_order": list(sections),
             "section_durations_s": durations,
+            "section_durations": durations,
+            "index_build_seconds": round(index_build_seconds, 6),
+            "budget_seconds": ctx.flags.budget_seconds,
+            "budget_spent_seconds": budget_spent,
         },
         "host": host,
         "roots": roots,

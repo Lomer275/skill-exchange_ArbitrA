@@ -28,7 +28,11 @@
         "python",
         "flags",
         "section_order",
-        "section_durations_s"
+        "section_durations_s",
+        "section_durations",
+        "index_build_seconds",
+        "budget_seconds",
+        "budget_spent_seconds"
       ],
       "properties": {
         "started_at": {"type": "string", "format": "date-time"},
@@ -64,7 +68,14 @@
         "section_durations_s": {
           "type": "object",
           "additionalProperties": {"type": "number", "minimum": 0}
-        }
+        },
+        "section_durations": {
+          "type": "object",
+          "additionalProperties": {"type": "number", "minimum": 0}
+        },
+        "index_build_seconds": {"type": "number", "minimum": 0},
+        "budget_seconds": {"type": "integer", "minimum": 0},
+        "budget_spent_seconds": {"type": "number", "minimum": 0}
       }
     },
     "host": {

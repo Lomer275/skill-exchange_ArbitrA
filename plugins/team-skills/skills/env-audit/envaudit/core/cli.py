@@ -8,13 +8,14 @@ import sys
 import time
 
 from envaudit.core.bundle import build_bundle
+from envaudit.core.budget import run_sections
 from envaudit.core.context import Context, Flags
 from envaudit.core.host import collect_host
 from envaudit.core.output import build_document, emit, finalize, prepare_output
 from envaudit.core.redact import scan_file
 from envaudit.core.runner import run, which
 from envaudit.core.worktrees import is_linked_worktree, linked_worktree_children
-from envaudit.sections import discover, run_sections
+from envaudit.sections import discover
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,7 +25,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--expect-user")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--scan-file", type=Path)
-    parser.add_argument("--budget-seconds", type=int, default=300)
+    # On 20.09, a full 25-project run needed about 350s: architecture 149s,
+    # secrets 67s, and the shared transcript index about 60s. The old 300s
+    # ceiling only worked while architecture was effectively idle. Typical
+    # 5-7-project runs still finish within 300s; the budget is a ceiling.
+    parser.add_argument("--budget-seconds", type=int, default=900)
     # Measured on 20.09: a 99k-line project takes ~115s; allow for slower machines.
     parser.add_argument("--arch-root-seconds", type=int, default=240)
     parser.add_argument("--max-text-mb", type=int, default=2)
