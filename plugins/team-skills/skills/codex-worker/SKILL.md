@@ -140,7 +140,7 @@ fi
 ```text
 CONTEXT: WORKER
 ROLE: <role>
-ORCHESTRATOR: Claude Code в проекте Arbitra_support (SUP).
+ORCHESTRATOR: Claude Code в проекте <имя проекта>.
 
 TASK_FILE: <task_file>            # либо
 BRIEF_FILE: <brief_file>          # одно из двух — что передано

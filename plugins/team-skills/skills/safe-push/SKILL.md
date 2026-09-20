@@ -63,7 +63,7 @@ Do not continue under any circumstances, even if the user asks.
 
 ### Step 2 — Building the commit message
 
-Read `docs/4. SUP-guides/versioning_guidelines.md` (at RUNTIME, not from memory) — for the project's current Conventional Commits format.
+Read `docs/4. <ПРЕФИКС>-guides/versioning_guidelines.md` (at RUNTIME, not from memory) — for the project's current Conventional Commits format.
 
 **Commit format per Conventional Commits:**
 ```

@@ -2,7 +2,7 @@
 name: init_dev
 description: >
   Creates the base documentation structure for a new project: docs/ folders, guides,
-  SUP-architecture.md, SUP-HANDOFF.md, SUP-CHANGELOG.md, CLAUDE.md.
+  <ПРЕФИКС>-architecture.md, <ПРЕФИКС>-HANDOFF.md, <ПРЕФИКС>-CHANGELOG.md, CLAUDE.md.
   Use when the user says "/init_dev", "инициализируй проект",
   "создай структуру документации", "новый проект", "init project docs".
 ---
@@ -38,8 +38,8 @@ Wait for the user's response before continuing.
 ### Step 2 — Determine the numbering
 
 Check existing files:
-- `glob docs/2. SUP-specifications/**/*.md` → find the maximum SNN
-- `glob docs/3. SUP-tasks/**/*.md` → find the maximum TNN
+- `glob docs/2. <ПРЕФИКС>-specifications/**/*.md` → find the maximum SNN
+- `glob docs/3. <ПРЕФИКС>-tasks/**/*.md` → find the maximum TNN
 
 If there are no files — start from S01 / T01.
 If there are — the next number = max + 1.
@@ -67,7 +67,7 @@ Create a `.gitkeep` in empty folders so that git tracks them.
 
 ### Step 4 — Copy the guides
 
-Read each file from `docs/4. SUP-guides/` of the current repo and write it to `docs/4. PREFIX-guides/` of the new project:
+Read each file from `docs/4. <ПРЕФИКС>-guides/` of the current repo and write it to `docs/4. PREFIX-guides/` of the new project:
 
 - `doc_conventions.md`
 - `specifications_guide.md`
@@ -81,7 +81,7 @@ When copying, replace all mentions of `SUP` with the new PREFIX in the text of t
 
 ---
 
-### Step 5 — Create SUP-architecture.md
+### Step 5 — Create <ПРЕФИКС>-architecture.md
 
 Use the user's answers from step 1. Create the file `PREFIX-architecture.md`:
 

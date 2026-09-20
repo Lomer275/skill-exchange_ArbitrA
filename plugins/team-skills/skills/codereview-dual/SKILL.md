@@ -69,7 +69,7 @@ If `available=false` — graceful fallback to single-review (see Step 5 fallback
 
 ### Step 1 — Gather context
 
-1. Find the task file: glob `docs/3. SUP-tasks/T<NN>_*.md` (or from HANDOFF).
+1. Find the task file: glob `docs/3. <ПРЕФИКС>-tasks/T<NN>_*.md` (or from HANDOFF).
 2. Read the task file: acceptance criteria, description, affected files.
 3. Determine the specification path (from the `**Спецификация:**` line).
 4. Read the changed code files (if listed or provided).
@@ -83,7 +83,7 @@ If the code is not provided and not specified in the task — ask the user to at
 In a single message (without delays):
 
 ```
-Skill(skill="codex-worker", args="role=reviewer task_file=docs/3. SUP-tasks/T<NN>_<name>.md spec_file=docs/2. SUP-specifications/S<NN>_<name>.md scope=read-only lens=correctness,edge-cases,risks timeout_min=5 task_id=T<NN>")
+Skill(skill="codex-worker", args="role=reviewer task_file=docs/3. <ПРЕФИКС>-tasks/T<NN>_<name>.md spec_file=docs/2. <ПРЕФИКС>-specifications/S<NN>_<name>.md scope=read-only lens=correctness,edge-cases,risks timeout_min=5 task_id=T<NN>")
 ```
 
 **Codex lens:** `correctness`, `edge-cases`, `risks` — **different from Claude's**, to provide a complementary signal.
@@ -167,7 +167,7 @@ Use only your own findings, with a marker in the table header `[fallback: claude
 
 ### Step 6 — Write to the task file
 
-In the task file (`docs/3. SUP-tasks/T<NN>_*.md`) add/update the section:
+In the task file (`docs/3. <ПРЕФИКС>-tasks/T<NN>_*.md`) add/update the section:
 
 ```markdown
 ## Code Review (dual)
@@ -199,7 +199,7 @@ If the section already existed — add a new one (don't overwrite old reviews), 
 **Sources:** [both]: <count> | [claude]: <count> | [codex]: <count>
 **Severity disagreements:** <count> [severity-disputed]
 
-**Task file updated:** docs/3. SUP-tasks/T<NN>_*.md (section `## Code Review (dual)`)
+**Task file updated:** docs/3. <ПРЕФИКС>-tasks/T<NN>_*.md (section `## Code Review (dual)`)
 
 **Next step:**
 - If there are CRITICAL/HIGH — run `/fix` or `/review-loop`.

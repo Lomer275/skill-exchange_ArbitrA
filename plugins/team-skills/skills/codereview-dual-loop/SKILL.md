@@ -197,4 +197,4 @@ After the fixes are done — return to Step 2 (the next iteration).
 - `/review-loop` — a loop with a routing choice of dual/single.
 - `/fix` — applying fixes from the review table.
 - `/codex-toggle` — kill-switch for the Claude × Codex bundle.
-- Spec S11: [docs/2. SUP-specifications/S11_claude_codex_orchestration_done.md](../../docs/2.%20SUP-specifications/S11_claude_codex_orchestration_done.md)
+- Spec S11: спецификация S11 «Claude × Codex orchestration» в документации вашего проекта

@@ -42,9 +42,9 @@ If `available=false` — STOP with a suggestion to use `/sprint` (classic).
 
 ### Step 1 — Parsing the spec
 
-1. Read `docs/2. SUP-specifications/S<NN>_*.md`.
+1. Read `docs/2. <ПРЕФИКС>-specifications/S<NN>_*.md`.
 2. Extract the task table: `ID`, `Зависит от`, `Фаза`, `Статус`.
-3. For each draft task, read the file (`docs/3. SUP-tasks/T<NN>_*.md`):
+3. For each draft task, read the file (`docs/3. <ПРЕФИКС>-tasks/T<NN>_*.md`):
    - Acceptance criteria.
    - Affected files (from the text or an explicit section).
 
@@ -139,7 +139,7 @@ To chat, for each task: "Created worktree T<NN>: $WT_PATH".
 In **a single message** (for true parallelism), make N calls:
 
 ```
-Skill(skill="codex-worker", args="role=implementer task_file=docs/3. SUP-tasks/T<NN>_<name>.md spec_file=docs/2. SUP-specifications/S<NN>_<name>.md worktree=<WT_PATH-or-current> scope=edit:<paths> timeout_min=10 task_id=T<NN>")
+Skill(skill="codex-worker", args="role=implementer task_file=docs/3. <ПРЕФИКС>-tasks/T<NN>_<name>.md spec_file=docs/2. <ПРЕФИКС>-specifications/S<NN>_<name>.md worktree=<WT_PATH-or-current> scope=edit:<paths> timeout_min=10 task_id=T<NN>")
 ```
 
 Save all task_id and output_file values for each worker.

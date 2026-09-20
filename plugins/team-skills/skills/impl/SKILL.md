@@ -43,7 +43,7 @@ Claude does the thinking; Codex only types.
 
 ### Step 0 — Routing checks
 
-1. **Kill-switch.** Read `.claude/codex.json:enabled` + env `SUP_CODEX_ENABLED` (precedence matrix: recognized env value wins, else file — see [runbook_codex_routing.md](../../../docs/4.%20SUP-guides/runbook_codex_routing.md)).
+1. **Kill-switch.** Read `.claude/codex.json:enabled` + env `SUP_CODEX_ENABLED` (precedence matrix: recognized env value wins, else file — see [runbook_codex_routing.md](../../../docs/4.%20<ПРЕФИКС>-guides/runbook_codex_routing.md)).
 2. **Availability.** `availability_cache` fresh (≤ 1h) → use it; otherwise re-check the binary + a smoke run.
 3. **CLI version** ≥ 0.143.0 (`codex --version`) — older CLIs race the OAuth refresh under parallel workers.
 
@@ -158,13 +158,13 @@ One screen:
 - **The exceptions pocket is narrow and must be announced out loud:** Codex unavailable · ≤3-line obvious edit in an already-open file · second Codex miss on the same change · the change requires live dialogue with the user mid-edit · `--self`.
 - **Never delegate a brief you could not implement yourself.** If you cannot specify it, you have not understood it — go back to Step 1.
 - **Never trust `touchedFiles`** from the companion engine — determine the changed files via `git`.
-- Codex does not commit, does not touch `.env*`, `SUP-CHANGELOG.md`, `SUP-HANDOFF.md` or `docs/3. SUP-tasks/Done/` — enforced by `AGENTS.md`, restated in the brief when the scope is near them.
+- Codex does not commit, does not touch `.env*`, `<ПРЕФИКС>-CHANGELOG.md`, `<ПРЕФИКС>-HANDOFF.md` or `docs/3. <ПРЕФИКС>-tasks/Done/` — enforced by `AGENTS.md`, restated in the brief when the scope is near them.
 
 ---
 
 ## Related
 
-- [runbook_codex_routing.md](../../../docs/4.%20SUP-guides/runbook_codex_routing.md) — the routing matrix and the division-of-labour law.
+- [runbook_codex_routing.md](../../../docs/4.%20<ПРЕФИКС>-guides/runbook_codex_routing.md) — the routing matrix and the division-of-labour law.
 - `/sprint-codex` — the same delegation, but spec-driven with waves and worktrees.
 - `/fix` — applies findings from `/codereview*` (delegates to Codex the same way).
 - `/codereview-dual` — Codex as reviewer, not implementer.

@@ -35,11 +35,11 @@ If the person already has a **complete spec description** (in a single message: 
 
 Don't rely on memory. **Read these files** before starting:
 
-1. `docs/4. SUP-guides/specifications_guide.md` — spec structure
-2. `docs/4. SUP-guides/doc_conventions.md` — naming, numbering
-3. `docs/4. SUP-guides/business_requirements_template.md` — if the spec is high-level and needs a BR linkage
-4. `SUP-architecture.md` — where the new spec fits into the overall picture
-5. `SUP-HANDOFF.md` — what's in progress right now (not duplicating?)
+1. `docs/4. <ПРЕФИКС>-guides/specifications_guide.md` — spec structure
+2. `docs/4. <ПРЕФИКС>-guides/doc_conventions.md` — naming, numbering
+3. `docs/4. <ПРЕФИКС>-guides/business_requirements_template.md` — if the spec is high-level and needs a BR linkage
+4. `<ПРЕФИКС>-architecture.md` — where the new spec fits into the overall picture
+5. `<ПРЕФИКС>-HANDOFF.md` — what's in progress right now (not duplicating?)
 
 This is your context. Don't relay it to the user — just use it when formulating questions.
 
@@ -115,7 +115,7 @@ At this point you have the problem, the goal, and the boundaries. Time to sketch
 
 4. **What could go wrong?** Name 2-3 risks off the top of your head — needed for the DoD section.
 
-If the person is stuck — **offer 2-3 architectural options** based on what you read in `SUP-architecture.md`, and ask them to choose. Don't make things up — use the project's patterns.
+If the person is stuck — **offer 2-3 architectural options** based on what you read in `<ПРЕФИКС>-architecture.md`, and ask them to choose. Don't make things up — use the project's patterns.
 
 ---
 
@@ -173,7 +173,7 @@ Now you have in your context:
 - <criterion 2>
 
 ## Связанные документы
-- <SUP-BRNN_xxx если применимо>
+- <<ПРЕФИКС>-BRNN_xxx если применимо>
 - <ссылки на прошлые SNN>
 ```
 
@@ -191,14 +191,14 @@ Call contract (in a single message to it):
 ```
 Create a new specification from the following draft.
 Status: draft (not active!) — human confirmation is required before launching tasks.
-Next SNN number — determine it by scanning docs/2. SUP-specifications/ + docs/backlog/.
+Next SNN number — determine it by scanning docs/2. <ПРЕФИКС>-specifications/ + docs/backlog/.
 
 <insert the entire summary from Phase 5>
 ```
 
 After /sup-spec-writer returns the file — **read it** and show the person:
 ```
-✅ Spec created: docs/2. SUP-specifications/SNN_<slug>.md
+✅ Spec created: docs/2. <ПРЕФИКС>-specifications/SNN_<slug>.md
    Status: draft
 
 Next steps:
