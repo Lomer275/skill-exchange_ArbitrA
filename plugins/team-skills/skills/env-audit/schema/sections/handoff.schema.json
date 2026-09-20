@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:env-audit:section:handoff",
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": ["roots"],
+  "$defs": {
+    "dated_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "date", "date_source", "date_trust"],
+      "properties": {
+        "path": {"type": "string"},
+        "date": {"type": ["string", "null"], "format": "date"},
+        "date_source": {"enum": ["git", "name", "header", "mtime", null]},
+        "date_trust": {"enum": ["high", "medium", "low", null]}
+      }
+    },
+    "canon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "rule", "date", "date_source", "date_trust", "dirty"],
+      "properties": {
+        "path": {"type": "string"},
+        "rule": {"enum": ["declared", "root", "docs"]},
+        "date": {"type": ["string", "null"], "format": "date"},
+        "date_source": {"enum": ["git", "name", "header", "mtime", null]},
+        "date_trust": {"enum": ["high", "medium", "low", null]},
+        "dirty": {"type": ["boolean", "null"]}
+      }
+    },
+    "last": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["date", "source", "trust"],
+      "properties": {
+        "date": {"type": ["string", "null"], "format": "date"},
+        "source": {"enum": ["name", "header", "mtime", null]},
+        "trust": {"enum": ["high", "medium", "low", null]}
+      }
+    },
+    "journal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["glob", "declared_in", "files", "last"],
+      "properties": {
+        "glob": {"type": "string"},
+        "declared_in": {"type": "string"},
+        "files": {"type": "integer", "minimum": 0},
+        "last": {
+          "anyOf": [
+            {"$ref": "#/$defs/last"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canon", "journals"],
+      "properties": {
+        "canon": {
+          "anyOf": [
+            {"$ref": "#/$defs/canon"},
+            {"type": "null"}
+          ]
+        },
+        "journals": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/journal"}
+        }
+      }
+    },
+    "resolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["qualified", "source", "path"],
+      "properties": {
+        "qualified": {"type": "string"},
+        "source": {"enum": ["managed", "user", "project", "user_command", "project_command"]},
+        "path": {"type": "string"}
+      }
+    },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resolves_to", "also_listed_as", "invoked_window", "last_invoked_at", "resolution_varies_by_cwd"],
+      "properties": {
+        "resolves_to": {
+          "anyOf": [
+            {"$ref": "#/$defs/resolved"},
+            {"type": "null"}
+          ]
+        },
+        "also_listed_as": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "invoked_window": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "last_invoked_at": {"type": ["string", "null"], "format": "date"},
+        "resolution_varies_by_cwd": {"type": "boolean"}
+      }
+    },
+    "write": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "kind", "line", "confidence", "writes_canon", "writes_journal", "outside_root", "match"],
+      "properties": {
+        "target": {"type": "string"},
+        "kind": {"enum": ["HANDOFF", "CHANGELOG", "OTHER"]},
+        "line": {"type": "integer", "minimum": 1},
+        "confidence": {"enum": ["verb_on_line", "mention_only"]},
+        "writes_canon": {"type": ["boolean", "null"]},
+        "writes_journal": {"type": "boolean"},
+        "outside_root": {"type": "boolean"},
+        "match": {"enum": ["exact", "generic", null]}
+      }
+    }
+  },
+  "properties": {
+    "roots": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["prefix", "canon", "journals", "candidates", "changelog", "project_active", "vcs", "skills", "close_writes", "codex_close_writes", "accept_writes", "close_writes_canon", "changelog_written_by"],
+        "properties": {
+          "prefix": {"type": ["string", "null"]},
+          "canon": {
+            "anyOf": [
+              {"$ref": "#/$defs/canon"},
+              {"type": "null"}
+            ]
+          },
+          "journals": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/journal"}
+          },
+          "candidates": {
+            "type": "array",
+            "items": {"$ref": "#/$defs/dated_file"}
+          },
+          "changelog": {"$ref": "#/$defs/document"},
+          "project_active": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "basis", "last_change_at"],
+            "properties": {
+              "value": {"type": "boolean"},
+              "basis": {"enum": ["git", "git+worktree", "dated_files", "mtime"]},
+              "last_change_at": {"type": ["string", "null"], "format": "date"}
+            }
+          },
+          "vcs": {"type": "boolean"},
+          "skills": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["close", "intro", "accept"],
+            "properties": {
+              "close": {"$ref": "#/$defs/skill"},
+              "intro": {"$ref": "#/$defs/skill"},
+              "accept": {"$ref": "#/$defs/skill"}
+            }
+          },
+          "close_writes": {"type": "array", "items": {"$ref": "#/$defs/write"}},
+          "codex_close_writes": {"type": "array", "items": {"$ref": "#/$defs/write"}},
+          "accept_writes": {"type": "array", "items": {"$ref": "#/$defs/write"}},
+          "close_writes_canon": {"type": ["boolean", "null"]},
+          "changelog_written_by": {
+            "type": "array",
+            "items": {"enum": ["accept", "close", "agents_md_codex"]},
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}

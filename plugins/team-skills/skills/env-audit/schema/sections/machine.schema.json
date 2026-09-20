@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:env-audit:section:machine",
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": [
+    "os",
+    "cgroup",
+    "memory",
+    "tools",
+    "projects",
+    "claude_settings",
+    "mcp",
+    "agent_stack",
+    "disk",
+    "cleanup_candidates",
+    "backups"
+  ],
+  "properties": {
+    "os": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kernel", "distro", "uptime_s"],
+      "properties": {
+        "kernel": {"type": "string"},
+        "distro": {"type": ["string", "null"]},
+        "uptime_s": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "cgroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory_max_mb", "memory_high_mb", "cpu_max", "pids_max", "events_high", "events_max", "oom_kill", "dropins"],
+      "properties": {
+        "memory_max_mb": {"type": ["integer", "null"], "minimum": 0},
+        "memory_high_mb": {"type": ["integer", "null"], "minimum": 0},
+        "cpu_max": {"type": ["string", "null"]},
+        "pids_max": {"type": ["integer", "null"], "minimum": 0},
+        "events_high": {"type": ["integer", "null"], "minimum": 0},
+        "events_max": {"type": ["integer", "null"], "minimum": 0},
+        "oom_kill": {"type": ["integer", "null"], "minimum": 0},
+        "dropins": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total_mb", "available_mb", "swap_total_mb", "swap_used_mb", "zram"],
+      "properties": {
+        "total_mb": {"type": ["integer", "null"], "minimum": 0},
+        "available_mb": {"type": ["integer", "null"], "minimum": 0},
+        "swap_total_mb": {"type": ["integer", "null"], "minimum": 0},
+        "swap_used_mb": {"type": ["integer", "null"], "minimum": 0},
+        "zram": {"type": ["boolean", "null"]}
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claude", "codex", "node", "python3", "git", "docker", "gh", "op", "jq", "rg", "lsof", "uv"],
+      "properties": {
+        "claude": {"$ref": "#/$defs/tool"},
+        "codex": {"$ref": "#/$defs/tool"},
+        "node": {"$ref": "#/$defs/tool"},
+        "python3": {"$ref": "#/$defs/tool"},
+        "git": {"$ref": "#/$defs/tool"},
+        "docker": {"$ref": "#/$defs/tool"},
+        "gh": {"$ref": "#/$defs/tool"},
+        "op": {"$ref": "#/$defs/tool"},
+        "jq": {"$ref": "#/$defs/tool"},
+        "rg": {"$ref": "#/$defs/tool"},
+        "lsof": {"$ref": "#/$defs/tool"},
+        "uv": {"$ref": "#/$defs/tool"}
+      }
+    },
+    "projects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dir", "count", "with_claude_md", "with_agents_md", "without_both"],
+      "properties": {
+        "dir": {"type": "string"},
+        "count": {"type": "integer", "minimum": 0},
+        "with_claude_md": {"type": "integer", "minimum": 0},
+        "with_agents_md": {"type": "integer", "minimum": 0},
+        "without_both": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "claude_settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exists", "allow_rules", "deny_rules", "default_mode", "model", "env_keys", "enabled_plugins", "backups"],
+      "properties": {
+        "exists": {"type": "boolean"},
+        "allow_rules": {"type": ["integer", "null"], "minimum": 0},
+        "deny_rules": {"type": ["integer", "null"], "minimum": 0},
+        "default_mode": {"type": ["string", "null"]},
+        "model": {"type": ["string", "null"]},
+        "env_keys": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "enabled_plugins": {"type": "integer", "minimum": 0},
+        "backups": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["declared", "running", "editor_windows"],
+      "properties": {
+        "declared": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["user", "projects"],
+          "properties": {
+            "user": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+            "projects": {
+              "type": "object",
+              "additionalProperties": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+            }
+          }
+        },
+        "running": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
+        "editor_windows": {"type": "integer", "minimum": 0}
+      }
+    },
+    "agent_stack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claude_procs", "codex_procs", "node_procs", "rss_mb", "share_of_total"],
+      "properties": {
+        "claude_procs": {"type": "integer", "minimum": 0},
+        "codex_procs": {"type": "integer", "minimum": 0},
+        "node_procs": {"type": "integer", "minimum": 0},
+        "rss_mb": {"type": "integer", "minimum": 0},
+        "share_of_total": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "disk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filesystems", "home_top", "home_visible_gb", "home_fs_used_gb", "home_partial", "large_files", "deleted_open"],
+      "properties": {
+        "filesystems": {"type": "array", "items": {"$ref": "#/$defs/filesystem"}},
+        "home_top": {"type": "array", "items": {"$ref": "#/$defs/sized_name"}, "maxItems": 15},
+        "home_visible_gb": {"type": "number", "minimum": 0},
+        "home_fs_used_gb": {"type": ["number", "null"], "minimum": 0},
+        "home_partial": {"type": "boolean"},
+        "large_files": {"type": "array", "items": {"$ref": "#/$defs/large_file"}, "maxItems": 12},
+        "deleted_open": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["files", "bytes"],
+          "properties": {
+            "files": {"type": "integer", "minimum": 0},
+            "bytes": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "cleanup_candidates": {"type": "array", "items": {"$ref": "#/$defs/cleanup"}},
+    "backups": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user_timers", "cron_entries", "cron_backup_like", "var_backups_recent_days"],
+      "properties": {
+        "user_timers": {"type": ["array", "null"], "items": {"type": "string"}, "uniqueItems": true},
+        "cron_entries": {"type": ["integer", "null"], "minimum": 0},
+        "cron_backup_like": {"type": ["integer", "null"], "minimum": 0},
+        "var_backups_recent_days": {"type": ["integer", "null"], "minimum": 0}
+      }
+    }
+  },
+  "$defs": {
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "version"],
+      "properties": {
+        "path": {"type": ["string", "null"]},
+        "version": {"type": ["string", "null"]}
+      }
+    },
+    "filesystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mount", "total_gb", "used_gb", "free_gb", "reserved_gb", "used_pct"],
+      "properties": {
+        "mount": {"type": "string"},
+        "total_gb": {"type": "number", "minimum": 0},
+        "used_gb": {"type": "number", "minimum": 0},
+        "free_gb": {"type": "number", "minimum": 0},
+        "reserved_gb": {"type": "number", "minimum": 0},
+        "used_pct": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    },
+    "sized_name": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "bytes"],
+      "properties": {
+        "name": {"type": "string"},
+        "bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "large_file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "date"],
+      "properties": {
+        "path": {"type": "string"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "date": {"type": "string", "format": "date"}
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "kind"],
+      "properties": {
+        "path": {"type": "string"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "kind": {"enum": ["cache", "transcripts", "tmp"]}
+      }
+    }
+  }
+}

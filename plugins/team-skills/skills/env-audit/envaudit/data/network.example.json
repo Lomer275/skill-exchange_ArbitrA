@@ -1,0 +1,22 @@
+{
+  "version": "example",
+  "must_reach": [
+    {"name": "Example HTTPS", "host": "example.org", "port": 443}
+  ],
+  "restricted": [
+    {
+      "name": "example-production",
+      "kind": "prod",
+      "hosts": ["192.0.2.10"],
+      "ports": [22]
+    },
+    {
+      "name": "example-team-machine",
+      "kind": "team_machine",
+      "hosts": ["192.0.2.20"],
+      "ports": [22]
+    }
+  ],
+  "granted": {"example-user": ["example-production"]},
+  "team_vault_names": ["Example Team"]
+}

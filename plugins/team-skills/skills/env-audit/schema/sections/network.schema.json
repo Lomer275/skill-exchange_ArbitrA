@@ -1,0 +1,94 @@
+{
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": ["definitions", "must_reach", "restricted", "ssh_hosts"],
+  "properties": {
+    "definitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "version", "path"],
+      "properties": {
+        "source": {"enum": ["file", "builtin"]},
+        "version": {"type": ["string", "null"]},
+        "path": {"const": "~/.config/env-audit/network.json"}
+      }
+    },
+    "must_reach": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "host", "port", "status", "dns_ms", "median_ms", "attempts", "ok"],
+        "properties": {
+          "name": {"type": "string"},
+          "host": {"type": "string"},
+          "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+          "status": {"enum": ["open", "closed", "timeout", "dns_fail"]},
+          "dns_ms": {"type": ["number", "null"], "minimum": 0},
+          "median_ms": {"type": ["number", "null"], "minimum": 0},
+          "attempts": {"type": "integer", "minimum": 1},
+          "ok": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "restricted": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "kind", "granted", "targets"],
+        "properties": {
+          "name": {"type": "string"},
+          "kind": {"enum": ["prod", "team_machine"]},
+          "granted": {"type": "boolean"},
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["host", "port", "tcp", "ssh_aliases", "known_hosts_entry", "host_key_matches_known", "access_possible_unconfirmed"],
+              "properties": {
+                "host": {"type": "string"},
+                "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                "tcp": {"enum": ["open", "closed", "timeout", "dns_fail"]},
+                "ssh_aliases": {
+                  "type": ["array", "null"],
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["alias", "user", "port", "identity_files_existing"],
+                    "properties": {
+                      "alias": {"type": "string"},
+                      "user": {"type": ["string", "null"]},
+                      "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                      "identity_files_existing": {"type": "integer", "minimum": 0}
+                    }
+                  }
+                },
+                "known_hosts_entry": {"type": ["boolean", "null"]},
+                "host_key_matches_known": {"type": ["boolean", "null"]},
+                "access_possible_unconfirmed": {"type": ["boolean", "null"]}
+              }
+            }
+          }
+        }
+      }
+    },
+    "ssh_hosts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["alias", "hostname", "port", "keyscan", "host_key_matches_known", "points_to_local_machine"],
+        "properties": {
+          "alias": {"type": "string"},
+          "hostname": {"type": "string"},
+          "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+          "keyscan": {"enum": ["ok", "timeout", "refused", "dns_fail"]},
+          "host_key_matches_known": {"type": ["boolean", "null"]},
+          "points_to_local_machine": {"type": ["boolean", "null"]}
+        }
+      }
+    }
+  }
+}

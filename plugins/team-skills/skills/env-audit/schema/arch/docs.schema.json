@@ -1,0 +1,157 @@
+{
+  "$id": "urn:env-audit:schema:arch:docs",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_files",
+    "missing_paths",
+    "stack_contradictions",
+    "python_version_claims",
+    "status_claims",
+    "app_label_mismatches",
+    "freshness",
+    "specs",
+    "md_code_copies",
+    "doc_locations"
+  ],
+  "properties": {
+    "agent_files": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "missing_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["doc", "line", "path", "source", "resolved_on_other_branch"],
+        "properties": {
+          "doc": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "path": {"type": "string"},
+          "source": {"enum": ["tree_listing", "backtick", "fenced"]},
+          "resolved_on_other_branch": {"type": ["string", "null"], "enum": ["origin/dev", null]}
+        }
+      }
+    },
+    "stack_contradictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["doc_name", "manifest_alternative", "role", "manifest_file"],
+        "properties": {
+          "doc_name": {"type": "string"},
+          "manifest_alternative": {"type": "string"},
+          "role": {"type": "string"},
+          "manifest_file": {"type": "string"}
+        }
+      }
+    },
+    "python_version_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["doc", "line", "claimed", "dockerfile", "actual"],
+        "properties": {
+          "doc": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "claimed": {"type": "string"},
+          "dockerfile": {"type": "string"},
+          "actual": {"type": "string"}
+        }
+      }
+    },
+    "status_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "lang", "doc", "line", "evidence"],
+        "properties": {
+          "claim": {"enum": ["no_code", "no_git", "no_tests", "no_secrets", "unrelated_module", "thin_module", "test_count"]},
+          "lang": {"enum": ["ru", "en"]},
+          "doc": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "evidence": {
+            "type": "object",
+            "additionalProperties": {
+              "type": ["integer", "number", "boolean", "string", "null"]
+            }
+          }
+        }
+      }
+    },
+    "app_label_mismatches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["doc", "line", "command", "label"],
+        "properties": {
+          "doc": {"type": "string"},
+          "line": {"type": "integer", "minimum": 1},
+          "command": {"type": "string"},
+          "label": {"type": "string"}
+        }
+      }
+    },
+    "freshness": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["doc", "last_commit_at", "code_commits_since", "status_doc_commits_since"],
+        "properties": {
+          "doc": {"type": "string"},
+          "last_commit_at": {"type": ["string", "null"]},
+          "code_commits_since": {"type": ["integer", "null"], "minimum": 0},
+          "status_doc_commits_since": {"type": ["integer", "null"], "minimum": 0}
+        }
+      }
+    },
+    "specs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by_status", "draft_with_done_tasks", "active_with_all_done", "status_convention_declared", "task_refs_without_file", "tasks_inline_documented", "numbering_collisions"],
+      "properties": {
+        "by_status": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "draft_with_done_tasks": {"type": "array", "items": {"type": "string"}},
+        "active_with_all_done": {"type": "array", "items": {"type": "string"}},
+        "status_convention_declared": {"type": "boolean"},
+        "task_refs_without_file": {"type": "array", "items": {"type": "string"}},
+        "tasks_inline_documented": {"type": "boolean"},
+        "numbering_collisions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "md_code_copies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["md", "definitions_in_md", "function", "code_path", "ratio"],
+        "properties": {
+          "md": {"type": "string"},
+          "definitions_in_md": {"type": "integer", "minimum": 10},
+          "function": {"type": "string"},
+          "code_path": {"type": "string"},
+          "ratio": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    },
+    "doc_locations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handoff_files", "changelog_files", "paths_named_in_agent_files"],
+      "properties": {
+        "handoff_files": {"type": "array", "items": {"type": "string"}},
+        "changelog_files": {"type": "array", "items": {"type": "string"}},
+        "paths_named_in_agent_files": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

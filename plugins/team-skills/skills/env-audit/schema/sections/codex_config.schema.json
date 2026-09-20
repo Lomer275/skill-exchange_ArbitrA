@@ -1,0 +1,64 @@
+{
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": ["codex_home", "config_exists"],
+  "allOf": [
+    {
+      "if": {
+        "properties": {"config_exists": {"const": true}},
+        "required": ["config_exists"]
+      },
+      "then": {
+        "required": [
+          "config_mode", "config_owner_is_user", "top", "profiles",
+          "sandbox_workspace_write_network_access", "danger_full_access_anywhere",
+          "global_agents_md", "codex_version"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "codex_home": {"type": "string"},
+    "config_exists": {"type": "boolean"},
+    "config_mode": {"type": ["string", "null"], "pattern": "^[0-7]{4}$"},
+    "config_owner_is_user": {"type": ["boolean", "null"]},
+    "top": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "approval_policy", "sandbox_mode", "model_reasoning_effort"],
+      "properties": {
+        "model": {"type": ["string", "null"]},
+        "approval_policy": {"type": ["string", "null"]},
+        "sandbox_mode": {"type": ["string", "null"]},
+        "model_reasoning_effort": {"type": ["string", "null"]}
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["model", "approval_policy", "sandbox_mode", "model_reasoning_effort"],
+        "properties": {
+          "model": {"type": ["string", "null"]},
+          "approval_policy": {"type": ["string", "null"]},
+          "sandbox_mode": {"type": ["string", "null"]},
+          "model_reasoning_effort": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "sandbox_workspace_write_network_access": {"type": ["boolean", "null"]},
+    "danger_full_access_anywhere": {"type": "boolean"},
+    "global_agents_md": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exists", "bytes", "team_context_blocks"],
+      "properties": {
+        "exists": {"type": "boolean"},
+        "bytes": {"type": ["integer", "null"], "minimum": 0},
+        "team_context_blocks": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "codex_version": {"type": ["string", "null"]}
+  }
+}

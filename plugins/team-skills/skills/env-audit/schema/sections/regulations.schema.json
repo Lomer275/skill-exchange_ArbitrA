@@ -1,0 +1,267 @@
+{
+  "type": ["object", "null"],
+  "additionalProperties": false,
+  "required": [
+    "r1_exchange",
+    "r2_docs",
+    "r4_github",
+    "r5_levels",
+    "r6_codex",
+    "r7_docker",
+    "r8_r10_memory",
+    "r11_superpowers",
+    "r3_sources"
+  ],
+  "properties": {
+    "r1_exchange": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": [
+        "marketplaces",
+        "skill_exchange_present",
+        "official_present",
+        "directory_checkout"
+      ],
+      "properties": {
+        "marketplaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "source_kind", "source", "auto_update", "last_updated"],
+            "properties": {
+              "name": {"type": "string"},
+              "source_kind": {"enum": ["github", "directory", "git", "other"]},
+              "source": {"type": ["string", "null"]},
+              "auto_update": {"type": ["boolean", "null"]},
+              "last_updated": {"type": ["string", "null"], "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"}
+            }
+          }
+        },
+        "skill_exchange_present": {"type": "boolean"},
+        "official_present": {"type": "boolean"},
+        "directory_checkout": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["path", "is_git", "behind_tracking", "last_fetch_date"],
+          "properties": {
+            "path": {"type": "string"},
+            "is_git": {"type": "boolean"},
+            "behind_tracking": {"type": ["integer", "null"], "minimum": 0},
+            "last_fetch_date": {"type": ["string", "null"], "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"}
+          }
+        }
+      }
+    },
+    "r2_docs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["docs_dir", "prefix", "folders", "root_files", "service_docs", "superpowers_dir"],
+        "properties": {
+          "docs_dir": {"type": "boolean"},
+          "prefix": {"type": ["string", "null"]},
+          "folders": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["1", "2", "3", "4", "5", "backlog"],
+            "properties": {
+              "1": {"type": "boolean"},
+              "2": {"type": "boolean"},
+              "3": {"type": "boolean"},
+              "4": {"type": "boolean"},
+              "5": {"type": "boolean"},
+              "backlog": {"type": "boolean"}
+            }
+          },
+          "root_files": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["README.md", "architecture", "CHANGELOG", "HANDOFF"],
+            "properties": {
+              "README.md": {"enum": ["root", "docs", null]},
+              "architecture": {"enum": ["root", "docs", null]},
+              "CHANGELOG": {"enum": ["root", "docs", null]},
+              "HANDOFF": {"enum": ["root", "docs", null]}
+            }
+          },
+          "service_docs": {
+            "type": "array",
+            "items": {"enum": ["ACCEPTANCE.md", "ADMIN-RUNBOOK.md", "USER-GUIDE.md"]},
+            "uniqueItems": true
+          },
+          "superpowers_dir": {"type": "boolean"}
+        }
+      }
+    },
+    "r4_github": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gh_config_present", "gh_hosts", "roots"],
+      "properties": {
+        "gh_config_present": {"type": "boolean"},
+        "gh_hosts": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "roots": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["vcs", "origin_host", "origin_repo", "upstream", "files", "has_docs"],
+            "properties": {
+              "vcs": {"type": "boolean"},
+              "origin_host": {"type": ["string", "null"]},
+              "origin_repo": {"type": ["string", "null"]},
+              "upstream": {"type": "boolean"},
+              "files": {"type": ["integer", "null"], "minimum": 0, "maximum": 10000},
+              "files_capped": {"type": "boolean"},
+              "has_docs": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "r5_levels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "global_claude_md",
+        "global_claude_team_context",
+        "global_codex_agents_md",
+        "global_codex_team_context",
+        "projects",
+        "memory_dirs_nonempty"
+      ],
+      "properties": {
+        "global_claude_md": {"type": "boolean"},
+        "global_claude_team_context": {"type": "integer", "minimum": 0},
+        "global_codex_agents_md": {"type": "boolean"},
+        "global_codex_team_context": {"type": "integer", "minimum": 0},
+        "projects": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["claude_md", "agents_md", "agents_md_team_context"],
+            "properties": {
+              "claude_md": {"type": "boolean"},
+              "agents_md": {"type": "boolean"},
+              "agents_md_team_context": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "memory_dirs_nonempty": {"type": "integer", "minimum": 0}
+      }
+    },
+    "r6_codex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "codex_version",
+        "version_at_least_0_146",
+        "global_agents_md",
+        "projects_claude_without_agents",
+        "codex_json"
+      ],
+      "properties": {
+        "codex_version": {"type": ["string", "null"]},
+        "version_at_least_0_146": {"type": "boolean"},
+        "global_agents_md": {"type": "boolean"},
+        "projects_claude_without_agents": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "codex_json": {"type": "object", "additionalProperties": {"type": "boolean"}}
+      }
+    },
+    "r7_docker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["docker_version", "daemon_reachable", "roots"],
+      "properties": {
+        "docker_version": {"type": ["string", "null"]},
+        "daemon_reachable": {"type": ["boolean", "null"]},
+        "roots": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["has_code", "container_files"],
+            "properties": {
+              "has_code": {"type": "boolean"},
+              "container_files": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+            }
+          }
+        }
+      }
+    },
+    "r8_r10_memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bitrix_regulation", "principles", "user_profile"],
+      "properties": {
+        "bitrix_regulation": {"$ref": "#/properties/sections/properties/regulations/$defs/card_matches"},
+        "principles": {"$ref": "#/properties/sections/properties/regulations/$defs/card_matches"},
+        "user_profile": {"$ref": "#/properties/sections/properties/regulations/$defs/card_matches"}
+      }
+    },
+    "r11_superpowers": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["installed", "version", "version_at_least_6_2_0", "enabled"],
+      "properties": {
+        "installed": {"type": "boolean"},
+        "version": {"type": ["string", "null"]},
+        "version_at_least_6_2_0": {"type": "boolean"},
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "r3_sources": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["installed_plugins", "user_skills", "project_skills"],
+      "properties": {
+        "installed_plugins": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "user_skills": {"type": "integer", "minimum": 0},
+        "project_skills": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+      }
+    }
+  },
+  "$defs": {
+    "card_matches": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact", "candidates", "candidates_truncated"],
+      "properties": {
+        "exact": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["memory_dir", "file", "date", "date_source", "date_trust", "name"],
+            "properties": {
+              "memory_dir": {"type": "string"},
+              "file": {"type": "string"},
+              "date": {"type": ["string", "null"], "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"},
+              "date_source": {"enum": ["name", "header", "mtime", null]},
+              "date_trust": {"enum": ["high", "medium", "low", null]},
+              "name": {"type": ["string", "null"]}
+            }
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["memory_dir", "file", "why"],
+            "properties": {
+              "memory_dir": {"type": "string"},
+              "file": {"type": "string"},
+              "why": {"type": "string"}
+            }
+          }
+        },
+        "candidates_truncated": {"type": "boolean"}
+      }
+    }
+  }
+}

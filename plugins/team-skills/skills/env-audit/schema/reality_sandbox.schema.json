@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:env-audit:reality:sandbox",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sandbox",
+    "root",
+    "canon_handoff",
+    "canon_changelog",
+    "journal_globs",
+    "has_task_file",
+    "typo_line",
+    "owned_paths",
+    "excluded_secret",
+    "skipped_symlinks",
+    "snapshot_skipped",
+    "snapshot_truncated",
+    "created_at"
+  ],
+  "properties": {
+    "sandbox": {"type": "string"},
+    "root": {"type": "string"},
+    "canon_handoff": {"type": ["string", "null"]},
+    "canon_changelog": {"type": ["string", "null"]},
+    "journal_globs": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "has_task_file": {"type": "boolean"},
+    "typo_line": {"type": "string"},
+    "owned_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 2,
+      "uniqueItems": true
+    },
+    "excluded_secret": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["class", "path"],
+        "properties": {
+          "class": {"type": "string"},
+          "path": {"type": "string"},
+          "path_sanitized": {"const": true}
+        }
+      }
+    },
+    "skipped_symlinks": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "snapshot_skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "reason"],
+        "properties": {
+          "path": {"type": "string"},
+          "reason": {"type": "string"},
+          "path_sanitized": {"const": true}
+        }
+      }
+    },
+    "snapshot_truncated": {"type": "boolean"},
+    "path_sanitized": {"const": true},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

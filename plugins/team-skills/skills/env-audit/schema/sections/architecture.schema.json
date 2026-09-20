@@ -1,0 +1,66 @@
+{
+  "type": ["object", "null"],
+  "additionalProperties": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "schema",
+      "definitions_version",
+      "definitions",
+      "rule_inputs",
+      "blind_spots"
+    ],
+    "properties": {
+      "schema": {"const": "env-audit/arch"},
+      "definitions_version": {"const": "3.0.0"},
+      "definitions": {
+        "type": "object",
+        "additionalProperties": {"type": "string"},
+        "required": [
+          "lines",
+          "sloc",
+          "sloc_no_strings",
+          "prod_scope",
+          "third_party_import",
+          "edge",
+          "edge_level",
+          "edge_flags",
+          "scc",
+          "fan_in",
+          "orphan",
+          "interface_module",
+          "live_unit",
+          "outside_git",
+          "local_only",
+          "fake_value",
+          "dated_name",
+          "data_shaped",
+          "distinct_values",
+          "stdlib_io",
+          "io_builtin",
+          "dist_alias_table"
+        ]
+      },
+      "rule_inputs": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "blind_spots": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["language", "share_of_code", "what"],
+          "properties": {
+            "language": {"type": "string"},
+            "share_of_code": {"type": "number", "minimum": 0, "maximum": 1},
+            "what": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

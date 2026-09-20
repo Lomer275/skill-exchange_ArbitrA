@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["copies_by_relpath"],
+  "properties": {
+    "copies_by_relpath": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["relpath", "copies", "distinct_hashes", "paths"],
+        "properties": {
+          "relpath": {"type": "string"},
+          "copies": {"type": "integer", "minimum": 3},
+          "distinct_hashes": {"type": "integer", "minimum": 2},
+          "paths": {"type": "array", "maxItems": 10, "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

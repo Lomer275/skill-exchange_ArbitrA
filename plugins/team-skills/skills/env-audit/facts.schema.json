@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "env-audit facts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "collector_version",
+    "definitions_version",
+    "collector",
+    "host",
+    "roots",
+    "window_days_effective",
+    "truncated",
+    "exit_code",
+    "skipped",
+    "errors",
+    "sections"
+  ],
+  "properties": {
+    "collector_version": {"const": "3.0.0"},
+    "definitions_version": {"const": "3.0.0"},
+    "collector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "duration_s",
+        "python",
+        "flags",
+        "section_order",
+        "section_durations_s",
+        "section_durations",
+        "index_build_seconds",
+        "budget_seconds",
+        "budget_spent_seconds"
+      ],
+      "properties": {
+        "started_at": {"type": "string", "format": "date-time"},
+        "duration_s": {"type": "number", "minimum": 0},
+        "python": {"type": "string"},
+        "flags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "budget_seconds",
+            "arch_root_seconds",
+            "max_text_mb",
+            "max_hash_mb",
+            "pytest_collect",
+            "pytest_python",
+            "docker",
+            "sibling",
+            "only"
+          ],
+          "properties": {
+            "budget_seconds": {"type": "integer"},
+            "arch_root_seconds": {"type": "integer", "minimum": 0},
+            "max_text_mb": {"type": "integer"},
+            "max_hash_mb": {"type": "integer"},
+            "pytest_collect": {"type": "boolean"},
+            "pytest_python": {"type": ["string", "null"]},
+            "docker": {"type": "boolean"},
+            "sibling": {"type": ["string", "null"]},
+            "only": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "section_order": {"type": "array", "items": {"type": "string"}},
+        "section_durations_s": {
+          "type": "object",
+          "additionalProperties": {"type": "number", "minimum": 0}
+        },
+        "section_durations": {
+          "type": "object",
+          "additionalProperties": {"type": "number", "minimum": 0}
+        },
+        "index_build_seconds": {"type": "number", "minimum": 0},
+        "budget_seconds": {"type": "integer", "minimum": 0},
+        "budget_spent_seconds": {"type": "number", "minimum": 0}
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "user",
+        "uid",
+        "home",
+        "hostname",
+        "python",
+        "profile",
+        "codex_home",
+        "claude_version",
+        "codex_version",
+        "users_with_home",
+        "logged_in_count",
+        "cpu_count",
+        "mem_total_mb",
+        "linked_worktrees_skipped"
+      ],
+      "properties": {
+        "user": {"type": "string"},
+        "uid": {"type": "integer", "minimum": 0},
+        "home": {"type": "string"},
+        "hostname": {"type": "string"},
+        "python": {"type": "string"},
+        "profile": {"enum": ["claude", "codex", "both", "none"]},
+        "codex_home": {"type": "string"},
+        "claude_version": {"type": ["string", "null"]},
+        "codex_version": {"type": ["string", "null"]},
+        "users_with_home": {"type": "integer", "minimum": 0},
+        "logged_in_count": {"type": ["integer", "null"], "minimum": 0},
+        "cpu_count": {"type": ["integer", "null"], "minimum": 0},
+        "mem_total_mb": {"type": ["integer", "null"], "minimum": 0},
+        "linked_worktrees_skipped": {"type": "integer", "minimum": 0}
+      }
+    },
+    "roots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "exists"],
+        "properties": {
+          "path": {"type": "string"},
+          "exists": {"type": "boolean"}
+        }
+      }
+    },
+    "window_days_effective": {"type": ["integer", "null"]},
+    "truncated": {"type": "boolean"},
+    "exit_code": {"enum": [0, 2, 3, 4]},
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section", "reason", "details"],
+        "properties": {
+          "section": {"type": "string"},
+          "reason": {
+            "enum": [
+              "budget",
+              "linked_worktree",
+              "no_vcs",
+              "not_owner",
+              "permission",
+              "no_sibling",
+              "flag_off",
+              "not_applicable",
+              "size_cap",
+              "blocked",
+              "no_definitions"
+            ]
+          },
+          "details": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section", "kind"],
+        "properties": {
+          "section": {"type": "string"},
+          "kind": {"type": "string"}
+        }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["object", "null"]
+      }
+    }
+  }
+}

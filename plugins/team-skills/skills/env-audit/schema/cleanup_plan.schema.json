@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:env-audit:cleanup-plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "created_on", "facts_path", "home", "diff_blocked", "items", "manual"],
+  "properties": {
+    "schema": {"const": "env-audit/cleanup-plan"},
+    "created_on": {"type": "string", "format": "date"},
+    "facts_path": {"type": "string"},
+    "home": {"type": "string"},
+    "diff_blocked": {"type": "boolean"},
+    "items": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/item"}
+    },
+    "manual": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "summary", "why_not_me"],
+        "properties": {
+          "kind": {"type": "string"},
+          "summary": {"type": "string"},
+          "why_not_me": {"type": "string"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha1": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "related": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "before_sha1", "after_sha1", "created", "artifact"],
+      "properties": {
+        "path": {"type": "string"},
+        "before_sha1": {"$ref": "#/$defs/sha1"},
+        "after_sha1": {"$ref": "#/$defs/sha1"},
+        "created": {"type": "boolean"},
+        "artifact": {"type": "string", "pattern": "^after/"}
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "kind", "list", "path", "before_sha1", "after_sha1", "selected",
+        "blocked", "summary", "diff_stats", "before_missing"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[0-9]{4}$"},
+        "kind": {
+          "enum": [
+            "claude_md_section_to_guide",
+            "close_canon_step",
+            "codex_close_canon_step",
+            "handoff_archive_mark",
+            "memory_index_compress",
+            "skill_override_off",
+            "skill_override_restore"
+          ]
+        },
+        "list": {"const": "after_yes"},
+        "path": {"type": "string"},
+        "before_sha1": {"$ref": "#/$defs/sha1"},
+        "after_sha1": {"$ref": "#/$defs/sha1"},
+        "selected": {"type": "boolean"},
+        "blocked": {
+          "enum": [null, "secret", "team_context", "target_exists", "cannot_fit", "secret_in_settings", "plugin_close", "no_canon", "cross_tree"]
+        },
+        "summary": {"type": "string"},
+        "diff_stats": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["added", "removed"],
+          "properties": {
+            "added": {"type": "integer", "minimum": 0},
+            "removed": {"type": "integer", "minimum": 0}
+          }
+        },
+        "before_missing": {"type": "boolean"},
+        "root": {"type": "string"},
+        "edit": {"type": "object"},
+        "related": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/related"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "$id": "urn:env-audit:arch:root_budget_seconds",
+  "type": "number",
+  "minimum": 0
+}

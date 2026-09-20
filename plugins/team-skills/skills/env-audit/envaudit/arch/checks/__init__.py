@@ -1,0 +1,1 @@
+"""Pluggable architecture checks."""

@@ -1,0 +1,108 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "files",
+    "prod_lines",
+    "templates",
+    "files_top",
+    "entrypoints",
+    "bootstrap_single"
+  ],
+  "properties": {
+    "files": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "prod_lines": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "templates": {
+      "$ref": "#/$defs/paths"
+    },
+    "files_top": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "lines",
+          "functions",
+          "classes",
+          "methods",
+          "share_of_prod",
+          "host_markers",
+          "curl_calls",
+          "sql_calls",
+          "data_shaped",
+          "churn"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "functions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "classes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "methods": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "share_of_prod": {
+            "type": "number",
+            "minimum": 0
+          },
+          "host_markers": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "curl_calls": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sql_calls": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "data_shaped": {
+            "type": "boolean"
+          },
+          "churn": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "entrypoints": {
+      "$ref": "#/$defs/paths"
+    },
+    "bootstrap_single": {
+      "type": "boolean"
+    }
+  },
+  "$id": "urn:env-audit:arch:php",
+  "$defs": {
+    "paths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
