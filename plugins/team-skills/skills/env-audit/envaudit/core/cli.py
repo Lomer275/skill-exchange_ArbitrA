@@ -13,6 +13,7 @@ from envaudit.core.host import collect_host
 from envaudit.core.output import build_document, emit, finalize, prepare_output
 from envaudit.core.redact import scan_file
 from envaudit.core.runner import run, which
+from envaudit.core.worktrees import is_linked_worktree, linked_worktree_children
 from envaudit.sections import discover, run_sections
 
 
@@ -24,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--scan-file", type=Path)
     parser.add_argument("--budget-seconds", type=int, default=300)
+    parser.add_argument("--arch-root-seconds", type=int, default=90)
     parser.add_argument("--max-text-mb", type=int, default=2)
     parser.add_argument("--max-hash-mb", type=int, default=20)
     parser.add_argument("--pytest-collect", action="store_true")
@@ -54,24 +56,42 @@ def _lower_priority() -> None:
         run([ionice, "-c3", "-p", str(os.getpid())], timeout=5)
 
 
-def _default_roots(home: Path) -> list[str]:
+def _default_roots(home: Path, ctx: Context) -> list[str]:
     projects = home / "projects"
     try:
-        return [
-            str(path)
-            for path in sorted(projects.iterdir(), key=lambda item: item.name)
-            if not path.name.startswith(".") and path.is_dir()
-        ]
+        candidates = sorted(projects.iterdir(), key=lambda item: item.name)
     except OSError:
         return []
 
+    roots = []
+    skipped = 0
+    for path in candidates:
+        if path.name.startswith(".") or not path.is_dir():
+            continue
+        count = 1 if is_linked_worktree(path) else 0
+        if count == 0 and not (path / ".git").is_dir():
+            count = linked_worktree_children(path)
+        if count:
+            skipped += count
+            ctx.skip(
+                "roots",
+                "linked_worktree",
+                details=f"{path.name}: {count} рабочих копий",
+            )
+            continue
+        roots.append(str(path))
+    ctx.shared["linked_worktrees_skipped"] = skipped
+    return roots
 
-def _root_arguments(args: argparse.Namespace, home: Path) -> list[str]:
+
+def _root_arguments(
+    args: argparse.Namespace, home: Path, ctx: Context
+) -> list[str]:
     roots = list(args.root)
     roots.extend(
         base64.b64decode(value).decode("utf-8") for value in args.root_b64
     )
-    return roots or _default_roots(home)
+    return roots or _default_roots(home, ctx)
 
 
 def _resolve_roots(
@@ -95,6 +115,7 @@ def _resolve_roots(
 def _flags_view(flags: Flags) -> dict:
     return {
         "budget_seconds": flags.budget_seconds,
+        "arch_root_seconds": flags.arch_root_seconds,
         "max_text_mb": flags.max_text_mb,
         "max_hash_mb": flags.max_hash_mb,
         "pytest_collect": flags.pytest_collect,
@@ -131,6 +152,7 @@ def main(argv: list[str]) -> int:
     started_at = time.time()
     flags = Flags(
         budget_seconds=args.budget_seconds,
+        arch_root_seconds=args.arch_root_seconds,
         max_text_mb=args.max_text_mb,
         max_hash_mb=args.max_hash_mb,
         pytest_collect=args.pytest_collect,
@@ -146,7 +168,9 @@ def main(argv: list[str]) -> int:
         started_at=started_at,
         deadline=started_at + flags.budget_seconds,
     )
-    ctx.roots, roots_view = _resolve_roots(_root_arguments(args, home), ctx)
+    ctx.roots, roots_view = _resolve_roots(
+        _root_arguments(args, home, ctx), ctx
+    )
     host = collect_host(ctx)
     ctx.shared["host"] = host
     sections, durations = run_sections(ctx, discover())

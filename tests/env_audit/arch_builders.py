@@ -90,6 +90,19 @@ def make_bare(path: Path) -> Path:
     return path
 
 
+def make_linked_worktrees(
+    source: Path, container: Path, *, count: int = 3
+) -> tuple[Path, list[Path]]:
+    repo = make_repo(source, {"app.py": "VALUE = 1\n"})
+    container.mkdir(parents=True, exist_ok=True)
+    worktrees = []
+    for index in range(count):
+        path = container / f"worktree-{index}"
+        _git(repo, "worktree", "add", "-b", f"worktree-{index}", str(path))
+        worktrees.append(path)
+    return repo, worktrees
+
+
 def write_crontab_stub(bin_dir: Path, lines: list[str]) -> None:
     bin_dir.mkdir(parents=True, exist_ok=True)
     data = bin_dir / "crontab-lines.json"

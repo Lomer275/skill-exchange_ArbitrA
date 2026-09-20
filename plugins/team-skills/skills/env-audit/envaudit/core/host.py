@@ -79,4 +79,7 @@ def collect_host(ctx: Context) -> dict:
         "logged_in_count": _logged_in_count(),
         "cpu_count": os.cpu_count(),
         "mem_total_mb": _mem_total_mb(),
+        "linked_worktrees_skipped": int(
+            ctx.shared.get("linked_worktrees_skipped", 0)
+        ),
     }

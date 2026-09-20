@@ -5,6 +5,7 @@ import time
 
 SKIP_REASONS = (
     "budget",
+    "linked_worktree",
     "no_vcs",
     "not_owner",
     "permission",
@@ -20,6 +21,7 @@ SKIP_REASONS = (
 @dataclass
 class Flags:
     budget_seconds: int = 300
+    arch_root_seconds: int = 90
     max_text_mb: int = 2
     max_hash_mb: int = 20
     pytest_collect: bool = False

@@ -7,6 +7,7 @@ import re
 from envaudit.core.context import Context
 from envaudit.core.runner import git
 from envaudit.core.walk import EXCLUDED_DIRS, FileEntry, iter_files, read_limited
+from envaudit.core.worktrees import is_linked_worktree
 
 
 READ_CACHE_LIMIT = 256 * 1024 * 1024
@@ -69,18 +70,11 @@ class ArchContext:
             if current_path != absolute_root and ".git" in files:
                 marker = current_path / ".git"
                 try:
-                    if marker.is_file():
-                        with marker.open(
-                            "r", encoding="utf-8", errors="replace"
-                        ) as stream:
-                            is_worktree = stream.read(256).lstrip().startswith(
-                                "gitdir:"
-                            )
-                    else:
-                        is_worktree = False
+                    with marker.open("rb") as stream:
+                        gitfile = stream.read(256).lstrip().startswith(b"gitdir:")
                 except OSError:
-                    is_worktree = False
-                if is_worktree:
+                    gitfile = False
+                if is_linked_worktree(current_path) or gitfile:
                     blocked.add(current_path)
                     dirs[:] = []
                     continue

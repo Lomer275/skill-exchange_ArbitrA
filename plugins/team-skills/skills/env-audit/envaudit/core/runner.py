@@ -80,6 +80,10 @@ def run(
         _kill_process_group(process)
         stdout, _ = process.communicate()
         return RunResult(None, stdout, True, "timeout")
+    except BaseException:
+        _kill_process_group(process)
+        process.communicate()
+        raise
     return RunResult(process.returncode, stdout, False, None)
 
 

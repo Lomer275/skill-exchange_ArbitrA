@@ -39,6 +39,7 @@
           "additionalProperties": false,
           "required": [
             "budget_seconds",
+            "arch_root_seconds",
             "max_text_mb",
             "max_hash_mb",
             "pytest_collect",
@@ -49,6 +50,7 @@
           ],
           "properties": {
             "budget_seconds": {"type": "integer"},
+            "arch_root_seconds": {"type": "integer", "minimum": 0},
             "max_text_mb": {"type": "integer"},
             "max_hash_mb": {"type": "integer"},
             "pytest_collect": {"type": "boolean"},
@@ -81,7 +83,8 @@
         "users_with_home",
         "logged_in_count",
         "cpu_count",
-        "mem_total_mb"
+        "mem_total_mb",
+        "linked_worktrees_skipped"
       ],
       "properties": {
         "user": {"type": "string"},
@@ -96,7 +99,8 @@
         "users_with_home": {"type": "integer", "minimum": 0},
         "logged_in_count": {"type": ["integer", "null"], "minimum": 0},
         "cpu_count": {"type": ["integer", "null"], "minimum": 0},
-        "mem_total_mb": {"type": ["integer", "null"], "minimum": 0}
+        "mem_total_mb": {"type": ["integer", "null"], "minimum": 0},
+        "linked_worktrees_skipped": {"type": "integer", "minimum": 0}
       }
     },
     "roots": {
@@ -125,6 +129,7 @@
           "reason": {
             "enum": [
               "budget",
+              "linked_worktree",
               "no_vcs",
               "not_owner",
               "permission",
