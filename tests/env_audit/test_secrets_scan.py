@@ -1,6 +1,7 @@
 import io
 import json
 from pathlib import Path
+import re
 import tarfile
 import time
 
@@ -85,6 +86,24 @@ def test_webhook_user_ids(run_collect, tmp_path):
     (root / "hooks.txt").write_text(first + "\n" + second, encoding="utf-8")
     item = _root(_section(run_collect("--root", root, "--only", "secrets")), root)["patterns"]["bitrix_webhook"]
     assert item["user_ids"] == [30351, 30662]
+
+
+def test_new_webhook_forms_in_tree(run_collect, tmp_path):
+    root = tmp_path / "plain"
+    root.mkdir()
+    (root / "rest.txt").write_text(
+        "`rest/4242/k9m2n5p8q4r7s3t6`",
+        encoding="utf-8",
+    )
+    (root / "bare.txt").write_text(
+        "Bitrix webhook: 4242/a1b2c3d4e5f6g7h8",
+        encoding="utf-8",
+    )
+    item = _root(
+        _section(run_collect("--root", root, "--only", "secrets")), root
+    )["patterns"]["bitrix_webhook"]
+    assert item["worktree_files"] == 2
+    assert item["user_ids"] == [4242]
 
 
 def test_context_file_critical_input(run_collect, fake_home, tmp_path):
@@ -289,6 +308,7 @@ def test_timings_present(run_collect, tmp_path):
         "agent_configs",
         "roots",
         "home",
+        "agent_histories",
         "shell_history",
         "config_dir",
         "storage",
@@ -306,3 +326,16 @@ def test_positive_control_fail_nulls_block(tmp_path, monkeypatch):
     assert section["positive_controls"]["tree"] == "fail"
     assert section["roots"] is None
     assert {"section": "secrets", "kind": "positive_control_failed:tree"} in ctx.errors
+
+
+def test_positive_control_requires_bare_webhook_form(tmp_path, monkeypatch):
+    started = time.time()
+    ctx = Context(Flags(), tmp_path, [], started, started + 300)
+    monkeypatch.setattr(patterns, "BITRIX_BARE_RE", re.compile(rb"(?!)"))
+    assert secrets._run_controls(ctx)["tree"] == "fail"
+
+
+def test_positive_control_covers_all_webhook_forms(tmp_path):
+    started = time.time()
+    ctx = Context(Flags(), tmp_path, [], started, started + 300)
+    assert secrets._run_controls(ctx)["tree"] == "pass"

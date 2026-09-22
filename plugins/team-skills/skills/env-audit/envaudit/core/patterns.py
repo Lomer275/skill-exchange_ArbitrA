@@ -5,6 +5,13 @@ import re
 
 LEFT_BOUNDARY = rb"(?<![A-Za-z0-9_-])"
 RIGHT_BOUNDARY = rb"(?![A-Za-z0-9_-])"
+BITRIX_BARE_RE = re.compile(
+    rb"(?<![A-Za-z0-9_/-])[0-9]{1,7}/"
+    rb"(?=[a-z0-9]{16}(?![A-Za-z0-9_/-]))"
+    rb"(?=[a-z0-9]{0,15}[a-z])"
+    rb"(?=[a-z0-9]{0,15}[0-9])"
+    rb"[a-z0-9]{16}(?![A-Za-z0-9_/-])"
+)
 
 
 @dataclass(frozen=True)
@@ -22,8 +29,10 @@ def _bounded(body: bytes) -> re.Pattern[bytes]:
 CLASSES = (
     SecretClass(
         "bitrix_webhook",
-        re.compile(rb"/rest/[0-9]+/[a-z0-9]{12,}/?"),
-        (b"/rest/",),
+        re.compile(
+            rb"(?:/|(?<![A-Za-z0-9_-]))rest/[0-9]+/[a-z0-9]{12,}/?"
+        ),
+        (b"rest/", b"/"),
         True,
     ),
     SecretClass(
@@ -131,7 +140,36 @@ def _basic_auth_matches(data: bytes, item: SecretClass):
         separator = data.find(b"://", separator + 3)
 
 
+def _has_bitrix_marker(line: bytes) -> bool:
+    folded = line.decode("utf-8", "ignore").casefold()
+    return any(marker in folded for marker in ("bitrix", "webhook", "вебхук"))
+
+
+def _bitrix_matches(data: bytes, item: SecretClass):
+    yield from item.regex.finditer(data)
+    offset = 0
+    for line in data.splitlines(keepends=True):
+        if _has_bitrix_marker(line):
+            for match in BITRIX_BARE_RE.finditer(line):
+                yield _OffsetMatch(match, offset)
+        offset += len(line)
+
+
+class _OffsetMatch:
+    def __init__(self, match: re.Match[bytes], offset: int) -> None:
+        self._match = match
+        self._offset = offset
+
+    def start(self) -> int:
+        return self._offset + self._match.start()
+
+    def end(self) -> int:
+        return self._offset + self._match.end()
+
+
 def _matches(data: bytes, item: SecretClass):
+    if item.name == "bitrix_webhook":
+        return _bitrix_matches(data, item)
     if item.name == "tg_bot_token":
         return _tg_matches(data, item)
     if item.name == "basic_auth_url":
@@ -201,5 +239,5 @@ def is_fake(value: bytes) -> bool:
 
 
 def webhook_user_id(value: bytes) -> int | None:
-    match = re.search(rb"/rest/([0-9]+)/[a-z0-9]{12,}/?", value)
+    match = re.search(rb"(?:rest/)?([0-9]{1,7})/[a-z0-9]{12,}/?", value)
     return int(match.group(1)) if match else None

@@ -12,12 +12,14 @@ def positive_control(
     ctx: Context,
     build: Callable[[Path], None],
     probe: Callable[[Path], int],
+    *,
+    minimum_hits: int = 1,
 ) -> str:
     del name
     temp_dir = Path(tempfile.mkdtemp(prefix="env-audit-ctl-"))
     try:
         build(temp_dir)
-        return "pass" if probe(temp_dir) > 0 else "fail"
+        return "pass" if probe(temp_dir) >= minimum_hits else "fail"
     except Exception:
         ctx.error(section, "positive_control_error")
         return "fail"

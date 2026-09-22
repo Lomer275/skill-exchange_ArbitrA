@@ -43,6 +43,21 @@ ARCHIVE_SUFFIXES = (".tar", ".tar.gz", ".tgz", ".zip")
 HOME_EXCLUDED_DIRS = EXCLUDED_DIRS | frozenset(
     {".cache", ".npm", ".nvm", ".vscode-server", ".cursor-server"}
 )
+HOME_PRIORITY_DIRS = (
+    ".claude",
+    ".codex",
+    ".secrets",
+    ".ssh",
+    ".config",
+    "Desktop",
+    "Downloads",
+    "Documents",
+    "Tools",
+)
+AGENT_HISTORY_WINDOW_DAYS = 30
+AGENT_HISTORY_MAX_BYTES = 2 * 1024 * 1024 * 1024
+AGENT_HISTORY_CHUNK_BYTES = 1024 * 1024
+AGENT_HISTORY_OVERLAP_BYTES = 64 * 1024
 SECRET_DIR_NAME_RE = re.compile(r"secret|env|cred|key|token", re.IGNORECASE)
 COPY_ALL_RE = re.compile(
     rb"(?im)^\s*(?:COPY|ADD)\s+(?:--[^\s]+\s+)*\.\s+\.\s*$"
@@ -860,6 +875,162 @@ def _home_exclusions(home: Path, roots: list[Path], codex_home: Path) -> tuple[P
     return tuple(dict.fromkeys(excluded))
 
 
+def _walk_regular_files(roots: list[Path]):
+    for root in sorted(roots, key=str):
+        if root.is_symlink() or not root.is_dir():
+            continue
+        for current, dirs, files in os.walk(root, followlinks=False):
+            current_path = Path(current)
+            dirs[:] = [
+                name
+                for name in sorted(dirs)
+                if not (current_path / name).is_symlink()
+            ]
+            for name in sorted(files):
+                path = current_path / name
+                if not path.is_symlink():
+                    yield path
+
+
+def _agent_history_sources(home: Path, codex_home: Path):
+    projects = home / ".claude" / "projects"
+    subagent_dirs = sorted(projects.glob("*/*/subagents"), key=str)
+    sessions = codex_home / "sessions"
+    return (
+        (
+            "claude_transcripts",
+            projects.is_dir(),
+            (path for path in sorted(projects.glob("*/*.jsonl"), key=str)),
+        ),
+        (
+            "claude_subagents",
+            bool(subagent_dirs),
+            _walk_regular_files(subagent_dirs),
+        ),
+        (
+            "codex_sessions",
+            sessions.is_dir(),
+            _walk_regular_files([sessions]),
+        ),
+    )
+
+
+def _empty_agent_history(present: bool) -> dict:
+    return {
+        "present": present,
+        "files_scanned": 0,
+        "files_with_hits": 0,
+        "by_class": {},
+        "bytes_read": 0,
+        "window_days": AGENT_HISTORY_WINDOW_DAYS,
+        "truncated": False,
+        "lower_bound": True,
+        "paths_sample": [],
+    }
+
+
+def _scan_agent_histories(
+    ctx: Context,
+    codex_home: Path,
+    *,
+    max_bytes: int = AGENT_HISTORY_MAX_BYTES,
+    chunk_bytes: int = AGENT_HISTORY_CHUNK_BYTES,
+) -> dict[str, dict]:
+    cutoff = time.time() - AGENT_HISTORY_WINDOW_DAYS * 24 * 60 * 60
+    total_bytes = 0
+    budget_reported = False
+    size_cap_reported = False
+    result = {}
+
+    def stop_for_budget(item: dict) -> None:
+        nonlocal budget_reported
+        item["truncated"] = True
+        ctx.mark_truncated()
+        if not budget_reported:
+            ctx.skip(NAME, "budget", "agent_histories")
+            budget_reported = True
+
+    def stop_for_size(item: dict) -> None:
+        nonlocal size_cap_reported
+        item["truncated"] = True
+        ctx.mark_truncated()
+        if not size_cap_reported:
+            ctx.skip(NAME, "size_cap", "agent_histories")
+            size_cap_reported = True
+
+    for name, present, paths in _agent_history_sources(ctx.home, codex_home):
+        item = _empty_agent_history(present)
+        class_files = {secret.name: 0 for secret in patterns.CLASSES}
+        if not present:
+            result[name] = item
+            continue
+        for path in paths:
+            if ctx.expired():
+                stop_for_budget(item)
+                break
+            try:
+                path_stat = path.stat()
+            except OSError:
+                continue
+            if not path.is_file() or path_stat.st_mtime < cutoff:
+                continue
+            if total_bytes >= max_bytes:
+                stop_for_size(item)
+                break
+            file_classes = set()
+            tail = b""
+            stopped = False
+            try:
+                stream = path.open("rb")
+            except OSError:
+                continue
+            item["files_scanned"] += 1
+            with stream:
+                while True:
+                    if ctx.expired():
+                        stop_for_budget(item)
+                        stopped = True
+                        break
+                    remaining = max_bytes - total_bytes
+                    if remaining <= 0:
+                        stop_for_size(item)
+                        stopped = True
+                        break
+                    try:
+                        chunk = stream.read(min(chunk_bytes, remaining))
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    total_bytes += len(chunk)
+                    item["bytes_read"] += len(chunk)
+                    data = tail + chunk
+                    for match in patterns.find(data, self_check_only=True):
+                        value = data[match.start : match.end]
+                        if not patterns.is_fake(value):
+                            file_classes.add(match.cls)
+                    tail = data[-AGENT_HISTORY_OVERLAP_BYTES:]
+                    if total_bytes >= max_bytes and stream.tell() < path_stat.st_size:
+                        stop_for_size(item)
+                        stopped = True
+                        break
+            if file_classes:
+                item["files_with_hits"] += 1
+                for cls in file_classes:
+                    class_files[cls] += 1
+                if len(item["paths_sample"]) < 10:
+                    item["paths_sample"].append(_display_home(path, ctx.home))
+            if stopped:
+                break
+        item["by_class"] = {
+            secret.name: class_files[secret.name]
+            for secret in patterns.CLASSES
+            if class_files[secret.name]
+        }
+        result[name] = item
+    return result
+
+
 def _inside_path(path: Path, parent: Path) -> bool:
     try:
         return os.path.commonpath((str(path), str(parent))) == str(parent)
@@ -875,6 +1046,7 @@ def _summary_entries(
     exclude_paths: tuple[Path, ...],
     excluded_worktrees: list[Path] | None,
     max_depth: int | None,
+    prioritize_top_level: bool = False,
 ):
     root = Path(os.path.abspath(root))
     blocked = {Path(os.path.abspath(path)) for path in exclude_paths}
@@ -897,7 +1069,13 @@ def _summary_entries(
             continue
         depth = len(relative_dir.parts)
         kept_dirs = []
-        for dirname in sorted(dirs):
+        ordered_dirs = sorted(dirs)
+        if prioritize_top_level and depth == 0:
+            available = set(ordered_dirs)
+            ordered_dirs = [
+                name for name in HOME_PRIORITY_DIRS if name in available
+            ] + [name for name in ordered_dirs if name not in HOME_PRIORITY_DIRS]
+        for dirname in ordered_dirs:
             candidate = Path(os.path.abspath(current_path / dirname))
             if dirname in exclude_dirs or candidate in blocked:
                 continue
@@ -955,6 +1133,7 @@ def _scan_tree_summary(
     matched_files = 0
     truncated = False
     excluded_worktrees: list[Path] | None = [] if exclude_worktrees else None
+    is_home_root = Path(os.path.abspath(root)) == Path(os.path.abspath(ctx.home))
     if not root.is_dir():
         result = {
             "files_scanned": 0,
@@ -972,6 +1151,24 @@ def _scan_tree_summary(
             budget_deadline is not None and now >= budget_deadline
         )
 
+    top_level_dirs = []
+    reached_top_level = set()
+    if is_home_root:
+        blocked = {Path(os.path.abspath(path)) for path in exclude_paths}
+        try:
+            names = [path.name for path in root.iterdir() if path.is_dir()]
+        except OSError:
+            names = []
+        available = {
+            name
+            for name in names
+            if name not in HOME_EXCLUDED_DIRS
+            and Path(os.path.abspath(root / name)) not in blocked
+        }
+        top_level_dirs = [
+            name for name in HOME_PRIORITY_DIRS if name in available
+        ] + sorted(name for name in available if name not in HOME_PRIORITY_DIRS)
+
     stopped_at = "."
     for entry, current_dir in _summary_entries(
         root,
@@ -980,6 +1177,7 @@ def _scan_tree_summary(
         exclude_paths=exclude_paths,
         excluded_worktrees=excluded_worktrees,
         max_depth=max_depth,
+        prioritize_top_level=is_home_root,
     ):
         stopped_at = current_dir
         if budget_expired():
@@ -989,6 +1187,8 @@ def _scan_tree_summary(
             truncated = True
             break
         if entry is None:
+            if current_dir != ".":
+                reached_top_level.add(current_dir.split("/", 1)[0])
             continue
         if entry.is_symlink or entry.size > 2 * 1024 * 1024:
             continue
@@ -1025,6 +1225,12 @@ def _scan_tree_summary(
     }
     if excluded_worktrees is not None:
         result["excluded_worktrees"] = len(excluded_worktrees)
+    if is_home_root:
+        result["not_reached"] = (
+            [name for name in top_level_dirs if name not in reached_top_level][:30]
+            if truncated
+            else []
+        )
     if truncated:
         result["stopped_at"] = stopped_at
     return result
@@ -1155,11 +1361,18 @@ def _ssh(ctx: Context) -> tuple[list[dict], int]:
 
 def _run_controls(ctx: Context) -> dict[str, str]:
     value = _control_value()
+    tail = value.rsplit(b"/", 1)[-1]
+    tree_values = (
+        value,
+        b"rest/2/" + tail,
+        b"BiTrIx webhook 3/" + tail,
+    )
 
     def build_tree(path: Path) -> None:
-        target = path / "sub" / "probe.txt"
-        target.parent.mkdir()
-        target.write_bytes(value)
+        target = path / "sub"
+        target.mkdir()
+        for index, probe in enumerate(tree_values):
+            (target / f"probe-{index}.txt").write_bytes(probe)
 
     def probe_tree(path: Path) -> int:
         counter = Counter()
@@ -1174,7 +1387,7 @@ def _run_controls(ctx: Context) -> dict[str, str]:
                     is_fixture=False,
                     include_generic=False,
                 )
-        return counter.as_dict()["bitrix_webhook"]["files"]
+        return counter.as_dict()["bitrix_webhook"]["matches"]
 
     def init_repo(path: Path) -> None:
         if run(["git", "init", "-q", str(path)]).rc != 0:
@@ -1218,7 +1431,14 @@ def _run_controls(ctx: Context) -> dict[str, str]:
         return home["files_with_matches"] + shell["with_matches"] + config["files_with_matches"]
 
     return {
-        "tree": positive_control(NAME, "tree", ctx, build_tree, probe_tree),
+        "tree": positive_control(
+            NAME,
+            "tree",
+            ctx,
+            build_tree,
+            probe_tree,
+            minimum_hits=len(tree_values),
+        ),
         "git_head": positive_control(NAME, "git_head", ctx, build_head, probe_head),
         "git_history": positive_control(NAME, "git_history", ctx, build_history, probe_history),
         "configs": positive_control(NAME, "configs", ctx, build_configs, probe_configs),
@@ -1280,6 +1500,10 @@ def collect(ctx: Context) -> dict:
         timings.update({"home": 0.0, "shell_history": 0.0, "config_dir": 0.0})
 
     started = time.perf_counter()
+    agent_histories = _scan_agent_histories(ctx, codex_home)
+    timings["agent_histories"] = round(time.perf_counter() - started, 2)
+
+    started = time.perf_counter()
     storage = _storage(ctx)
     timings["storage"] = round(time.perf_counter() - started, 2)
 
@@ -1301,6 +1525,7 @@ def collect(ctx: Context) -> dict:
         "agent_configs_generic_assignment": configs_generic,
         "roots": roots,
         "home": home,
+        "agent_histories": agent_histories,
         "shell_history": shell_history,
         "config_dir": config_dir,
         "storage": storage,

@@ -107,3 +107,32 @@ def test_home_walk_order_is_deterministic(fake_home, monkeypatch):
     )
 
     assert seen == ["~/a.txt", "~/z.txt", "~/middle/b.txt"]
+
+
+def test_home_priority_and_not_reached(fake_home, monkeypatch):
+    for dirname in (".aaa", ".claude", "Downloads"):
+        directory = fake_home / dirname
+        directory.mkdir(exist_ok=True)
+        (directory / "probe.txt").write_text(dirname, encoding="utf-8")
+    seen = []
+    started = time.time()
+    ctx = Context(Flags(), fake_home, [], started, started + 300)
+
+    def stop_after_first(data, counter, *, path_rel, is_fixture, include_generic):
+        seen.append(path_rel)
+        ctx.deadline = time.time() - 1
+        return 0
+
+    monkeypatch.setattr(secrets, "scan_bytes", stop_after_first)
+    summary = secrets._scan_tree_summary(
+        fake_home,
+        ctx,
+        home_prefix=True,
+        include_generic=False,
+        budget_details="home",
+    )
+
+    assert seen == ["~/.claude/probe.txt"]
+    assert summary["truncated"] is True
+    assert {".aaa", "Downloads"} <= set(summary["not_reached"])
+    assert len(summary["not_reached"]) <= 30
