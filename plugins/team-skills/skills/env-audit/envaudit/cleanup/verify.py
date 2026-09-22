@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import time
 
+from envaudit.core.constants import MEMORY_INDEX_MAX_BYTES
 from envaudit.core.context import Context, Flags
 from envaudit.sections import handoff, instructions, run_sections, skills
 
@@ -136,7 +137,7 @@ def _item_expected(item: dict, after: dict, home: Path) -> bool:
             and isinstance(match.get("index_lines"), int)
             and match["index_lines"] <= 200
             and isinstance(match.get("index_bytes"), int)
-            and match["index_bytes"] <= 25_000
+            and match["index_bytes"] <= MEMORY_INDEX_MAX_BYTES
         )
     if kind in {"skill_override_off", "skill_override_restore"}:
         return _override_expected(item, after, home)
