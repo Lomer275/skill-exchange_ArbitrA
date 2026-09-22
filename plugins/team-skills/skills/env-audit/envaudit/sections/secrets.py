@@ -67,6 +67,9 @@ AGENT_HISTORY_WINDOW_DAYS = 30
 AGENT_HISTORY_MAX_BYTES = 2 * 1024 * 1024 * 1024
 AGENT_HISTORY_CHUNK_BYTES = 1024 * 1024
 AGENT_HISTORY_OVERLAP_BYTES = 64 * 1024
+HOME_BUDGET_SHARE = 0.4
+HOME_BUDGET_MIN_SECONDS = 30
+ROOTS_BUDGET_MIN_SECONDS = 10
 SECRET_DIR_NAME_RE = re.compile(r"secret|env|cred|key|token", re.IGNORECASE)
 COPY_ALL_RE = re.compile(
     rb"(?im)^\s*(?:COPY|ADD)\s+(?:--[^\s]+\s+)*\.\s+\.\s*$"
@@ -80,6 +83,12 @@ CYRILLIC_INN_MARKERS = tuple(
 def _control_value(user_id: int = 1) -> bytes:
     prefix = b"/" + b"rest" + b"/" + str(user_id).encode("ascii") + b"/"
     return prefix + b"k9m2n5p8q4r7s3t6"
+
+
+def _skip_budget_once(ctx: Context, details: str) -> None:
+    expected = {"section": NAME, "reason": "budget", "details": details}
+    if expected not in ctx.skipped:
+        ctx.skip(NAME, "budget", details)
 
 
 def _mode(path: Path) -> str | None:
@@ -525,7 +534,13 @@ def _root_patterns(
 
 
 def _scan_root(root: Path, ctx: Context, vcs: bool) -> dict:
-    entries = sorted(iter_files(root, ctx, NAME), key=lambda entry: entry.rel)
+    entries = []
+    for entry in iter_files(root, ctx, NAME):
+        if ctx.expired():
+            ctx.mark_truncated()
+            break
+        entries.append(entry)
+    entries.sort(key=lambda entry: entry.rel)
     entry_by_rel = {entry.rel: entry for entry in entries}
     tracked = _tracked_files(root) if vcs else set()
     untracked = _untracked_files(root) if vcs else set(entry_by_rel)
@@ -1220,7 +1235,7 @@ def _scan_tree_summary(
         if budget_expired():
             ctx.mark_truncated()
             if budget_details is not None:
-                ctx.skip(NAME, "budget", budget_details)
+                _skip_budget_once(ctx, budget_details)
             truncated = True
             break
         if entry is None:
@@ -1246,7 +1261,7 @@ def _scan_tree_summary(
         if budget_expired():
             ctx.mark_truncated()
             if budget_details is not None:
-                ctx.skip(NAME, "budget", budget_details)
+                _skip_budget_once(ctx, budget_details)
             truncated = True
             break
     by_class = {
@@ -1538,37 +1553,67 @@ def collect(ctx: Context) -> dict:
         configs_generic = {"files": 0, "matches": 0}
     timings["agent_configs"] = round(time.perf_counter() - started, 2)
 
+    now = time.time()
+    section_deadline = (
+        ctx.section_deadline
+        if ctx.section_deadline is not None
+        else ctx.deadline
+    )
+    remaining_seconds = max(0.0, section_deadline - now)
+    home_seconds = min(
+        max(remaining_seconds * HOME_BUDGET_SHARE, HOME_BUDGET_MIN_SECONDS),
+        max(0.0, remaining_seconds - ROOTS_BUDGET_MIN_SECONDS),
+    )
+    roots_seconds = max(0.0, remaining_seconds - home_seconds)
+    roots_deadline = now + roots_seconds
+    budget_split = {
+        "roots_seconds": round(roots_seconds, 1),
+        "home_seconds": round(home_seconds, 1),
+        "histories_seconds": 0.0,
+    }
+
     started = time.perf_counter()
     roots: dict[str, dict] | None
-    if any(controls[name] == "fail" for name in ("tree", "git_head", "git_history")):
-        roots = None
-    else:
-        roots = {}
-        for root in ctx.roots:
-            vcs = git_available and is_git_repo(root)
-            if not git_available:
-                ctx.skipped.append(
-                    {"section": NAME, "reason": "no_git", "details": str(root)}
-                )
-            elif not vcs:
-                ctx.skip(NAME, "no_vcs", details=str(root))
-            roots[str(root)] = _scan_root(root, ctx, vcs)
+    original_section_deadline = ctx.section_deadline
+    ctx.section_deadline = min(ctx.deadline, roots_deadline)
+    roots_budget_expired = False
+    try:
+        if any(controls[name] == "fail" for name in ("tree", "git_head", "git_history")):
+            roots = None
+        else:
+            roots = {}
+            for root in ctx.roots:
+                vcs = git_available and is_git_repo(root)
+                if not git_available:
+                    ctx.skipped.append(
+                        {"section": NAME, "reason": "no_git", "details": str(root)}
+                    )
+                elif not vcs:
+                    ctx.skip(NAME, "no_vcs", details=str(root))
+                roots[str(root)] = _scan_root(root, ctx, vcs)
+                roots_budget_expired = roots_budget_expired or time.time() >= roots_deadline
+    finally:
+        ctx.section_deadline = original_section_deadline
+    if roots_budget_expired:
+        _skip_budget_once(ctx, "roots")
     timings["roots"] = round(time.perf_counter() - started, 2)
 
     if controls["home"] == "pass":
-        now = time.time()
-        home_deadline = min(now + 120, ctx.deadline - 30)
         home, shell_history, config_dir = _scan_home_blocks(
             ctx,
             codex_home,
             timings,
-            home_deadline=home_deadline,
+            home_deadline=section_deadline,
         )
     else:
         home = shell_history = config_dir = None
         timings.update({"home": 0.0, "shell_history": 0.0, "config_dir": 0.0})
 
     started = time.perf_counter()
+    budget_split["histories_seconds"] = round(
+        max(0.0, section_deadline - time.time()),
+        1,
+    )
     agent_histories = _scan_agent_histories(ctx, codex_home)
     timings["agent_histories"] = round(time.perf_counter() - started, 2)
 
@@ -1586,6 +1631,7 @@ def collect(ctx: Context) -> dict:
     return {
         "lower_bound": True,
         "timings_s": timings,
+        "budget_split": budget_split,
         "positive_controls": controls,
         "generic_assignment_scope": list(GENERIC_ASSIGNMENT_SCOPE),
         "context_files": context_files,
