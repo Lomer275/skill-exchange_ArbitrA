@@ -5,6 +5,24 @@ import re
 
 LEFT_BOUNDARY = rb"(?<![A-Za-z0-9_-])"
 RIGHT_BOUNDARY = rb"(?![A-Za-z0-9_-])"
+BITRIX_BARE_RE = re.compile(
+    rb"(?<![A-Za-z0-9_/-])[0-9]{1,7}/"
+    rb"(?=[a-z0-9]{16}(?![A-Za-z0-9_/-]))"
+    rb"(?=[a-z0-9]{0,15}[a-z])"
+    rb"(?=[a-z0-9]{0,15}[0-9])"
+    rb"[a-z0-9]{16}(?![A-Za-z0-9_/-])"
+)
+BITRIX_MARKERS = (
+    b"itrix",
+    b"ITRIX",
+    b"ebhook",
+    b"EBHOOK",
+    "ебхук".encode(),
+    "ЕБХУК".encode(),
+    b"iTrIx",
+    b"EBhook",
+    "еБхУк".encode(),
+)
 
 
 @dataclass(frozen=True)
@@ -22,8 +40,10 @@ def _bounded(body: bytes) -> re.Pattern[bytes]:
 CLASSES = (
     SecretClass(
         "bitrix_webhook",
-        re.compile(rb"/rest/[0-9]+/[a-z0-9]{12,}/?"),
-        (b"/rest/",),
+        re.compile(
+            rb"(?:/|(?<![A-Za-z0-9_-]))rest/[0-9]+/[a-z0-9]{12,}/?"
+        ),
+        (b"rest/", *BITRIX_MARKERS),
         True,
     ),
     SecretClass(
@@ -131,7 +151,47 @@ def _basic_auth_matches(data: bytes, item: SecretClass):
         separator = data.find(b"://", separator + 3)
 
 
+def _has_bitrix_marker(line: bytes) -> bool:
+    folded = line.decode("utf-8", "ignore").casefold()
+    return any(marker in folded for marker in ("bitrix", "webhook", "вебхук"))
+
+
+def _bitrix_matches(data: bytes, item: SecretClass):
+    yield from item.regex.finditer(data)
+
+    marker_lines = set()
+    for marker in BITRIX_MARKERS:
+        position = data.find(marker)
+        while position >= 0:
+            start = data.rfind(b"\n", 0, position) + 1
+            end = data.find(b"\n", position + len(marker))
+            if end < 0:
+                end = len(data)
+            marker_lines.add((start, end))
+            position = data.find(marker, position + 1)
+
+    for start, end in sorted(marker_lines):
+        line = data[start:end]
+        if _has_bitrix_marker(line):
+            for match in BITRIX_BARE_RE.finditer(line):
+                yield _OffsetMatch(match, start)
+
+
+class _OffsetMatch:
+    def __init__(self, match: re.Match[bytes], offset: int) -> None:
+        self._match = match
+        self._offset = offset
+
+    def start(self) -> int:
+        return self._offset + self._match.start()
+
+    def end(self) -> int:
+        return self._offset + self._match.end()
+
+
 def _matches(data: bytes, item: SecretClass):
+    if item.name == "bitrix_webhook":
+        return _bitrix_matches(data, item)
     if item.name == "tg_bot_token":
         return _tg_matches(data, item)
     if item.name == "basic_auth_url":
@@ -201,5 +261,5 @@ def is_fake(value: bytes) -> bool:
 
 
 def webhook_user_id(value: bytes) -> int | None:
-    match = re.search(rb"/rest/([0-9]+)/[a-z0-9]{12,}/?", value)
+    match = re.search(rb"(?:rest/)?([0-9]{1,7})/[a-z0-9]{12,}/?", value)
     return int(match.group(1)) if match else None

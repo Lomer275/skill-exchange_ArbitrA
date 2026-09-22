@@ -3,6 +3,7 @@ import time
 
 from envaudit.core.context import Context, Flags
 from envaudit.core.output import finalize
+from envaudit.core.patterns import find
 from envaudit.core.redact import REDACTED, scan_file, self_check
 
 from .canaries import CANARY_CLASSES, canary, fragments
@@ -63,3 +64,12 @@ def test_scan_file_canary(tmp_path):
         for value in values
         for fragment in fragments(value)
     )
+
+
+def test_bare_webhook_match_span_excludes_marker():
+    marker = b"Bitrix webhook: "
+    value = b"4242/a1b2c3d4e5f6g7h8"
+    data = marker + value
+    match = next(item for item in find(data) if item.cls == "bitrix_webhook")
+    assert data[match.start : match.end] == value
+    assert data[: match.start] == marker
