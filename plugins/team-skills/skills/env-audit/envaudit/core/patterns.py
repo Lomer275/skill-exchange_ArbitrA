@@ -12,6 +12,17 @@ BITRIX_BARE_RE = re.compile(
     rb"(?=[a-z0-9]{0,15}[0-9])"
     rb"[a-z0-9]{16}(?![A-Za-z0-9_/-])"
 )
+BITRIX_MARKERS = (
+    b"itrix",
+    b"ITRIX",
+    b"ebhook",
+    b"EBHOOK",
+    "ебхук".encode(),
+    "ЕБХУК".encode(),
+    b"iTrIx",
+    b"EBhook",
+    "еБхУк".encode(),
+)
 
 
 @dataclass(frozen=True)
@@ -32,7 +43,7 @@ CLASSES = (
         re.compile(
             rb"(?:/|(?<![A-Za-z0-9_-]))rest/[0-9]+/[a-z0-9]{12,}/?"
         ),
-        (b"rest/", b"/"),
+        (b"rest/", *BITRIX_MARKERS),
         True,
     ),
     SecretClass(
@@ -147,12 +158,23 @@ def _has_bitrix_marker(line: bytes) -> bool:
 
 def _bitrix_matches(data: bytes, item: SecretClass):
     yield from item.regex.finditer(data)
-    offset = 0
-    for line in data.splitlines(keepends=True):
+
+    marker_lines = set()
+    for marker in BITRIX_MARKERS:
+        position = data.find(marker)
+        while position >= 0:
+            start = data.rfind(b"\n", 0, position) + 1
+            end = data.find(b"\n", position + len(marker))
+            if end < 0:
+                end = len(data)
+            marker_lines.add((start, end))
+            position = data.find(marker, position + 1)
+
+    for start, end in sorted(marker_lines):
+        line = data[start:end]
         if _has_bitrix_marker(line):
             for match in BITRIX_BARE_RE.finditer(line):
-                yield _OffsetMatch(match, offset)
-        offset += len(line)
+                yield _OffsetMatch(match, start)
 
 
 class _OffsetMatch:

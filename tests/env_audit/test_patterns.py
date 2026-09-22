@@ -1,5 +1,6 @@
 import pytest
 
+from envaudit.core import patterns
 from envaudit.core.patterns import find, is_fake, webhook_user_id
 
 from .canaries import CANARY_CLASSES, canary
@@ -58,7 +59,20 @@ def test_bitrix_bare_rejects_false_positives(data):
 
 @pytest.mark.parametrize(
     "marker",
-    ["BiTrIx", "WEBhook", "ВеБхУк"],
+    [
+        "Bitrix",
+        "BITRIX",
+        "bitrix",
+        "Webhook",
+        "WEBHOOK",
+        "webhook",
+        "Вебхук",
+        "ВЕБХУК",
+        "вебхук",
+        "BiTrIx",
+        "WEBhook",
+        "ВеБхУк",
+    ],
 )
 def test_bitrix_bare_requires_marker_on_same_line(marker):
     value = "4242/a1b2c3d4e5f6g7h8"
@@ -67,3 +81,18 @@ def test_bitrix_bare_requires_marker_on_same_line(marker):
     assert len(matches) == 1
     assert data[matches[0].start : matches[0].end] == value.encode("ascii")
     assert webhook_user_id(value.encode("ascii")) == 4242
+
+
+def test_bitrix_prefilter_skips_unmarked_path(monkeypatch):
+    calls = 0
+    original = patterns._bitrix_matches
+
+    def counted(data, item):
+        nonlocal calls
+        calls += 1
+        return original(data, item)
+
+    monkeypatch.setattr(patterns, "_bitrix_matches", counted)
+
+    assert find(b"ordinary/path/without/a/web-hook-marker") == []
+    assert calls == 0
