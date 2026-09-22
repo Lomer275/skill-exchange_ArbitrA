@@ -99,7 +99,7 @@
       ],
       "properties": {
         "user": {"type": "string"},
-        "uid": {"type": "integer", "minimum": 0},
+        "uid": {"type": ["integer", "null"], "minimum": 0},
         "home": {"type": "string"},
         "hostname": {"type": "string"},
         "python": {"type": "string"},
@@ -107,7 +107,7 @@
         "codex_home": {"type": "string"},
         "claude_version": {"type": ["string", "null"]},
         "codex_version": {"type": ["string", "null"]},
-        "users_with_home": {"type": "integer", "minimum": 0},
+        "users_with_home": {"type": ["integer", "null"], "minimum": 0},
         "logged_in_count": {"type": ["integer", "null"], "minimum": 0},
         "cpu_count": {"type": ["integer", "null"], "minimum": 0},
         "mem_total_mb": {"type": ["integer", "null"], "minimum": 0},
@@ -149,7 +149,8 @@
               "not_applicable",
               "size_cap",
               "blocked",
-              "no_definitions"
+              "no_definitions",
+              "no_git"
             ]
           },
           "details": {"type": ["string", "null"]}

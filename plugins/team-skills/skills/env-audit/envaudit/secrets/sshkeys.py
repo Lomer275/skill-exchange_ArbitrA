@@ -2,6 +2,9 @@ import base64
 from pathlib import Path
 import stat
 
+from envaudit.core import osinfo
+from envaudit.core.runner import run, which
+
 
 def _key_type(header: bytes) -> str:
     if b"OPENSSH" in header:
@@ -40,16 +43,34 @@ def _encrypted(data: bytes, key_type: str) -> bool | None:
     return None
 
 
+def _passphrase(path: Path) -> bool | str:
+    executable = which("ssh-keygen")
+    if executable is None:
+        return "not_checked"
+    result = run(
+        [executable, "-y", "-P", "", "-f", str(path)],
+        timeout=15,
+    )
+    if result.rc is None:
+        return "not_checked"
+    return result.rc != 0
+
+
 def key_info(path: Path, data: bytes | None = None) -> dict:
-    mode = stat.S_IMODE(path.stat().st_mode)
+    windows = osinfo.is_windows()
+    mode = None if windows else stat.S_IMODE(path.stat().st_mode)
     if data is None:
         data = path.read_bytes()
     header = data.splitlines()[0] if data else b""
     key_type = _key_type(header)
-    return {
+    result = {
         "file": str(path),
         "type": key_type,
-        "mode": f"{mode:04o}",
-        "wider_than_600": bool(mode & 0o077),
+        "mode": None if mode is None else f"{mode:04o}",
+        "wider_than_600": None if mode is None else bool(mode & 0o077),
         "encrypted": _encrypted(data, key_type),
+        "passphrase": _passphrase(path),
     }
+    if windows:
+        result["acl"] = "not_checked"
+    return result

@@ -20,7 +20,7 @@ authority on how to run. This file says what the pieces are and what may never h
 
 The collector needs python3.10 and the standard library — nothing else. Exit codes:
 0 done, 2 no project root found, 3 the self-check redacted a value, 4 wrong account,
-5 not a POSIX system — on native Windows follow `references/windows.md` (`--scan-file` still works).
+5 not a POSIX system — on native Windows only `--only secrets` and `--scan-file` run; for the rest follow `references/windows.md`.
 
 ## Before step 0 — make sure this is v3
 
