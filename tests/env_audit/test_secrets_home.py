@@ -78,7 +78,9 @@ def test_home_budget_preserves_later_blocks(fake_home):
 
     assert home["truncated"] is True
     assert home["stopped_at"] == "."
-    assert {"section": "secrets", "reason": "budget", "details": "home"} in ctx.skipped
+    expected = {"section": "secrets", "reason": "budget", "details": "home"}
+    assert home["files_scanned"] == 0
+    assert ctx.skipped.count(expected) == 1
     assert shell["with_matches"] == 1
     assert config_dir["files_with_matches"] == 1
 
