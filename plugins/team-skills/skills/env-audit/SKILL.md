@@ -19,7 +19,17 @@ authority on how to run. This file says what the pieces are and what may never h
 | `python3 reality_check.py estimate / prepare / command / run --confirmed / verdict / cleanup` | proves in an isolated sandbox whether `/close` and `/accept` really write to the canonical HANDOFF and CHANGELOG | inside the sandbox only |
 
 The collector needs python3.10 and the standard library — nothing else. Exit codes:
-0 done, 2 no project root found, 3 the self-check redacted a value, 4 wrong account.
+0 done, 2 no project root found, 3 the self-check redacted a value, 4 wrong account,
+5 not a POSIX system — on native Windows follow `references/windows.md` (`--scan-file` still works).
+
+## Before step 0 — make sure this is v3
+
+`collect.py` and `meta.json` with version 3.x must lie next to this file. If they do not,
+or the brief you loaded calls itself v2.x, the person is running a stale copy: stop and say so.
+The usual cause is updating the marketplace folder with `git pull`. That refreshes the
+catalogue but not the installed plugin. The fix: `/plugin marketplace update skill-exchange`,
+update `team-skills` in `/plugin`, then reload the editor window. In VS Code a new chat in the
+same window keeps the old skill list.
 
 ## The run, in nine steps
 
