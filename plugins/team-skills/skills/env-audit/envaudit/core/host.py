@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 import platform
-import pwd
 import re
 import socket
 
@@ -46,6 +45,8 @@ def _mem_total_mb() -> int | None:
 
 
 def collect_host(ctx: Context) -> dict:
+    import pwd
+
     account = pwd.getpwuid(os.geteuid())
     codex_home = Path(os.environ.get("CODEX_HOME", str(ctx.home / ".codex")))
     codex_home = Path(os.path.realpath(codex_home.expanduser()))

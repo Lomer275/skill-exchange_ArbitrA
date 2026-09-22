@@ -90,10 +90,38 @@ def test_memory_mapping_root_worktree_cwd(fake_home, monkeypatch):
     assert len(memory["roots_with_multiple_dirs"][str(root)]) == 3
 
 
+def test_memory_dir_collisions(fake_home):
+    colliding = [
+        fake_home / "projects" / "Экспресс-Банкрот",
+        fake_home / "projects" / "Кредитный доктор",
+    ]
+    distinct = [
+        fake_home / "projects" / "alpha",
+        fake_home / "projects" / "bravo",
+    ]
+    for root in colliding + distinct:
+        root.mkdir(parents=True)
+    encoded = memory_dir_name(str(colliding[0]))
+    assert encoded == memory_dir_name(str(colliding[1]))
+    write_memory(fake_home, encoded)
+
+    section = instructions.collect(_context(fake_home, colliding + distinct))
+
+    assert section["memory_dir_collisions"] == [
+        {
+            "encoded": encoded,
+            "roots": sorted(str(root) for root in colliding),
+            "memory_exists": True,
+        }
+    ]
+
+
 def test_index_limits(fake_home):
     root = fake_home / "projects" / "project"
-    cwd = root / "nested"
-    cwd.mkdir(parents=True)
+    within_limit = root / "within-limit"
+    over_limit = root / "over-limit"
+    within_limit.mkdir(parents=True)
+    over_limit.mkdir(parents=True)
     write_memory(
         fake_home,
         memory_dir_name(str(root)),
@@ -101,19 +129,37 @@ def test_index_limits(fake_home):
     )
     write_memory(
         fake_home,
-        memory_dir_name(str(cwd)),
-        index=_sized_index(100, 26_000),
+        memory_dir_name(str(within_limit)),
+        index=_sized_index(100, 25_023),
     )
-    write_session(fake_home, str(root), "cwd", [user_line(iso(1), cwd=str(cwd))])
+    write_memory(
+        fake_home,
+        memory_dir_name(str(over_limit)),
+        index=_sized_index(100, 25_700),
+    )
+    write_session(
+        fake_home,
+        str(root),
+        "within-limit",
+        [user_line(iso(1), cwd=str(within_limit))],
+    )
+    write_session(
+        fake_home,
+        str(root),
+        "over-limit",
+        [user_line(iso(2), cwd=str(over_limit))],
+    )
 
     items = {
         item["name"]: item
         for item in instructions.collect(_context(fake_home, [root]))["memory"]["dirs"]
     }
     first = items[memory_dir_name(str(root))]
-    second = items[memory_dir_name(str(cwd))]
+    second = items[memory_dir_name(str(within_limit))]
+    third = items[memory_dir_name(str(over_limit))]
     assert (first["index_over_lines"], first["index_over_bytes"]) == (True, False)
-    assert (second["index_over_lines"], second["index_over_bytes"]) == (False, True)
+    assert (second["index_over_lines"], second["index_over_bytes"]) == (False, False)
+    assert (third["index_over_lines"], third["index_over_bytes"]) == (False, True)
 
 
 def test_start_context_median_and_exclusions(fake_home):

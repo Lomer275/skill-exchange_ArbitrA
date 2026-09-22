@@ -3,7 +3,7 @@
   "$id": "urn:env-audit:section:instructions",
   "type": ["object", "null"],
   "additionalProperties": false,
-  "required": ["global", "projects", "memory", "start_context"],
+  "required": ["global", "projects", "memory_dir_collisions", "memory", "start_context"],
   "$defs": {
     "instruction_file": {
       "type": "object",
@@ -63,6 +63,24 @@
             }
           },
           "total_bytes": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "memory_dir_collisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["encoded", "roots", "memory_exists"],
+        "properties": {
+          "encoded": {"type": "string"},
+          "roots": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2,
+            "uniqueItems": true
+          },
+          "memory_exists": {"type": "boolean"}
         }
       }
     },

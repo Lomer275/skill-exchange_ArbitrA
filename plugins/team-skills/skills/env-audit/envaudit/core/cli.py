@@ -3,7 +3,6 @@ import base64
 import json
 import os
 from pathlib import Path
-import pwd
 import sys
 import time
 
@@ -19,7 +18,18 @@ from envaudit.sections import discover
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Collect environment audit facts")
+    parser = argparse.ArgumentParser(
+        description="Collect environment audit facts",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Коды выхода:\n"
+            "  0 — сбор или проверка завершены успешно\n"
+            "  2 — ошибка аргументов, корень не найден или результат нельзя записать\n"
+            "  3 — самопроверка нашла секрет в файле или собранных данных\n"
+            "  4 — текущий пользователь или HOME не совпадает с --expect-user\n"
+            "  5 — полный сбор недоступен на Windows или без модуля pwd"
+        ),
+    )
     parser.add_argument("--root", action="append", default=[])
     parser.add_argument("--root-b64", action="append", default=[])
     parser.add_argument("--expect-user")
@@ -44,12 +54,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _expect_user(name: str) -> bool:
+    import pwd
+
     account = pwd.getpwuid(os.geteuid())
     return (
         account.pw_name == name
         and os.path.realpath(os.environ.get("HOME", ""))
         == os.path.realpath(account.pw_dir)
     )
+
+
+def _full_collection_supported() -> bool:
+    if os.name == "nt":
+        return False
+    try:
+        import pwd  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 def _lower_priority() -> None:
@@ -141,6 +163,13 @@ def main(argv: list[str]) -> int:
         code, report = scan_file(args.scan_file)
         print(json.dumps(report, ensure_ascii=False, sort_keys=True, indent=1))
         return code
+    if not _full_collection_supported():
+        print(
+            "Сборщик рассчитан на Linux/WSL. На Windows аудит идёт вручную по "
+            "references/windows.md",
+            file=sys.stderr,
+        )
+        return 5
     if args.expect_user is not None and not _expect_user(args.expect_user):
         print("{}")
         return 4

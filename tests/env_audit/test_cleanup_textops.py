@@ -4,6 +4,7 @@ from envaudit.cleanup.textops import (
     links,
     md_sections,
 )
+from envaudit.core.constants import MEMORY_INDEX_MAX_BYTES
 
 
 def test_md_sections_team_block():
@@ -32,8 +33,20 @@ def test_compress_memory_index_keeps_links():
 
     assert fits is True
     assert len(result.splitlines()) <= 200
-    assert len(result.encode("utf-8")) <= 25_000
+    assert len(result.encode("utf-8")) <= MEMORY_INDEX_MAX_BYTES
     assert links(result) == links(text)
+
+
+def test_compress_memory_index_uses_25_kib_limit():
+    within_limit = "x" * 25_023
+    over_limit = "x" * 25_700
+
+    within_result, within_fits = compress_memory_index(within_limit)
+    over_result, over_fits = compress_memory_index(over_limit)
+
+    assert (within_result, within_fits) == (within_limit, True)
+    assert over_fits is True
+    assert over_result != over_limit
 
 
 def test_insert_after_line():

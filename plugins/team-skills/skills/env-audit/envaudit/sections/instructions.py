@@ -5,6 +5,7 @@ from pathlib import Path
 from statistics import median
 
 from envaudit.core import runner
+from envaudit.core.constants import MEMORY_INDEX_MAX_BYTES
 from envaudit.core.context import Context
 from envaudit.core.skills_index import memory_dir_name
 from envaudit.core.transcripts import Record, load_index
@@ -20,7 +21,6 @@ _PROJECT_FILES = {
     "CLAUDE.local.md": "claude_local_md",
 }
 _INDEX_MAX_LINES = 200
-_INDEX_MAX_BYTES = 25_000
 
 
 def _display(path: Path, home: Path) -> str:
@@ -162,8 +162,26 @@ def _memory_stats(directory: Path, root: Path, matched_by: str) -> dict:
         "index_lines": lines,
         "index_bytes": size,
         "index_over_lines": lines > _INDEX_MAX_LINES,
-        "index_over_bytes": size > _INDEX_MAX_BYTES,
+        "index_over_bytes": size > MEMORY_INDEX_MAX_BYTES,
     }
+
+
+def _memory_dir_collisions(ctx: Context) -> list[dict]:
+    grouped: dict[str, set[str]] = {}
+    for root in ctx.roots:
+        resolved = str(Path(os.path.realpath(root)))
+        grouped.setdefault(memory_dir_name(resolved), set()).add(resolved)
+
+    base = ctx.home / ".claude" / "projects"
+    return [
+        {
+            "encoded": encoded,
+            "roots": sorted(roots),
+            "memory_exists": (base / encoded / "memory").is_dir(),
+        }
+        for encoded, roots in sorted(grouped.items())
+        if len(roots) >= 2
+    ]
 
 
 def _memory(ctx: Context, records: list[Record]) -> dict:
@@ -375,6 +393,7 @@ def collect(ctx: Context) -> dict:
             "codex_agents_md": _global_file(codex_home / "AGENTS.md", ctx.home),
         },
         "projects": {str(root): _project_files(root, ctx) for root in ctx.roots},
+        "memory_dir_collisions": _memory_dir_collisions(ctx),
         "memory": _memory(ctx, index.records),
         "start_context": {
             str(root): _start_context(root, index) for root in ctx.roots

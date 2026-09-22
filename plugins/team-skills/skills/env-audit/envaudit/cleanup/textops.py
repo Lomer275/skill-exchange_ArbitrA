@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 import re
 
+from envaudit.core.constants import MEMORY_INDEX_MAX_BYTES
+
 
 TEAM_BEGIN = "BEGIN team-context"
 TEAM_END = "END team-context"
@@ -132,7 +134,7 @@ def compress_memory_index(
     text: str,
     *,
     max_lines: int = 200,
-    max_bytes: int = 25_000,
+    max_bytes: int = MEMORY_INDEX_MAX_BYTES,
     hook_chars: int = 80,
 ) -> tuple[str, bool]:
     if len(text.splitlines()) <= max_lines and len(text.encode("utf-8")) <= max_bytes:
