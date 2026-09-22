@@ -1,3 +1,4 @@
+import getpass
 import os
 from pathlib import Path
 import platform
@@ -5,6 +6,7 @@ import re
 import socket
 
 from .context import Context
+from . import osinfo
 from .runner import run, which
 
 
@@ -45,9 +47,25 @@ def _mem_total_mb() -> int | None:
 
 
 def collect_host(ctx: Context) -> dict:
-    import pwd
+    if osinfo.is_windows():
+        user = getpass.getuser()
+        uid = None
+        users_with_home = None
+        logged_in_count = None
+        mem_total_mb = None
+    else:
+        import pwd
 
-    account = pwd.getpwuid(os.geteuid())
+        account = pwd.getpwuid(os.geteuid())
+        user = account.pw_name
+        uid = os.geteuid()
+        users_with_home = sum(
+            1
+            for entry in pwd.getpwall()
+            if 1000 <= entry.pw_uid < 65534 and Path(entry.pw_dir).is_dir()
+        )
+        logged_in_count = _logged_in_count()
+        mem_total_mb = _mem_total_mb()
     codex_home = Path(os.environ.get("CODEX_HOME", str(ctx.home / ".codex")))
     codex_home = Path(os.path.realpath(codex_home.expanduser()))
     has_claude = which("claude") is not None or (ctx.home / ".claude").is_dir()
@@ -61,14 +79,9 @@ def collect_host(ctx: Context) -> dict:
     else:
         profile = "none"
 
-    users_with_home = sum(
-        1
-        for entry in pwd.getpwall()
-        if 1000 <= entry.pw_uid < 65534 and Path(entry.pw_dir).is_dir()
-    )
     return {
-        "user": account.pw_name,
-        "uid": os.geteuid(),
+        "user": user,
+        "uid": uid,
         "home": str(ctx.home),
         "hostname": socket.gethostname(),
         "python": platform.python_version(),
@@ -77,9 +90,9 @@ def collect_host(ctx: Context) -> dict:
         "claude_version": _version("claude"),
         "codex_version": _version("codex"),
         "users_with_home": users_with_home,
-        "logged_in_count": _logged_in_count(),
+        "logged_in_count": logged_in_count,
         "cpu_count": os.cpu_count(),
-        "mem_total_mb": _mem_total_mb(),
+        "mem_total_mb": mem_total_mb,
         "linked_worktrees_skipped": int(
             ctx.shared.get("linked_worktrees_skipped", 0)
         ),

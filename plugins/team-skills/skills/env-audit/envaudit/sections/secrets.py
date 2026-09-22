@@ -13,6 +13,7 @@ import time
 import zipfile
 
 from envaudit.core import patterns, worktrees
+from envaudit.core import osinfo
 from envaudit.core.context import Context
 from envaudit.core.controls import positive_control
 from envaudit.core.dockerignore import load_matcher
@@ -23,8 +24,15 @@ from envaudit.core.runner import (
     git_stream,
     is_git_repo,
     run,
+    which,
 )
-from envaudit.core.walk import EXCLUDED_DIRS, FileEntry, audit_backup_dirs, iter_files
+from envaudit.core.walk import (
+    EXCLUDED_DIRS,
+    FileEntry,
+    audit_backup_dirs,
+    iter_files,
+    windows_home_exclusions,
+)
 from envaudit.secrets.external import collect_external_access
 from envaudit.secrets.pii import FIO_KEYS, FIO_RE, INN_KEYS, scan_json_bytes, valid_inn12
 from envaudit.secrets.scan import Counter, _scan_bytes_many, is_fixture_path, scan_bytes
@@ -49,6 +57,7 @@ HOME_PRIORITY_DIRS = (
     ".secrets",
     ".ssh",
     ".config",
+    "AppData",
     "Desktop",
     "Downloads",
     "Documents",
@@ -74,10 +83,19 @@ def _control_value(user_id: int = 1) -> bytes:
 
 
 def _mode(path: Path) -> str | None:
+    if osinfo.is_windows():
+        return None
     try:
         return f"{stat.S_IMODE(path.stat().st_mode):04o}"
     except OSError:
         return None
+
+
+def _access_fields(path: Path) -> dict:
+    result = {"mode": _mode(path)}
+    if osinfo.is_windows():
+        result["acl"] = "not_checked"
+    return result
 
 
 def _display_home(path: Path, home: Path) -> str:
@@ -417,7 +435,7 @@ def _directory_info(path: Path, home: Path | None = None) -> dict | None:
     if not path.is_dir():
         return None
     files = 0
-    wider = 0
+    wider: int | None = None if osinfo.is_windows() else 0
     if not path.is_symlink():
         for current, _dirs, names in os.walk(path, followlinks=False):
             for name in names:
@@ -425,12 +443,19 @@ def _directory_info(path: Path, home: Path | None = None) -> dict | None:
                 if item.is_symlink():
                     continue
                 files += 1
+                if wider is None:
+                    continue
                 try:
                     wider += int(bool(stat.S_IMODE(item.stat().st_mode) & 0o077))
                 except OSError:
                     continue
     shown = _display_home(path, home) if home is not None else path.name
-    return {"path": shown, "mode": _mode(path), "files": files, "files_wider_than_600": wider}
+    return {
+        "path": shown,
+        **_access_fields(path),
+        "files": files,
+        "files_wider_than_600": wider,
+    }
 
 
 def _archive_members(path: Path) -> int | None:
@@ -599,7 +624,7 @@ def _scan_root(root: Path, ctx: Context, vcs: bool) -> dict:
                 "ignored": rel in ignored if vcs else None,
                 "symlink": entry.is_symlink,
                 "symlink_target_inside_root": entry.symlink_inside_root,
-                "mode": _mode(entry.path),
+                **_access_fields(entry.path),
                 "identical_to_ignored_env": same_ignored,
                 "value_classes": _value_classes(data_by_env.get(rel, b"")),
                 "ci_referenced": rel.encode("utf-8") in ci_data
@@ -822,7 +847,7 @@ def _scan_agent_config(
     return {
         "path": shown,
         "is_backup": is_backup,
-        "mode": _mode(path),
+        **_access_fields(path),
         "env_keys_with_secret": env_count,
         "allow_rules_with_secret": allow_count,
         "other_matches": len(other_matches),
@@ -866,8 +891,20 @@ def _scan_agent_configs(
 
 def _home_exclusions(home: Path, roots: list[Path], codex_home: Path) -> tuple[Path, ...]:
     root_paths = [path for root in roots for path in (root, Path(os.path.realpath(root)))]
-    excluded = [*root_paths, *audit_backup_dirs(home), home / ".local" / "share" / "Trash", codex_home / "sessions"]
-    for pattern in ("OneDrive*", "Dropbox*", "Яндекс.Диск*", "Google Drive*"):
+    excluded = [
+        *root_paths,
+        *audit_backup_dirs(home),
+        *windows_home_exclusions(home),
+        home / ".local" / "share" / "Trash",
+        codex_home / "sessions",
+    ]
+    for pattern in (
+        "OneDrive*",
+        "Dropbox*",
+        "Яндекс.Диск*",
+        "Google Drive*",
+        "Мой диск*",
+    ):
         excluded.extend(path for path in home.glob(pattern) if path.is_dir())
     projects = home / ".claude" / "projects"
     excluded.extend(projects.glob("*/*.jsonl"))
@@ -1273,6 +1310,20 @@ def _scan_home_blocks(
         ctx.home / ".zsh_history",
         ctx.home / ".local" / "share" / "fish" / "fish_history",
         ctx.home / ".python_history",
+        ctx.home
+        / "AppData"
+        / "Roaming"
+        / "Microsoft"
+        / "Windows"
+        / "PowerShell"
+        / "PSReadLine"
+        / "ConsoleHost_history.txt",
+        ctx.home
+        / ".local"
+        / "share"
+        / "powershell"
+        / "PSReadLine"
+        / "ConsoleHost_history.txt",
     ):
         try:
             if path.stat().st_size > 2 * 1024 * 1024:
@@ -1359,7 +1410,11 @@ def _ssh(ctx: Context) -> tuple[list[dict], int]:
     return keys, authorized
 
 
-def _run_controls(ctx: Context) -> dict[str, str]:
+def _run_controls(
+    ctx: Context, *, git_available: bool | None = None
+) -> dict[str, str]:
+    if git_available is None:
+        git_available = which("git") is not None
     value = _control_value()
     tail = value.rsplit(b"/", 1)[-1]
     tree_values = (
@@ -1430,7 +1485,7 @@ def _run_controls(ctx: Context) -> dict[str, str]:
         home, shell, config = _scan_home_blocks(local, path / ".codex")
         return home["files_with_matches"] + shell["with_matches"] + config["files_with_matches"]
 
-    return {
+    controls = {
         "tree": positive_control(
             NAME,
             "tree",
@@ -1439,11 +1494,20 @@ def _run_controls(ctx: Context) -> dict[str, str]:
             probe_tree,
             minimum_hits=len(tree_values),
         ),
-        "git_head": positive_control(NAME, "git_head", ctx, build_head, probe_head),
-        "git_history": positive_control(NAME, "git_history", ctx, build_history, probe_history),
         "configs": positive_control(NAME, "configs", ctx, build_configs, probe_configs),
         "home": positive_control(NAME, "home", ctx, build_home, probe_home),
     }
+    if git_available:
+        controls["git_head"] = positive_control(
+            NAME, "git_head", ctx, build_head, probe_head
+        )
+        controls["git_history"] = positive_control(
+            NAME, "git_history", ctx, build_history, probe_history
+        )
+    else:
+        controls["git_head"] = "not_checked"
+        controls["git_history"] = "not_checked"
+    return controls
 
 
 def _record_control_failures(ctx: Context, controls: dict[str, str]) -> None:
@@ -1455,7 +1519,8 @@ def _record_control_failures(ctx: Context, controls: dict[str, str]) -> None:
 def collect(ctx: Context) -> dict:
     timings: dict[str, float] = {}
     started = time.perf_counter()
-    controls = _run_controls(ctx)
+    git_available = which("git") is not None
+    controls = _run_controls(ctx, git_available=git_available)
     _record_control_failures(ctx, controls)
     timings["positive_controls"] = round(time.perf_counter() - started, 2)
     host = ctx.shared.get("host", {})
@@ -1480,8 +1545,12 @@ def collect(ctx: Context) -> dict:
     else:
         roots = {}
         for root in ctx.roots:
-            vcs = is_git_repo(root)
-            if not vcs:
+            vcs = git_available and is_git_repo(root)
+            if not git_available:
+                ctx.skipped.append(
+                    {"section": NAME, "reason": "no_git", "details": str(root)}
+                )
+            elif not vcs:
                 ctx.skip(NAME, "no_vcs", details=str(root))
             roots[str(root)] = _scan_root(root, ctx, vcs)
     timings["roots"] = round(time.perf_counter() - started, 2)

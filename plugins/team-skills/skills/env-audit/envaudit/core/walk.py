@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 
+from . import osinfo
 from .context import Context
 
 
@@ -31,6 +32,24 @@ def audit_backup_dirs(home: Path) -> tuple[Path, ...]:
         )
     except OSError:
         return ()
+
+
+def windows_home_exclusions(home: Path) -> tuple[Path, ...]:
+    if not osinfo.is_windows():
+        return ()
+    local = home / "AppData" / "Local"
+    return tuple(
+        local / name
+        for name in (
+            "Temp",
+            "Packages",
+            "Microsoft",
+            "Google",
+            "Mozilla",
+            "BraveSoftware",
+            "Yandex",
+        )
+    )
 
 
 def _absolute(path: Path) -> Path:

@@ -3,12 +3,24 @@ import json
 import os
 from pathlib import Path
 import platform
+import sys
 import time
 
 from envaudit import COLLECTOR_VERSION, DEFINITIONS_VERSION
 
 from .context import Context
 from .redact import self_check
+
+
+def configure_console() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
 
 
 def build_document(

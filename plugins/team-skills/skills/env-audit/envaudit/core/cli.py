@@ -1,5 +1,6 @@
 import argparse
 import base64
+import getpass
 import json
 import os
 from pathlib import Path
@@ -10,7 +11,14 @@ from envaudit.core.bundle import build_bundle
 from envaudit.core.budget import run_sections
 from envaudit.core.context import Context, Flags
 from envaudit.core.host import collect_host
-from envaudit.core.output import build_document, emit, finalize, prepare_output
+from envaudit.core import osinfo
+from envaudit.core.output import (
+    build_document,
+    configure_console,
+    emit,
+    finalize,
+    prepare_output,
+)
 from envaudit.core.redact import scan_file
 from envaudit.core.runner import run, which
 from envaudit.core.worktrees import is_linked_worktree, linked_worktree_children
@@ -54,6 +62,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _expect_user(name: str) -> bool:
+    if osinfo.is_windows():
+        return getpass.getuser() == name
     import pwd
 
     account = pwd.getpwuid(os.geteuid())
@@ -64,9 +74,9 @@ def _expect_user(name: str) -> bool:
     )
 
 
-def _full_collection_supported() -> bool:
-    if os.name == "nt":
-        return False
+def _full_collection_supported(only: list[str] | None = None) -> bool:
+    if osinfo.is_windows():
+        return only == ["secrets"]
     try:
         import pwd  # noqa: F401
     except ImportError:
@@ -77,7 +87,7 @@ def _full_collection_supported() -> bool:
 def _lower_priority() -> None:
     try:
         os.nice(15)
-    except OSError:
+    except (AttributeError, OSError):
         pass
     ionice = which("ionice")
     if ionice:
@@ -155,6 +165,7 @@ def _flags_view(flags: Flags) -> dict:
 
 
 def main(argv: list[str]) -> int:
+    configure_console()
     args = build_parser().parse_args(argv)
     if args.bundle:
         print(build_bundle(), end="")
@@ -163,7 +174,7 @@ def main(argv: list[str]) -> int:
         code, report = scan_file(args.scan_file)
         print(json.dumps(report, ensure_ascii=False, sort_keys=True, indent=1))
         return code
-    if not _full_collection_supported():
+    if not _full_collection_supported(args.only):
         print(
             "Сборщик рассчитан на Linux/WSL. На Windows аудит идёт вручную по "
             "references/windows.md",
