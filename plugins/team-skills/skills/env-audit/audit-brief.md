@@ -68,7 +68,7 @@
 | 3 | Знакомство с человеком | `interview.md` |
 | 4 | План: белый список + клинап-дифф | `cleanup.py plan --facts … --out-dir <D>` |
 | 5 | **Согласие №2** — показать `plan.diff` → применить | `cleanup.py apply --plan <D> --confirmed`, затем `verify` |
-| 6 | **Согласие №3** — оценка расхода → песочница | `reality_check.py estimate / prepare / run --confirmed / verdict / cleanup` |
+| 6 | **Согласие №3** — оценка расхода → песочница (канон не объявлен → не просить, см. `reality.md`) | `reality_check.py estimate / prepare / run --confirmed / verdict / cleanup` |
 | 7 | Самопроверка всего, что покажешь и запишешь | `collect.py --scan-file <файл>` |
 | 8 | `REPORT.md` + facts.json + сводка + инструкция | раздел 8 |
 
