@@ -68,6 +68,60 @@ def test_late_section_not_starved(tmp_path):
     assert "secrets" in sections and "late" in sections
 
 
+def test_section_timeout_returns_last_partial(tmp_path):
+    def slow(ctx):
+        ctx.publish_partial("secrets", {"completed": ["context_files"]})
+        time.sleep(1)
+        return {"completed": ["all"]}
+
+    ctx = _context(tmp_path, budget_seconds=0.1)
+
+    sections, _ = run_sections(ctx, [_module("secrets", 10, slow)])
+
+    assert sections["secrets"] == {
+        "completed": ["context_files"],
+        "truncated": True,
+    }
+    assert {
+        "section": "secrets",
+        "reason": "budget",
+        "details": None,
+    } in ctx.skipped
+
+
+def test_expired_section_return_uses_last_partial(tmp_path):
+    def expires_after_publish(ctx):
+        ctx.publish_partial("secrets", {"completed": ["context_files"]})
+        ctx.section_deadline = time.time() - 1
+        return {"completed": ["all"]}
+
+    ctx = _context(tmp_path)
+
+    sections, _ = run_sections(
+        ctx,
+        [_module("secrets", 10, expires_after_publish)],
+    )
+
+    assert sections["secrets"] == {
+        "completed": ["context_files"],
+        "truncated": True,
+    }
+
+
+def test_completed_section_ignores_published_partial(tmp_path):
+    def complete(ctx):
+        ctx.publish_partial("secrets", {"completed": ["context_files"]})
+        return {"completed": ["all"]}
+
+    ctx = _context(tmp_path)
+
+    sections, _ = run_sections(ctx, [_module("secrets", 10, complete)])
+
+    assert sections["secrets"] == {"completed": ["all"]}
+    assert ctx.skipped == []
+    assert ctx.truncated is False
+
+
 def test_arch_root_budget_within_section_cap(tmp_path, monkeypatch):
     roots = [tmp_path / name for name in ("one", "two", "three")]
     for root in roots:
@@ -91,7 +145,8 @@ def test_arch_root_budget_within_section_cap(tmp_path, monkeypatch):
     sections, _ = run_sections(ctx, [architecture])
 
     assert sections["architecture"]
-    assert set(sections["architecture"]) == {
+    assert sections["architecture"]["truncated"] is True
+    assert set(sections["architecture"]) - {"truncated"} == {
         str(root.resolve()) for root in roots
     }
     assert observed_timeouts

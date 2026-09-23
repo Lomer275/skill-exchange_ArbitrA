@@ -102,8 +102,27 @@ def test_new_webhook_forms_in_tree(run_collect, tmp_path):
     item = _root(
         _section(run_collect("--root", root, "--only", "secrets")), root
     )["patterns"]["bitrix_webhook"]
-    assert item["worktree_files"] == 2
+    assert item["worktree_files"] == 1
+    assert item["fake_filtered"] == 1
     assert item["user_ids"] == [4242]
+
+
+def test_control_value_filtered_from_agent_histories(
+    run_collect, fake_home, tmp_path
+):
+    root = tmp_path / "plain"
+    root.mkdir()
+    session = fake_home / ".codex" / "sessions" / "probe.jsonl"
+    session.parent.mkdir(parents=True)
+    session.write_text(
+        "rest/4242/k9m2n5p8q4r7s3t6\n",
+        encoding="utf-8",
+    )
+
+    section = _section(run_collect("--root", root, "--only", "secrets"))
+
+    assert "bitrix_webhook" not in section["agent_histories"]["codex_sessions"]["by_class"]
+    assert set(section["positive_controls"].values()) <= {"pass", "not_checked"}
 
 
 def test_context_file_critical_input(run_collect, fake_home, tmp_path):

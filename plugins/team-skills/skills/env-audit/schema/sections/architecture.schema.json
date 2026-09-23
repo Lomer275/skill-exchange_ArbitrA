@@ -1,5 +1,8 @@
 {
   "type": ["object", "null"],
+  "properties": {
+    "truncated": {"const": true}
+  },
   "additionalProperties": {
     "type": "object",
     "additionalProperties": false,

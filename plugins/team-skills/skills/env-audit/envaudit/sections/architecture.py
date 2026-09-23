@@ -126,6 +126,14 @@ def _output_order(root: Path) -> tuple[str, str]:
     return (root.name, str(root))
 
 
+def _ordered_result(ctx: Context, result: dict[str, dict | None]) -> dict:
+    return {
+        str(root.resolve()): result[str(root.resolve())]
+        for root in sorted(ctx.roots, key=_output_order)
+        if str(root.resolve()) in result
+    }
+
+
 def collect(ctx: Context) -> dict:
     result: dict[str, dict | None] = {}
     checks = discover_checks()
@@ -184,7 +192,5 @@ def collect(ctx: Context) -> dict:
             result[str(root.resolve())] = None
         finally:
             _cleanup(actx)
-    return {
-        str(root.resolve()): result[str(root.resolve())]
-        for root in sorted(ctx.roots, key=_output_order)
-    }
+        ctx.publish_partial(NAME, _ordered_result(ctx, result))
+    return _ordered_result(ctx, result)

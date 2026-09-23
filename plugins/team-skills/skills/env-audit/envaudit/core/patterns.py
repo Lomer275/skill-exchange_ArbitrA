@@ -1,4 +1,6 @@
 from bisect import bisect_left
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 import re
 
@@ -23,6 +25,11 @@ BITRIX_MARKERS = (
     b"EBhook",
     "еБхУк".encode(),
 )
+CONTROL_VALUE = b"k9m2n5p8" + b"q4r7s3t6"
+CONTROL_VALUE_RE = re.compile(
+    rb"^(?:(?:/?rest/)?[0-9]{1,7}/)?" + CONTROL_VALUE + rb"/?$"
+)
+_ALLOW_CONTROL_VALUES = ContextVar("allow_control_values", default=False)
 
 
 @dataclass(frozen=True)
@@ -247,8 +254,19 @@ def _monotonic_runs(value: bytes) -> list[int]:
     return runs
 
 
+@contextmanager
+def allow_control_values():
+    state = _ALLOW_CONTROL_VALUES.set(True)
+    try:
+        yield
+    finally:
+        _ALLOW_CONTROL_VALUES.reset(state)
+
+
 def is_fake(value: bytes) -> bool:
     lowered = value.lower()
+    if CONTROL_VALUE_RE.fullmatch(lowered) and not _ALLOW_CONTROL_VALUES.get():
+        return True
     if re.search(rb"(.)\1{5,}", lowered, re.DOTALL):
         return True
     if any(
