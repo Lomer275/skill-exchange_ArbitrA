@@ -6,6 +6,9 @@ from envaudit.core.patterns import find, is_fake, webhook_user_id
 from .canaries import CANARY_CLASSES, canary
 
 
+CONTROL_VALUE = b"k9m2n5p8" + b"q4r7s3t6"
+
+
 @pytest.mark.parametrize("secret_class", CANARY_CLASSES)
 def test_each_class_detected(secret_class):
     matches = find(("prefix " + canary(secret_class) + " suffix").encode("utf-8"))
@@ -21,6 +24,19 @@ def test_fake_filter():
     assert is_fake(labelled)
     assert is_fake(monotonic)
     assert not is_fake(canary("openai_key", seed=8).encode("ascii"))
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        CONTROL_VALUE,
+        b"/rest/1/" + CONTROL_VALUE,
+        b"rest/4242/" + CONTROL_VALUE,
+        b"4242/" + CONTROL_VALUE,
+    ],
+)
+def test_collector_control_value_is_fake(value):
+    assert is_fake(value)
 
 
 def test_boundaries():

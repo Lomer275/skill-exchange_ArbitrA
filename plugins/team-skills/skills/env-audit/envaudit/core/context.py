@@ -44,6 +44,7 @@ class Context:
     shared: dict[str, object] = field(default_factory=dict)
     section_deadline: float | None = None
     section_budget_seconds: float | None = None
+    partial_sections: dict[str, dict] = field(default_factory=dict)
 
     def skip(self, section: str, reason: str, details: str | None = None) -> None:
         if reason not in SKIP_REASONS:
@@ -66,3 +67,6 @@ class Context:
 
     def mark_truncated(self) -> None:
         self.truncated = True
+
+    def publish_partial(self, section: str, payload: dict) -> None:
+        self.partial_sections[section] = dict(payload)

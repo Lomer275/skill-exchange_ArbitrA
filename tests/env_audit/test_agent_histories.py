@@ -73,7 +73,7 @@ def test_agent_history_byte_cap_sets_truncated(fake_home):
 
 
 def test_agent_history_match_across_chunk_boundary(fake_home):
-    value = b"rest/4242/k9m2n5p8q4r7s3t6"
+    value = b"rest/4242/q7w4e1r8t5y2u9i6"
     transcript = fake_home / ".claude" / "projects" / "project" / "boundary.jsonl"
     transcript.parent.mkdir(parents=True)
     transcript.write_bytes(b"x" * 28 + b" " + value)

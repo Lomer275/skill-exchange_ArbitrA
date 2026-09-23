@@ -79,6 +79,15 @@ def _skip_budget(ctx: Context, section: str) -> None:
     ctx.mark_truncated()
 
 
+def _partial_result(ctx: Context, section: str) -> dict | None:
+    partial = ctx.partial_sections.get(section)
+    if partial is None:
+        return None
+    result = dict(partial)
+    result["truncated"] = True
+    return result
+
+
 def run_sections(
     ctx: Context, modules: list[ModuleType]
 ) -> tuple[dict[str, dict | None], dict[str, float]]:
@@ -108,6 +117,7 @@ def run_sections(
         )
         ctx.section_budget_seconds = section_budget
         ctx.section_deadline = min(ctx.deadline, time.time() + section_budget)
+        ctx.partial_sections.pop(module.NAME, None)
         try:
             if section_budget <= 0:
                 raise _SectionBudgetExpired
@@ -126,9 +136,10 @@ def run_sections(
                 sections[module.NAME] = None
             if ctx.expired():
                 _skip_budget(ctx, module.NAME)
+                sections[module.NAME] = _partial_result(ctx, module.NAME)
         except _SectionBudgetExpired:
             _skip_budget(ctx, module.NAME)
-            sections[module.NAME] = None
+            sections[module.NAME] = _partial_result(ctx, module.NAME)
         finally:
             durations[module.NAME] = round(
                 time.perf_counter() - started, 6

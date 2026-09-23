@@ -1500,28 +1500,31 @@ def _run_controls(
         home, shell, config = _scan_home_blocks(local, path / ".codex")
         return home["files_with_matches"] + shell["with_matches"] + config["files_with_matches"]
 
-    controls = {
-        "tree": positive_control(
-            NAME,
-            "tree",
-            ctx,
-            build_tree,
-            probe_tree,
-            minimum_hits=len(tree_values),
-        ),
-        "configs": positive_control(NAME, "configs", ctx, build_configs, probe_configs),
-        "home": positive_control(NAME, "home", ctx, build_home, probe_home),
-    }
-    if git_available:
-        controls["git_head"] = positive_control(
-            NAME, "git_head", ctx, build_head, probe_head
-        )
-        controls["git_history"] = positive_control(
-            NAME, "git_history", ctx, build_history, probe_history
-        )
-    else:
-        controls["git_head"] = "not_checked"
-        controls["git_history"] = "not_checked"
+    with patterns.allow_control_values():
+        controls = {
+            "tree": positive_control(
+                NAME,
+                "tree",
+                ctx,
+                build_tree,
+                probe_tree,
+                minimum_hits=len(tree_values),
+            ),
+            "configs": positive_control(
+                NAME, "configs", ctx, build_configs, probe_configs
+            ),
+            "home": positive_control(NAME, "home", ctx, build_home, probe_home),
+        }
+        if git_available:
+            controls["git_head"] = positive_control(
+                NAME, "git_head", ctx, build_head, probe_head
+            )
+            controls["git_history"] = positive_control(
+                NAME, "git_history", ctx, build_history, probe_history
+            )
+        else:
+            controls["git_head"] = "not_checked"
+            controls["git_history"] = "not_checked"
     return controls
 
 
@@ -1531,6 +1534,18 @@ def _record_control_failures(ctx: Context, controls: dict[str, str]) -> None:
             ctx.error(NAME, f"positive_control_failed:{name}")
 
 
+def _publish_partial(
+    ctx: Context,
+    result: dict,
+    timings: dict[str, float],
+) -> None:
+    payload = dict(result)
+    payload["timings_s"] = dict(timings)
+    if "budget_split" in payload:
+        payload["budget_split"] = dict(payload["budget_split"])
+    ctx.publish_partial(NAME, payload)
+
+
 def collect(ctx: Context) -> dict:
     timings: dict[str, float] = {}
     started = time.perf_counter()
@@ -1538,12 +1553,24 @@ def collect(ctx: Context) -> dict:
     controls = _run_controls(ctx, git_available=git_available)
     _record_control_failures(ctx, controls)
     timings["positive_controls"] = round(time.perf_counter() - started, 2)
+    result = {
+        "lower_bound": True,
+        "positive_controls": controls,
+        "generic_assignment_scope": list(GENERIC_ASSIGNMENT_SCOPE),
+    }
     host = ctx.shared.get("host", {})
     codex_home = Path(str(host.get("codex_home", ctx.home / ".codex"))) if isinstance(host, dict) else ctx.home / ".codex"
 
     started = time.perf_counter()
     context_files, context_generic = _scan_context_files(ctx, codex_home)
     timings["context_files"] = round(time.perf_counter() - started, 2)
+    result.update(
+        {
+            "context_files": context_files,
+            "context_generic_assignment": context_generic,
+        }
+    )
+    _publish_partial(ctx, result, timings)
 
     started = time.perf_counter()
     if controls["configs"] == "pass":
@@ -1552,6 +1579,32 @@ def collect(ctx: Context) -> dict:
         configs = None
         configs_generic = {"files": 0, "matches": 0}
     timings["agent_configs"] = round(time.perf_counter() - started, 2)
+    result.update(
+        {
+            "agent_configs": configs,
+            "agent_configs_generic_assignment": configs_generic,
+        }
+    )
+    _publish_partial(ctx, result, timings)
+
+    started = time.perf_counter()
+    storage = _storage(ctx)
+    timings["storage"] = round(time.perf_counter() - started, 2)
+    result["storage"] = storage
+    _publish_partial(ctx, result, timings)
+
+    started = time.perf_counter()
+    ssh_keys, authorized_keys = _ssh(ctx)
+    timings["ssh_keys"] = round(time.perf_counter() - started, 2)
+    result.update(
+        {"ssh_keys": ssh_keys, "authorized_keys": authorized_keys}
+    )
+    _publish_partial(ctx, result, timings)
+
+    started = time.perf_counter()
+    external_access = collect_external_access(ctx.home)
+    timings["external"] = round(time.perf_counter() - started, 2)
+    result["external_access"] = external_access
 
     now = time.time()
     section_deadline = (
@@ -1571,6 +1624,8 @@ def collect(ctx: Context) -> dict:
         "home_seconds": round(home_seconds, 1),
         "histories_seconds": 0.0,
     }
+    result["budget_split"] = budget_split
+    _publish_partial(ctx, result, timings)
 
     started = time.perf_counter()
     roots: dict[str, dict] | None
@@ -1597,6 +1652,8 @@ def collect(ctx: Context) -> dict:
     if roots_budget_expired:
         _skip_budget_once(ctx, "roots")
     timings["roots"] = round(time.perf_counter() - started, 2)
+    result["roots"] = roots
+    _publish_partial(ctx, result, timings)
 
     if controls["home"] == "pass":
         home, shell_history, config_dir = _scan_home_blocks(
@@ -1608,6 +1665,14 @@ def collect(ctx: Context) -> dict:
     else:
         home = shell_history = config_dir = None
         timings.update({"home": 0.0, "shell_history": 0.0, "config_dir": 0.0})
+    result.update(
+        {
+            "home": home,
+            "shell_history": shell_history,
+            "config_dir": config_dir,
+        }
+    )
+    _publish_partial(ctx, result, timings)
 
     started = time.perf_counter()
     budget_split["histories_seconds"] = round(
@@ -1616,35 +1681,7 @@ def collect(ctx: Context) -> dict:
     )
     agent_histories = _scan_agent_histories(ctx, codex_home)
     timings["agent_histories"] = round(time.perf_counter() - started, 2)
-
-    started = time.perf_counter()
-    storage = _storage(ctx)
-    timings["storage"] = round(time.perf_counter() - started, 2)
-
-    started = time.perf_counter()
-    ssh_keys, authorized_keys = _ssh(ctx)
-    timings["ssh_keys"] = round(time.perf_counter() - started, 2)
-
-    started = time.perf_counter()
-    external_access = collect_external_access(ctx.home)
-    timings["external"] = round(time.perf_counter() - started, 2)
-    return {
-        "lower_bound": True,
-        "timings_s": timings,
-        "budget_split": budget_split,
-        "positive_controls": controls,
-        "generic_assignment_scope": list(GENERIC_ASSIGNMENT_SCOPE),
-        "context_files": context_files,
-        "context_generic_assignment": context_generic,
-        "agent_configs": configs,
-        "agent_configs_generic_assignment": configs_generic,
-        "roots": roots,
-        "home": home,
-        "agent_histories": agent_histories,
-        "shell_history": shell_history,
-        "config_dir": config_dir,
-        "storage": storage,
-        "ssh_keys": ssh_keys,
-        "authorized_keys": authorized_keys,
-        "external_access": external_access,
-    }
+    result["agent_histories"] = agent_histories
+    _publish_partial(ctx, result, timings)
+    result["timings_s"] = timings
+    return result
