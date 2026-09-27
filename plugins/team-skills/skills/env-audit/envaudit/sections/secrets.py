@@ -67,9 +67,12 @@ AGENT_HISTORY_WINDOW_DAYS = 30
 AGENT_HISTORY_MAX_BYTES = 2 * 1024 * 1024 * 1024
 AGENT_HISTORY_CHUNK_BYTES = 1024 * 1024
 AGENT_HISTORY_OVERLAP_BYTES = 64 * 1024
-HOME_BUDGET_SHARE = 0.4
+ROOTS_BUDGET_SHARE = 0.4
+HOME_BUDGET_SHARE = 0.35
+HISTORIES_BUDGET_SHARE = 0.25
 HOME_BUDGET_MIN_SECONDS = 30
 ROOTS_BUDGET_MIN_SECONDS = 10
+HISTORIES_BUDGET_MIN_SECONDS = 20
 SECRET_DIR_NAME_RE = re.compile(r"secret|env|cred|key|token", re.IGNORECASE)
 COPY_ALL_RE = re.compile(
     rb"(?im)^\s*(?:COPY|ADD)\s+(?:--[^\s]+\s+)*\.\s+\.\s*$"
@@ -89,6 +92,43 @@ def _skip_budget_once(ctx: Context, details: str) -> None:
     expected = {"section": NAME, "reason": "budget", "details": details}
     if expected not in ctx.skipped:
         ctx.skip(NAME, "budget", details)
+
+
+def _split_scan_budget(remaining_seconds: float) -> tuple[float, float, float]:
+    parts = (
+        (ROOTS_BUDGET_SHARE, ROOTS_BUDGET_MIN_SECONDS),
+        (HOME_BUDGET_SHARE, HOME_BUDGET_MIN_SECONDS),
+        (HISTORIES_BUDGET_SHARE, HISTORIES_BUDGET_MIN_SECONDS),
+    )
+    minimum_total = sum(minimum for _share, minimum in parts)
+    if remaining_seconds < minimum_total:
+        allocations = []
+        available = remaining_seconds
+        for _share, minimum in parts:
+            allocated = min(available, minimum)
+            allocations.append(allocated)
+            available -= allocated
+        return tuple(allocations)
+
+    allocations: list[float | None] = [None] * len(parts)
+    available = remaining_seconds
+    pending = set(range(len(parts)))
+    while pending:
+        pending_share = sum(parts[index][0] for index in pending)
+        below_minimum = {
+            index
+            for index in pending
+            if available * parts[index][0] / pending_share < parts[index][1]
+        }
+        if not below_minimum:
+            for index in pending:
+                allocations[index] = available * parts[index][0] / pending_share
+            break
+        for index in below_minimum:
+            allocations[index] = parts[index][1]
+            available -= parts[index][1]
+        pending -= below_minimum
+    return tuple(value for value in allocations if value is not None)
 
 
 def _mode(path: Path) -> str | None:
@@ -1613,16 +1653,14 @@ def collect(ctx: Context) -> dict:
         else ctx.deadline
     )
     remaining_seconds = max(0.0, section_deadline - now)
-    home_seconds = min(
-        max(remaining_seconds * HOME_BUDGET_SHARE, HOME_BUDGET_MIN_SECONDS),
-        max(0.0, remaining_seconds - ROOTS_BUDGET_MIN_SECONDS),
+    roots_seconds, planned_home_seconds, planned_histories_seconds = (
+        _split_scan_budget(remaining_seconds)
     )
-    roots_seconds = max(0.0, remaining_seconds - home_seconds)
     roots_deadline = now + roots_seconds
     budget_split = {
         "roots_seconds": round(roots_seconds, 1),
-        "home_seconds": round(home_seconds, 1),
-        "histories_seconds": 0.0,
+        "home_seconds": round(planned_home_seconds, 1),
+        "histories_seconds": round(planned_histories_seconds, 1),
     }
     result["budget_split"] = budget_split
     _publish_partial(ctx, result, timings)
@@ -1655,12 +1693,19 @@ def collect(ctx: Context) -> dict:
     result["roots"] = roots
     _publish_partial(ctx, result, timings)
 
+    home_started_at = time.time()
+    home_seconds = max(
+        0.0,
+        section_deadline - home_started_at - planned_histories_seconds,
+    )
+    home_deadline = home_started_at + home_seconds
+    budget_split["home_seconds"] = round(home_seconds, 1)
     if controls["home"] == "pass":
         home, shell_history, config_dir = _scan_home_blocks(
             ctx,
             codex_home,
             timings,
-            home_deadline=section_deadline,
+            home_deadline=home_deadline,
         )
     else:
         home = shell_history = config_dir = None

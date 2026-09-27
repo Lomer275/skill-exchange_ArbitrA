@@ -44,45 +44,134 @@ def _patch_fast_blocks(monkeypatch):
     )
 
 
-def test_budget_split_and_root_deadline(fake_home, tmp_path, monkeypatch):
+def test_budget_split_gives_each_part_its_share(fake_home, tmp_path, monkeypatch):
     clock = [1000.0]
-    roots = [tmp_path / "one", tmp_path / "two"]
-    for root in roots:
-        root.mkdir()
+    root = tmp_path / "root"
+    root.mkdir()
     _patch_fast_blocks(monkeypatch)
     monkeypatch.setattr(secrets.time, "time", lambda: clock[0])
     monkeypatch.setattr(secrets, "which", lambda _name: None)
     root_deadlines = []
     home_deadlines = []
+    history_budgets = []
 
     def scan_root(_root, ctx, _vcs):
         root_deadlines.append(ctx.section_deadline)
-        clock[0] = 1060.0
-        ctx.mark_truncated()
+        clock[0] = 1040.0
         return {}
 
     def scan_home(_ctx, _codex_home, _timings, home_deadline):
         home_deadlines.append(home_deadline)
-        clock[0] = 1070.0
+        clock[0] = 1075.0
         return ({"files_scanned": 1}, {}, {})
+
+    def scan_histories(ctx, _codex_home):
+        history_budgets.append(ctx.remaining_seconds())
+        return {}
 
     monkeypatch.setattr(secrets, "_scan_root", scan_root)
     monkeypatch.setattr(secrets, "_scan_home_blocks", scan_home)
-    monkeypatch.setattr(secrets, "_scan_agent_histories", lambda _ctx, _codex_home: {})
-    ctx = Context(Flags(), fake_home, roots, 1000.0, 1200.0)
+    monkeypatch.setattr(secrets, "_scan_agent_histories", scan_histories)
+    ctx = Context(Flags(), fake_home, [root], 1000.0, 1200.0)
     ctx.section_deadline = 1100.0
 
     section = secrets.collect(ctx)
 
-    assert root_deadlines == [1060.0, 1060.0]
-    assert home_deadlines == [1100.0]
+    assert root_deadlines == [1040.0]
+    assert home_deadlines == [1075.0]
+    assert history_budgets == [25.0]
     assert section["budget_split"] == {
-        "roots_seconds": 60.0,
-        "home_seconds": 40.0,
-        "histories_seconds": 30.0,
+        "roots_seconds": 40.0,
+        "home_seconds": 35.0,
+        "histories_seconds": 25.0,
     }
-    expected = {"section": "secrets", "reason": "budget", "details": "roots"}
-    assert ctx.skipped.count(expected) == 1
+
+
+def test_budget_split_prioritizes_minimums_when_time_is_short(
+    fake_home, tmp_path, monkeypatch
+):
+    clock = [1000.0]
+    root = tmp_path / "root"
+    root.mkdir()
+    _patch_fast_blocks(monkeypatch)
+    monkeypatch.setattr(secrets.time, "time", lambda: clock[0])
+    monkeypatch.setattr(secrets, "which", lambda _name: None)
+    root_deadlines = []
+    home_deadlines = []
+    history_budgets = []
+
+    def scan_root(_root, ctx, _vcs):
+        root_deadlines.append(ctx.section_deadline)
+        clock[0] = 1010.0
+        return {}
+
+    def scan_home(_ctx, _codex_home, _timings, home_deadline):
+        home_deadlines.append(home_deadline)
+        clock[0] = 1040.0
+        return ({"files_scanned": 1}, {}, {})
+
+    def scan_histories(ctx, _codex_home):
+        history_budgets.append(ctx.remaining_seconds())
+        return {}
+
+    monkeypatch.setattr(secrets, "_scan_root", scan_root)
+    monkeypatch.setattr(secrets, "_scan_home_blocks", scan_home)
+    monkeypatch.setattr(secrets, "_scan_agent_histories", scan_histories)
+    ctx = Context(Flags(), fake_home, [root], 1000.0, 1200.0)
+    ctx.section_deadline = 1045.0
+
+    section = secrets.collect(ctx)
+
+    assert root_deadlines == [1010.0]
+    assert home_deadlines == [1040.0]
+    assert history_budgets == [5.0]
+    assert section["budget_split"] == {
+        "roots_seconds": 10.0,
+        "home_seconds": 30.0,
+        "histories_seconds": 5.0,
+    }
+
+
+def test_unused_budget_moves_to_home_then_histories(
+    fake_home, tmp_path, monkeypatch
+):
+    clock = [1000.0]
+    root = tmp_path / "root"
+    root.mkdir()
+    _patch_fast_blocks(monkeypatch)
+    monkeypatch.setattr(secrets.time, "time", lambda: clock[0])
+    monkeypatch.setattr(secrets, "which", lambda _name: None)
+    home_deadlines = []
+    history_budgets = []
+
+    def scan_root(_root, _ctx, _vcs):
+        clock[0] = 1012.0
+        return {}
+
+    def scan_home(_ctx, _codex_home, _timings, home_deadline):
+        home_deadlines.append(home_deadline)
+        clock[0] = 1020.0
+        return ({"files_scanned": 1}, {}, {})
+
+    def scan_histories(ctx, _codex_home):
+        history_budgets.append(ctx.remaining_seconds())
+        return {}
+
+    monkeypatch.setattr(secrets, "_scan_root", scan_root)
+    monkeypatch.setattr(secrets, "_scan_home_blocks", scan_home)
+    monkeypatch.setattr(secrets, "_scan_agent_histories", scan_histories)
+    ctx = Context(Flags(), fake_home, [root], 1000.0, 1200.0)
+    ctx.section_deadline = 1100.0
+
+    section = secrets.collect(ctx)
+
+    assert home_deadlines == [1075.0]
+    assert history_budgets == [80.0]
+    assert section["budget_split"] == {
+        "roots_seconds": 40.0,
+        "home_seconds": 63.0,
+        "histories_seconds": 80.0,
+    }
 
 
 def test_reserved_home_budget_scans_file(fake_home, tmp_path, monkeypatch):
@@ -95,6 +184,7 @@ def test_reserved_home_budget_scans_file(fake_home, tmp_path, monkeypatch):
     monkeypatch.setattr(secrets, "which", lambda _name: None)
     monkeypatch.setattr(secrets, "HOME_BUDGET_MIN_SECONDS", 0.03)
     monkeypatch.setattr(secrets, "ROOTS_BUDGET_MIN_SECONDS", 0.02)
+    monkeypatch.setattr(secrets, "HISTORIES_BUDGET_MIN_SECONDS", 0.01)
     monkeypatch.setattr(secrets, "_scan_agent_histories", lambda _ctx, _codex_home: {})
     original_read = secrets._read_for_scan
     clock = [1000.0]
