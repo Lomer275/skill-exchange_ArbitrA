@@ -2,7 +2,7 @@
   "name": "auto-pilot",
   "display_name": "Auto-Pilot Orchestrator",
   "author": "kostya",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Continuous-mode autopilot для проектов с SUP-конвенциями: cron-headless оркестратор который сам выбирает следующее действие (Rule 1-6), self-heal на budget exhaustion, TG control plane (inline-buttons + slash-commands), git-guard на destructive ops. Включает SKILL.md, 10 helper-скриптов, JSON-schema для config и install.sh для setup.",
   "tags": [
     "autopilot",

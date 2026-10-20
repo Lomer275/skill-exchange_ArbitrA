@@ -30,7 +30,7 @@
       "name": "auto-pilot",
       "display_name": "Auto-Pilot Orchestrator",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Continuous-mode autopilot для проектов с SUP-конвенциями: cron-headless оркестратор который сам выбирает следующее действие (Rule 1-6), self-heal на budget exhaustion, TG control plane (inline-buttons + slash-commands), git-guard на destructive ops. Включает SKILL.md, 10 helper-скриптов, JSON-schema для config и install.sh для setup.",
       "tags": [
         "autopilot",
@@ -94,7 +94,7 @@
       "name": "codereview",
       "display_name": "Code Review",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Многофазный придирчивый код-ревью задачи: критерии приёмки + adversarial + user walkthrough + архитектурный fit. Только анализ, без фиксов.",
       "tags": [
         "code-review",
@@ -106,7 +106,7 @@
       "name": "codereview-dual",
       "display_name": "Code Review (Dual)",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Двойной независимый код-ревью: Claude + Codex параллельно, мерж findings в одну severity-ranked таблицу с метками [both]/[claude]/[codex].",
       "tags": [
         "code-review",
@@ -119,7 +119,7 @@
       "name": "codereview-dual-loop",
       "display_name": "Code Review (Dual) Loop",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Цикл /codereview-dual → /fix до полной чистоты от CRITICAL и HIGH. Принудительный dual (Claude + Codex) на каждой итерации, максимум 5 итераций. При недоступности Codex — graceful fallback на /review-loop.",
       "tags": [
         "code-review",
@@ -157,7 +157,7 @@
       "name": "codex-worker",
       "display_name": "Codex Worker (internal helper)",
       "author": "kostya",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "description": "Internal helper для запуска Codex-воркера. Вызывается из /impl, /fix, /codereview-dual и /sprint-codex. Принимает файл задачи либо разовый brief_file (путь /impl). Движок выбирается по ЗДОРОВЬЮ, а не по наличию: плагин codex@openai-codex несёт свой движок, который может быть старше глобального CLI и молча возвращать пустой результат — тогда воркер уходит на legacy codex exec (обязательно с < /dev/null, иначе CLI ждёт EOF на stdin и висит до таймаута).",
       "tags": [
         "internal",
@@ -214,7 +214,7 @@
       "name": "fix",
       "display_name": "Fix Bugs",
       "author": "kostya",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "description": "Планирование и применение фиксов по findings из ревью или визуальной проверки. План строит Claude и ждёт подтверждения; правки исполняемого кода делегируются Codex-воркеру, дифф Claude сверяет с планом. CRITICAL → HIGH → MEDIUM, минимальные точечные изменения.",
       "tags": [
         "code-review",
@@ -227,7 +227,7 @@
       "name": "impl",
       "display_name": "Impl — Claude решает, Codex реализует",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Точка входа режима «Claude думает — Codex программирует». Делегирует написание кода Codex-имплементеру для ЛЮБОЙ правки, файл задачи не нужен: Claude находит код и пишет бриф, Codex реализует, Claude читает дифф и гоняет тесты. Без него делегирование существует только внутри /sprint-codex и /codereview-dual.",
       "tags": [
         "codex",
@@ -279,8 +279,8 @@
       "name": "review-loop",
       "display_name": "Review Loop",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Цикл codereview → fix до полной чистоты от CRITICAL и HIGH. Максимум 5 итераций.",
+      "version": "1.1.0",
+      "description": "Цикл codereview → fix до полной чистоты от CRITICAL и HIGH. Максимум 5 итераций; досрочный стоп, когда фиксы ходят по кругу.",
       "tags": [
         "code-review",
         "fix",
@@ -292,7 +292,7 @@
       "name": "safe-push",
       "display_name": "Safe Commit & Push",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits. Не делает force push без явной просьбы.",
       "tags": [
         "git",
@@ -332,7 +332,7 @@
       "name": "sprint",
       "display_name": "Sprint",
       "author": "kostya",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run и --yes (headless mode для cron-автопилота с check_authz из HANDOFF YAML, TG-ask retry-loop).",
       "tags": [
         "workflow",
@@ -345,7 +345,7 @@
       "name": "sprint-codex",
       "display_name": "Sprint (Codex)",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач.",
       "tags": [
         "workflow",

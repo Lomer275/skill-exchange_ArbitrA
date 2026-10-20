@@ -186,6 +186,7 @@ If the directive is empty, absent, or points to a nonexistent skill — go to Ru
 
 Does `git status` show uncommitted changes **in the whitelist zone**?
 → This is an unfinished previous tick. Finish it:
+- If the latest log entry for that task is `outcome=blocked` — a review loop that ended in its Step 4 (limit, plateau, a finding that survived two fix rounds), a refused push, any other block → do **not** invoke `/accept` or `/sup-push`: STOP + escalate `⚠️ T<NN> заблокирована: незакоммиченные изменения оставлены для человека.`
 - If there is a latest task in `autopilot_log.md` without a "closed" entry → invoke `/accept TNN`, then `/sup-push`
 - Otherwise → STOP + escalate `⚠️ Несоммиченные изменения без следа в логе, разберись.`
 
@@ -223,11 +224,12 @@ Invoke the chosen skill via the Skill tool. **Hand full control over to it** —
 
 - If the inner skill returned success → go to phase 5
 - If the inner skill got stuck / asked for confirmation / hit an error → go to phase 6 (escalate)
+- If the inner skill ended **not clean** — `/review-loop` or `/codereview-dual-loop` exited through its Step 4, directly or as a `/sprint` / `/sprint-codex` task left ⚠️ blocked by it, or `/sup-push` did not push → phase 6 with `outcome=blocked`. No branch finalization; the uncommitted changes stay for the person
 - If you yourself did not get a response within a reasonable time (for example `/sprint` > 30 minutes) — escalate with the note "possibly stuck"
 
 ### After a successful `/sprint` — finalize the branch
 
-`/sprint` already does review-loop → accept → push itself. But the decision of "what to do next with the branch" (PR into main? leave it pushed?) — invoke `superpowers:finishing-a-development-branch`. It will look at the context and pick the right option.
+`/sprint` already does review-loop → accept → push itself. A task it left ⚠️ blocked is not part of the success: any blocked task → phase 6 instead of this section. Otherwise, the decision of "what to do next with the branch" (PR into main? leave it pushed?) — invoke `superpowers:finishing-a-development-branch`. It will look at the context and pick the right option.
 
 **Override**: you do NOT merge into main and do NOT create a ready-for-review PR. If `finishing-a-development-branch` wants to merge → stop it, create a draft PR instead of the merge, leave it for the person.
 

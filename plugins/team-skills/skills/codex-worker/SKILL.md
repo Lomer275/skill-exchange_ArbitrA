@@ -19,7 +19,7 @@ As of 2026-06-11 the worker launches Codex **through the `codex@openai-codex` pl
 |----------|-----------|---------|----------|
 | `role` | yes | — | `reviewer` or `implementer` |
 | `task_file` | one of | — | path to the task file (TNN_*.md) — the spec-driven path (`/sprint-codex`, `/codereview-dual`) |
-| `brief_file` | one of | — | path to an ad-hoc brief (`/tmp/sup-codex/impl-*-brief.md`) — the `/impl` path, no TNN file involved |
+| `brief_file` | one of | — | absolute path to an ad-hoc brief (`~/sup-codex/impl-*-brief.md`) — the `/impl` path, no TNN file involved |
 | `spec_file` | no | — | path to the specification (SNN_*.md) |
 | `worktree` | no | `current` | abs path to the worktree or `current` |
 | `scope` | yes | — | `read-only` for reviewer, `edit:<paths>` for implementer |
@@ -58,6 +58,21 @@ Extract the variables from args. Validation:
 > `brief_file` is the ad-hoc path introduced for `/impl`: the source of truth for the worker is a brief written by Claude, not a TNN task file. Everything downstream (engine, watchdog, return contract) is identical — only the prompt's source document differs.
 
 If invalid — return `status: error, notes: <reason>`.
+
+**Brief completeness (`brief_file` only).** A brief is the whole of the
+worker's understanding; a hole in it becomes a guess in the code. Run the checker from the
+worktree (or the current repo root):
+
+```bash
+python3 scripts/staff/brief.py check "$BRIEF_FILE"
+```
+
+- Exit `0` → continue.
+- Exit `1` → return `status: error, notes: brief incomplete: <the checker's output, one line per problem>`. Do not launch Codex.
+- `scripts/staff/brief.py` absent (not in this project or branch) → continue, with
+  `notes: brief.py absent, brief not machine-checked`.
+
+`task_file` (TNN) is not checked here: `/sprint-codex` owns task-file quality.
 
 ---
 
@@ -159,7 +174,10 @@ DO:
 - Малые точечные правки, без рефакторинга вне задачи.
 - Используй `python` из $VIRTUAL_ENV/bin/python для всех запусков (если работаешь в worktree).
 <если role=reviewer>:
-- Top findings с severity, evidence (файл:строка), recommended fixes.
+- Top findings с severity, evidence (файл:строка), сценарием отказа и recommended fixes.
+  Сценарий отказа — конкретный вход или состояние → неверный результат или падение
+  («дано …; когда …; тогда …»). Находку без файл:строка или без сценария оркестратор
+  отбрасывает — не присылай её.
 - Линзы: <lens>.
 
 OUTPUT (финальное сообщение):

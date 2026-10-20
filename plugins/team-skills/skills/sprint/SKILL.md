@@ -238,7 +238,7 @@ If a task finished with status ⚠️ blocked or ⛔ skipped:
 
 ### 2.4 — After the wave
 
-In `--yes`: `scripts/autopilot/tg_notify.sh "✅ Sprint <Spec> Волна N/M готова — коммит <sha> → dev"`
+In `--yes`: `scripts/autopilot/tg_notify.sh "✅ Sprint <Spec> Волна N/M готова — коммит <sha> → dev"` — only when every task of the wave is ✅ done. A wave with a ⚠️ blocked or ⛔ skipped task sends `⚠️ Sprint <Spec> Волна N/M: закрыто K из L, заблокированы: <TNN, …>` instead.
 
 ### 2.5 — After all waves
 
@@ -369,10 +369,14 @@ Fixes are applied in fast mode (without waiting for confirmation).
 
 ### Step 7 — Accept + Push
 
-After a clean review-loop:
+After a clean review-loop only. One that ended in its Step 4 — limit, plateau, or a finding that survived two fix rounds — is not clean: skip this step, show its blockers, and set the task to ⚠️ blocked, so 2.3 marks its dependents ⛔ skipped. In `--yes`, additionally a TG escalation `🔴 T05 — review-loop не чисто (<статус>)`; in the autopilot, `outcome=blocked`. The changes stay uncommitted for a human.
+
+When clean:
 
 1. Run `/accept TNN` — the skill closes the task, moves the file, updates HANDOFF and CHANGELOG
 2. Run `/sup-push` — the skill checks secrets, builds the commit, and pushes
+
+Any `/sup-push` result other than its «✅ Запушено!» (Step 4, scenario C) — «push не выполнен: нужен человек», a stop on its secrets-gate question, a 🚫 СТОП on secrets, `index-changed`, a push rejected or waiting for an upstream choice — means the task is not finished. `/accept` has already marked it done in the files: leave that as it is, the human finishes with `/sup-push`, not a second `/accept`. Do not announce it closed; show the local commit hash (if there is one) and the branch, set the task to ⚠️ blocked, in `--yes` a TG escalation `🔴 T05 — push не выполнен`, in the autopilot `outcome=blocked`, and stop.
 
 Announce completion:
 

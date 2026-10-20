@@ -2,7 +2,7 @@
   "name": "safe-push",
   "display_name": "Safe Commit & Push",
   "author": "kostya",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits. Не делает force push без явной просьбы.",
   "tags": [
     "git",

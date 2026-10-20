@@ -106,16 +106,40 @@ To chat: "Wave N: <shared directory|worktree-per-task>, reason: <...>".
 
 #### 3.2 — Preparing the worktree (if needed)
 
+**Never under `/tmp`, never from the current HEAD, never merging into the main checkout.**
+Some hosts wipe `/tmp` nightly (worktrees and their branches' work vanish), and a shared main
+checkout may be a mix of branches — building on it drags foreign
+changes into the sprint. Worktrees live in `$WT_ROOT` — `<repo>-wt/`, next to the main checkout.
+Shell state does not carry over between calls, so every command below that names `$WT_ROOT` starts with:
+
+```bash
+WT_ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")-wt"
+```
+
+Layout:
+
+- **Sprint branch** `feat/<spec>-sprint<N>` from `origin/main`, in its own worktree
+  `$WT_ROOT/<spec>-sprint<N>` — created once, before wave 1:
+  ```bash
+  git fetch -q origin main
+  git worktree add -b "feat/${SPEC}-sprint${N}" "$WT_ROOT/${SPEC}-sprint${N}" origin/main
+  ```
+- **Task branches** from the sprint branch (so wave 2 sees wave 1), one worktree per task.
+- If the task files are not on `origin/main` yet (spec PR still open), pass them to the worker
+  by absolute path from the worktree where they live.
+
 For each task in the wave:
 
 ```bash
-WT_PATH="/tmp/sup-codex-wt/T${NN}-${SLUG}"
+WT_PATH="$WT_ROOT/${SPEC}-T${NN}"
 BRANCH="codex/T${NN}-${SLUG}"
+SPRINT_BRANCH="feat/${SPEC}-sprint${N}"
 
 # Collision check (R6)
 if [ -e "$WT_PATH" ]; then
   TS=$(date +%s)
-  mv "$WT_PATH" "${WT_PATH}.failed-${TS}"
+  # git worktree move, not mv: a plain mv leaves a stale registration and the next add fails
+  git worktree move "$WT_PATH" "${WT_PATH}.failed-${TS}" 2>/dev/null || mv "$WT_PATH" "${WT_PATH}.failed-${TS}"
   echo "⚠️ Existing worktree saved: ${WT_PATH}.failed-${TS}"
   # rename the branch if it exists
   if git show-ref --verify --quiet "refs/heads/${BRANCH}"; then
@@ -123,8 +147,8 @@ if [ -e "$WT_PATH" ]; then
   fi
 fi
 
-# Create fresh worktree
-git worktree add "$WT_PATH" -b "$BRANCH"
+# Create fresh worktree from the sprint branch (not from the current HEAD)
+git worktree add "$WT_PATH" -b "$BRANCH" "$SPRINT_BRANCH"
 
 # venv passthrough (R3): symlink if venv is in the repo
 if [ -d "$(git rev-parse --show-toplevel)/.venv" ] && [ ! -e "$WT_PATH/.venv" ]; then
@@ -156,17 +180,31 @@ Wait for all workers to finish. In parallel, `Read(output_file)` for each. On co
 ```markdown
 **Wave N — Results:**
 - T<NN1>: ✅ ok (<duration>s) — <brief summary from output>
-- T<NN2>: ⚠️ timeout — debug in /tmp/sup-codex-wt/T<NN2>-...failed-<ts>
+- T<NN2>: ⚠️ timeout — debug in <repo>-wt/<spec>-T<NN2>.failed-<ts>
 - T<NN3>: ✅ ok (<duration>s) — ...
 ```
 
-#### 3.5 — Merging branches
-
-Only for **successful** workers. Sequentially:
+**Scope gate per worker — before reading its diff.** The task file is the brief: its `## ФАЙЛЫ` section is the allowed list.
 
 ```bash
-cd <repo-root>
-git merge "codex/T<NN>-<slug>"
+python3 scripts/staff/scope_check.py --brief "<abs path to T<NN>_*.md>" --repo "$WT_PATH" \
+  --base "$SPRINT_BRANCH" --format text --task T<NN> > ~/sup-codex/T<NN>-scope.txt; echo "exit=$?"
+```
+
+- `--base` is the **sprint branch**, not `origin/main`: after wave 1 is merged, `origin/main` as base would charge earlier tasks' files to this one.
+- Exit `0` → read the diff against the task, then commit in the task worktree (explicit paths from `ФАЙЛЫ`; Codex does not commit). `owner_review:` paths are listed in the final report.
+- Exit `1` → **one** corrective run of the same worker: the prompt gets a `# ПРАВКИ ПО РЕВЬЮ` section with the gate output. Second RED → the task is ⚠️, its branch is **not merged**, the rest of the wave goes on.
+- Exit `2` → the task file has no usable `ФАЙЛЫ` or the base is wrong — fix the task file / command, not the worker.
+- `lint_unavailable` → install ruff (`/usr/bin/python3 -m pip install --user ruff`) and re-run; not a worker miss.
+- A task that edits only `.claude/` (not in git) → the gate does not apply; Claude does it directly anyway.
+
+#### 3.5 — Merging branches
+
+Only for workers with a **green gate** and a reviewed, committed diff. Sequentially, **into the sprint branch, in the sprint worktree** — never into the main checkout:
+
+```bash
+cd "$WT_ROOT/${SPEC}-sprint${N}"
+git merge --no-ff --no-edit "codex/T<NN>-<slug>"
 ```
 
 On a conflict:
@@ -176,7 +214,7 @@ On a conflict:
 
 On a successful merge:
 ```bash
-git worktree remove "/tmp/sup-codex-wt/T<NN>-<slug>"
+git worktree remove "$WT_ROOT/${SPEC}-T<NN>"
 git branch -d "codex/T<NN>-<slug>"
 ```
 
@@ -192,23 +230,35 @@ Failed worktrees (with `.failed-<ts>`) are **not removed** — they remain for d
 1. /review-loop  — for all changes as a batch
    └─ internally it calls /codereview (via routing → /codereview-dual)
    └─ and /fix until clean of CRITICAL/HIGH
+   └─ ended in its Step 4 (limit, plateau, or a finding that survived
+      two fix rounds) → NOT clean: skip 2 and 3, go to Step 6 with its
+      blockers and «Что возвращалось»
 
 2. For each task in the waves: /accept T<NN>
 
 3. /sup-push  — one commit for the whole batch (or one per task,
                 ask the user at the start of the sprint)
+   └─ ended «push не выполнен: нужен человек», or stopped on its
+      secrets-gate question → not finished: Push line ⚠️, Step 6
 ```
+
+The changes of a not-clean run stay for a human, unpushed: in a shared-directory wave they are uncommitted; in a worktree wave they are already merged into the sprint branch by 3.5 (local commits). Do not push that branch and do not delete it: name it and its last commit in the Step 6 report. Called from `/sprint --yes` or the
+autopilot: a TG escalation (`scripts/autopilot/tg_notify.sh "🔴 Sprint <Spec> — review-loop не
+чисто (<статус>)"`, or `… — push не выполнен`) and `outcome=blocked`, as in `/sprint` Step 7.
 
 ---
 
 ### Step 5 — Cleanup
 
 ```bash
-# Files older than 7 days in /tmp/sup-codex/
+# Files older than 7 days in /tmp/sup-codex/ (prompts and raw worker output only;
+# briefs and scope-gate output live in ~/sup-codex/ and are not swept here)
 find /tmp/sup-codex -type f -mtime +7 -delete 2>/dev/null
 
 # keep last-run.log for debugging
 ```
+
+No worktrees under `/tmp` any more; task worktrees live in `<repo>-wt/` and are removed after their merge (3.5).
 
 ---
 
@@ -228,11 +278,13 @@ find /tmp/sup-codex -type f -mtime +7 -delete 2>/dev/null
 | T78 | ✅ merged | 8m | T78-<slug> (cleaned) |
 | T79 | ⚠️ timeout | 10m | T79-<slug>.failed-<ts> (debug) |
 
-### Review-loop: <clean | N iterations, MEDIUM/LOW remaining>
-### Accept: ✅ K tasks
-### Push: ✅ <commit hash> (or: commit awaiting an explicit /sup-push)
+### Review-loop: <clean | N iterations, MEDIUM/LOW remaining | ⚠️ limit / plateau / survived two fix rounds — blockers remain>
+### Accept: <✅ K tasks | ⛔ skipped — review-loop not clean>
+### Push: <✅ <commit hash> | ⚠️ commit <hash> local, push refused | ⛔ skipped — review-loop not clean> (or: commit awaiting an explicit /sup-push)
 
-**Failed tasks:** require manual triage. Debug snapshots in /tmp/sup-codex-wt/*.failed-*
+**Next** (only when review-loop is not clean or the push was refused): resolve the blockers by hand → `/review-loop` → `/accept` → `/sup-push`; a refused push → `/sup-push` by a human.
+
+**Failed tasks:** require manual triage. Debug snapshots in <repo>-wt/*.failed-*
 ```
 
 ---
@@ -244,6 +296,8 @@ find /tmp/sup-codex -type f -mtime +7 -delete 2>/dev/null
 - **Worktree creation is sequential** (to avoid races), but the workers inside them run in parallel.
 - **Collision check (R6) before each `git worktree add`** — rename an occupied path to `.failed-<ts>`.
 - **venv passthrough (R3)** — symlink `.venv` into the worktree + env variables via `codex-worker`.
+- **Scope gate before every merge** — `--base` = sprint branch; two RED in a row → ⚠️, not merged.
+- **Worktrees in `<repo>-wt/` next to the main checkout, merges into the sprint branch** — never `/tmp`, never the main checkout.
 - **After merge — only `/review-loop`** (R5), without a direct `/codereview-dual`.
 - **Do not remove failed worktrees automatically** — keep them under `.failed-<ts>` for debugging.
 - **Merge conflicts — interactive with the user**, not automatic resolution.
