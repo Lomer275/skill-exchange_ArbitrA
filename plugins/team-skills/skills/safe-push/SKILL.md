@@ -28,7 +28,17 @@ If there are no staged files and no files were specified — warn and stop.
 
 ### Step 1 — Secrets check (BLOCKING)
 
-**Stage first.** If the user named files, stage exactly those now: `git add -- <файлы>` (never `git add -A` / `git add .`, see Rules). Every check below looks at what is staged, and Step 3 commits exactly that. Nothing staged and no files named → warn and stop:
+**Branch first.** Find the deploy branch — the one whose push ships to prod (the project's `CLAUDE.md` names it; usually `main`, with a workflow like `deploy-prod.yml` on push). `git branch --show-current` prints it, or nothing (detached HEAD) → stop before staging anything: that branch takes changes only through a PR.
+
+```
+⛔ Ты на <ветка деплоя> — push сюда = выкат на прод. Перенеси работу на ветку:
+   git switch -c <тип>/<коротко>   (staged и изменённые файлы переедут с ней)
+и запусти /sup-push снова. PR — отдельным шагом, после твоего «да».
+```
+
+A project where a push to `main` deploys nothing (no such workflow, `CLAUDE.md` says commits go straight to `main`) has no deploy branch: say so in one line and go on.
+
+**Stage.** If the user named files, stage exactly those now: `git add -- <файлы>` (never `git add -A` / `git add .`, see Rules). Every check below looks at what is staged, and Step 3 commits exactly that. Nothing staged and no files named → warn and stop:
 ```
 ⚠️ Нет staged-файлов для коммита. Добавь файлы через git add или укажи их явно.
 ```
@@ -224,6 +234,7 @@ Never force-push from the session. If the user explicitly asks for a force push 
 
 ## Rules
 
+- **Never commit or push on the deploy branch** (Step 1): a push there is a deploy to prod; the agent does not switch branches for the human, it shows the command
 - **Secrets are an absolute block for the agent**: a hit → stop; the agent never overrides it, even if the user insists. The human may mark a false gitleaks hit (Step 1) or commit from their own terminal
 - **Read versioning_guidelines.md at runtime** — do not rely on memory for the commit format
 - **Do not commit without confirmation** — always show the message before git commit

@@ -4,7 +4,7 @@
       "name": "accept",
       "display_name": "Accept Task",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Закрывает задачу: помечает done в файле/спеке/HANDOFF, добавляет в CHANGELOG, переносит в Done/. Адаптируется к префиксу проекта.",
       "tags": [
         "workflow",
@@ -30,7 +30,7 @@
       "name": "auto-pilot",
       "display_name": "Auto-Pilot Orchestrator",
       "author": "kostya",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "description": "Continuous-mode autopilot для проектов с SUP-конвенциями: cron-headless оркестратор который сам выбирает следующее действие (Rule 1-6), self-heal на budget exhaustion, TG control plane (inline-buttons + slash-commands), git-guard на destructive ops. Включает SKILL.md, 10 helper-скриптов, JSON-schema для config и install.sh для setup.",
       "tags": [
         "autopilot",
@@ -68,7 +68,7 @@
       "name": "bitrix24-developer",
       "display_name": "Bitrix24 Developer",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Generic-набор паттернов работы с Bitrix24 REST API: CRM, smart processes, business processes, disk, batch API, n8n integration.",
       "tags": [
         "bitrix24",
@@ -81,7 +81,7 @@
       "name": "close",
       "display_name": "Close — завершение рабочего дня",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Завершает рабочую сессию одной командой: харвест повторов в навыки, фиксация контекста (хендофф + память агента + статусы задач ПО ФАКТУ), карточка эффективности ярусов AI, секрет-скан и подготовка коммита дня, уборка временного мусора. Парный к /intro. Источник — кокпит Алексея, версия адаптирована под конвенции SUP.",
       "tags": [
         "workflow",
@@ -119,7 +119,7 @@
       "name": "codereview-dual-loop",
       "display_name": "Code Review (Dual) Loop",
       "author": "kostya",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "description": "Цикл /codereview-dual → /fix до полной чистоты от CRITICAL и HIGH. Принудительный dual (Claude + Codex) на каждой итерации, максимум 5 итераций. При недоступности Codex — graceful fallback на /review-loop.",
       "tags": [
         "code-review",
@@ -157,7 +157,7 @@
       "name": "codex-worker",
       "display_name": "Codex Worker (internal helper)",
       "author": "kostya",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "description": "Internal helper для запуска Codex-воркера. Вызывается из /impl, /fix, /codereview-dual и /sprint-codex. Принимает файл задачи либо разовый brief_file (путь /impl). Движок выбирается по ЗДОРОВЬЮ, а не по наличию: плагин codex@openai-codex несёт свой движок, который может быть старше глобального CLI и молча возвращать пустой результат — тогда воркер уходит на legacy codex exec (обязательно с < /dev/null, иначе CLI ждёт EOF на stdin и висит до таймаута).",
       "tags": [
         "internal",
@@ -185,7 +185,7 @@
       "name": "env-audit",
       "display_name": "Env Audit",
       "author": "Костя",
-      "version": "3.4.1",
+      "version": "3.4.2",
       "description": "Приёмка рабочего места: коллектор фактов + бриф до 20 КБ + справочники по темам. Одиннадцать регламентов, секреты и 1Password, сеть, расход токенов и связка с Codex, архитектура проектов, знакомство с человеком. Клинап применяется только после показанного диффа и «да», запись HANDOFF и CHANGELOG проверяется по факту в песочнице; в финале — отчёт и инструкция человеку",
       "tags": [
         "audit",
@@ -254,7 +254,7 @@
       "name": "intro",
       "display_name": "Intro — возврат в контекст",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Загружает контекст проекта в начале сессии — парный к /close. Читает хендофф (RESUME-PROMPT), открытые задачи и состояние git, выводит: где остановились, следующий шаг, открытые блокеры. Ловит расхождение хендоффа с репо и говорит о нём прямо. Ничего не меняет — только читает.",
       "tags": [
         "workflow",
@@ -292,8 +292,8 @@
       "name": "safe-push",
       "display_name": "Safe Commit & Push",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits. Не делает force push без явной просьбы.",
+      "version": "1.2.0",
+      "description": "Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits. Не делает force push без явной просьбы и не коммитит в ветку деплоя (обычно main).",
       "tags": [
         "git",
         "safety"
@@ -304,7 +304,7 @@
       "name": "spec-brainstorm",
       "display_name": "Spec Brainstorm",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Интерактивное со-создание новой спецификации проекта в режиме «вопрос-ответ». Проводит через структурированную разведку (проблема → цель → фазы → архитектура → DoD), затем делегирует финальную запись файла в /spec-writer. Принципиально интерактивный — задаёт вопросы по одному через AskUserQuestion, не пишет файл пока человек не финализировал.",
       "tags": [
         "spec",
@@ -319,7 +319,7 @@
       "name": "spec-writer",
       "display_name": "Spec Writer",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Создаёт документы проекта: спецификации (S), задачи (T), бизнес-требования (BR). Один вызов = один файл, только скелет.",
       "tags": [
         "documentation",
@@ -332,7 +332,7 @@
       "name": "sprint",
       "display_name": "Sprint",
       "author": "kostya",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run и --yes (headless mode для cron-автопилота с check_authz из HANDOFF YAML, TG-ask retry-loop).",
       "tags": [
         "workflow",

@@ -238,7 +238,7 @@ If a task finished with status ⚠️ blocked or ⛔ skipped:
 
 ### 2.4 — After the wave
 
-In `--yes`: `scripts/autopilot/tg_notify.sh "✅ Sprint <Spec> Волна N/M готова — коммит <sha> → dev"` — only when every task of the wave is ✅ done. A wave with a ⚠️ blocked or ⛔ skipped task sends `⚠️ Sprint <Spec> Волна N/M: закрыто K из L, заблокированы: <TNN, …>` instead.
+In `--yes`: `scripts/autopilot/tg_notify.sh "✅ Sprint <Spec> Волна N/M готова — коммит <sha> → <ветка>"` — only when every task of the wave is ✅ done. A wave with a ⚠️ blocked or ⛔ skipped task sends `⚠️ Sprint <Spec> Волна N/M: закрыто K из L, заблокированы: <TNN, …>` instead.
 
 ### 2.5 — After all waves
 
@@ -303,7 +303,7 @@ Interpretation: `yes` → continue, `no` → ⚠️ blocked, `skip` → ⛔ skip
 
 ### Step 4 — Implementation
 
-Write the code per the plan. Autonomously, without stops.
+If the project splits roles — Claude decides, Codex writes the code (its `CLAUDE.md` says so and `/impl` is installed) — Claude does not write executable code here: turn the plan into a brief and hand it to `/impl` — Codex writes the code, Claude reads the diff against the brief. Routing and the exceptions pocket — the project's `runbook_codex_routing.md`, if it has one; an exception is announced in one line. Codex disabled or unavailable is itself an exception: then write the code per the plan yourself. Without such a split — write the code per the plan yourself. Autonomously, without stops.
 
 If an **unplanned risk** is discovered in the process (a pattern from "Risk detection" that was not in the step 2 plan) → IMMEDIATE STOP:
 
@@ -325,7 +325,7 @@ Run the tests of the affected modules. **If the tests pass** → proceed to step
 
 **If the tests fail:**
 
-- Attempt 1: analyze the traceback, find the cause, fix it
+- Attempt 1: analyze the traceback, find the cause, fix it (when Step 4 went through `/impl`, the fix goes the same way — a follow-up brief with the traceback)
 - Attempt 2: after the fix, run the tests again
 - Attempt 3: final attempt
 
@@ -374,7 +374,7 @@ After a clean review-loop only. One that ended in its Step 4 — limit, plateau,
 When clean:
 
 1. Run `/accept TNN` — the skill closes the task, moves the file, updates HANDOFF and CHANGELOG
-2. Run `/sup-push` — the skill checks secrets, builds the commit, and pushes
+2. Commit and push — `/sup-push` checks secrets, builds the commit, and pushes. **Interactive mode:** commit only on the human's explicit word: show the files and the ready message and wait for «да»; no answer → the task stays ⚠️ «не запушено», nothing is committed. **`--yes` mode:** the owner launching `/sprint --yes` is the standing request for this run — run `/sup-push`. It refuses the deploy branch (usually `main`, where a push deploys to prod), so the sprint works on a branch.
 
 Any `/sup-push` result other than its «✅ Запушено!» (Step 4, scenario C) — «push не выполнен: нужен человек», a stop on its secrets-gate question, a 🚫 СТОП on secrets, `index-changed`, a push rejected or waiting for an upstream choice — means the task is not finished. `/accept` has already marked it done in the files: leave that as it is, the human finishes with `/sup-push`, not a second `/accept`. Do not announce it closed; show the local commit hash (if there is one) and the branch, set the task to ⚠️ blocked, in `--yes` a TG escalation `🔴 T05 — push не выполнен`, in the autopilot `outcome=blocked`, and stop.
 
@@ -437,7 +437,8 @@ In `--yes`: a one-line TG summary `<emoji> Sprint <Spec> закончен — <K
 - **Dependency cycle → STOP at the start**
 - **--dry-run → plan only** (even with --yes — the plan is output with markers, nothing is executed)
 - **Fallback without dependencies → sequentially**
-- **sup-push after every accept**: do not accumulate commits between tasks
+- **One commit per accepted task**: do not accumulate commits between tasks; in interactive mode each one waits for the human's «да» (Step 7)
+- **Code goes through `/impl`** when the project splits roles (Step 4): Claude writes the brief and reads the diff; writing code itself only under the exceptions pocket, announced
 - **--yes without a HANDOFF YAML block → everything defaults to `ask`**. If TG creds are also not configured — `/sprint --yes` refuses to start with the error "No HANDOFF authz + no TG creds = no autonomy possible"
 
 ---

@@ -2,7 +2,7 @@
 name: intro
 description: >
   Loads the project context at the start of a session — the paired opener for /close.
-  Reads the project's canonical HANDOFF (RESUME-PROMPT), the open tasks and the current branch state,
+  Reads the project's canonical HANDOFF (the «Продолжаем…» line at the top), the open tasks and the current branch state,
   then reports where we stopped, the next step and the open blockers. Use when the user
   says "/intro", "продолжаем", "что у нас", "с чего начинаем", "загрузи контекст",
   "что вчера делали".
@@ -22,8 +22,9 @@ description: >
   → `<ПРЕФИКС>-HANDOFF.md` в корне → `docs/<ПРЕФИКС>-HANDOFF.md`. Датированная серия
   `handoffs/HANDOFF_<дата>.md` — журнал, а не канон.
 
-1. **Канон состояния** (`<ПРЕФИКС>-HANDOFF.md` или объявленный путь) — RESUME-PROMPT наверху,
-   ⚠️ незавершённое, блокеры, git-состояние.
+1. **Канон состояния** (`<ПРЕФИКС>-HANDOFF.md` или объявленный путь) — строка «Продолжаем…» наверху:
+   секция RESUME-PROMPT, если канон её ведёт, иначе первая строка верхней секции текущего состояния
+   (например «## Открытое / активное»; так её оставляет `/close`), ⚠️ незавершённое, блокеры, git-состояние.
 2. **`<ПРЕФИКС>-CHANGELOG.md`**, секция «Не выпущено» — что закрыто, но ещё не в релизе.
 3. **Открытые задачи** `docs/3. <ПРЕФИКС>-tasks/T*.md` — какие 🟡 и по каким спекам.
 4. **Git**: `git status --short` + `git log --oneline -5` + текущая ветка.
@@ -33,7 +34,7 @@ description: >
 ## Что вывести
 
 ```
-**Где остановились:** <1–2 строки из RESUME-PROMPT>
+**Где остановились:** <1–2 строки из строки «Продолжаем…»>
 **Следующий шаг:** <конкретное действие>
 **Открытые блокеры:** <что ждёт владельца / внешнюю систему; «нет» — тоже ответ>
 **Состояние репо:** ветка <name>, <N> незакоммиченных файлов<, расхождение с хендоффом: …>

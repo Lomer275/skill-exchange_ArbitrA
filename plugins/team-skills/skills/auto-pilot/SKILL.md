@@ -41,13 +41,13 @@ The autopilot writes to TG @lobster_21 at key moments. The goal is to **read it 
 
 | Point | Message template |
 |---|---|
-| Cron tick starts (wrapper) | `🤖 Автопилот стартует (HH:MM Z)`<br>`Ветка: dev @ <sha>`<br>`Последний коммит: <commit title>`<br>`Из HANDOFF: <directive>`<br>` `<br>`Читаю состояние, выбираю действие.` |
+| Cron tick starts (wrapper) | `🤖 Автопилот стартует (HH:MM Z)`<br>`Ветка: <work_branch> @ <sha>`<br>`Последний коммит: <commit title>`<br>`Из HANDOFF: <directive>`<br>` `<br>`Читаю состояние, выбираю действие.` |
 | Decision made (phase 3) | `🎯 Решение: Rule X — <как назвал правило>`<br>`Беру: /sprint --yes S14 (Wave 2 из 4)`<br>`Состояние: 5/16 задач S14 закрыто, осталось 11`<br>`В очереди этой волны: T125 T126 T127 T128 T130`<br>`Стопы: T126 (Bitrix) и T130 (UI) попросят клик` |
 | Wave started | `🟡 Sprint S14 Волна 2/4 — старт`<br>`Auto-go: T125 T127 T128 (параллельно)`<br>`Будут ждать клика: T126 T130`<br>`Ожидаемое время: 15–25 минут` |
 | Task closed within a wave | `✓ T125 закрыто — payload schemas`<br>`12 unit-тестов passed, 3 файла изменено`<br>`Коммит: <sha>` |
-| Wave done | `✅ Sprint S14 Волна 2/4 готова (24 мин)`<br>`Закрыто 5/5 задач:`<br>`• T125 — payload schemas (12 тестов)`<br>`• T127 — validate_payment_data (8 тестов)`<br>`• T128 — snapshot_history (15 тестов)`<br>`• T126 — Bitrix sync (ты подтвердил, 24 теста)`<br>`• T130 — UI шаблоны (ты подтвердил, ручная проверка)`<br>`Коммит: <sha> → dev`<br>`Прогресс: 10/16 задач S14` |
+| Wave done | `✅ Sprint S14 Волна 2/4 готова (24 мин)`<br>`Закрыто 5/5 задач:`<br>`• T125 — payload schemas (12 тестов)`<br>`• T127 — validate_payment_data (8 тестов)`<br>`• T128 — snapshot_history (15 тестов)`<br>`• T126 — Bitrix sync (ты подтвердил, 24 теста)`<br>`• T130 — UI шаблоны (ты подтвердил, ручная проверка)`<br>`Коммит: <sha> → <work_branch>`<br>`Прогресс: 10/16 задач S14` |
 | Decision needed (RISKY/DEPLOY/MANUAL_TEST) | via `tg_ask.sh` with buttons:<br>`⚠️ T126 — нужно решение`<br>`Bitrix sync cron, греди recompute + advisory lock`<br>`Файлы: Handler/payments/sync.py`<br>`Внешние API: Bitrix REST (read-write по deal.list)`<br>`Тесты: будут написаны после фикса`<br>` `<br>`Ответь: ✅ да / ❌ нет / ⏩ пропустить` |
-| Tick finished successfully | `✅ Автопилот закончил тик`<br>`Длительность: 24 мин`<br>`Ветка: dev @ <sha>`<br>`Сделал: <короткое описание>`<br>`Новых коммитов: <N>`<br>`Прогресс: 10/16 задач S14`<br>`Дальше: следующий тик в 18:00 МСК — Wave 3` |
+| Tick finished successfully | `✅ Автопилот закончил тик`<br>`Длительность: 24 мин`<br>`Ветка: <work_branch> @ <sha>`<br>`Сделал: <короткое описание>`<br>`Новых коммитов: <N>`<br>`Прогресс: 10/16 задач S14`<br>`Дальше: следующий тик в 18:00 МСК — Wave 3` |
 | Tick idle (nothing to do) | `😴 Делать нечего`<br>`HANDOFF пуст / нет активных задач`<br>`Последняя проверка: HH:MM`<br>`CI на main: success`<br>`Жду следующего тика (18:00 МСК)` |
 | Tick failed/stuck | `🔴 Тик застрял`<br>`Где: T127, Step 5 (test failures)`<br>`Что: 3 попытки фикса не помогли. Последняя ошибка:`<br>`AssertionError: expected 200, got 500`<br>` `<br>`Подробности: autopilot_log.md`<br>`Нужно: посмотри лог и скажи как чинить` |
 
@@ -74,7 +74,7 @@ After:
 ```
 ✅ Автопилот закончил волну
 Сделал 5 задач из 16 (волна 1/4) — модели + утилиты + EventType
-Запушил: dev @ d1fa4c2
+Запушил: autopilot @ d1fa4c2
 Дальше — волна 2 (5 задач, есть стопы)
 ```
 
@@ -154,7 +154,7 @@ Before doing anything, check all the red flags. Any one = an immediate stop with
 |---|---|
 | The latest `deploy-prod` run on main = `failure` or `cancelled` | STOP + escalate `🔴 CI на main красный (run #X). Автопилот замёрз до ручного резолва.` |
 | `git status` shows unmerged conflicts / detached HEAD | STOP + escalate `⚠️ Репо в нестандартном состоянии: <git status>` |
-| Branch ≠ `dev` (or the one explicitly set in `autopilot.json:branch.work_branch`) | STOP + escalate `⚠️ Текущая ветка <X>, ожидалась <work_branch>` |
+| Branch ≠ `autopilot.json:branch.work_branch` (default `autopilot` — a branch off `origin/main`; create it with `git switch -c autopilot origin/main` before enabling). The deploy branch (`main` where a push to it deploys to prod) is never a work branch, and neither is a long-abandoned branch that has drifted far behind `main` | STOP + escalate `⚠️ Текущая ветка <X>, ожидалась <work_branch>` |
 | HANDOFF.md contains the line `⛔ AUTOPILOT_PAUSE` | STOP without escalation, this is your deliberate pause |
 
 **Under no circumstances** do: `git push --force`, `git reset --hard`, `git checkout --`, `gh pr merge`, `gh pr close --delete-branch`, `rm -rf`, or deletion of task/spec files. This is an **architectural ban** — even if review-loop or another skill suggests it. In such cases — STOP + escalate.
@@ -192,7 +192,7 @@ Does `git status` show uncommitted changes **in the whitelist zone**?
 
 ### Rule 3 — A ready, active task
 
-Does `docs/3. SUP-tasks/` have a `TNN_*.md` with YAML frontmatter `status: active` and no blockers (in the frontmatter `blocked_by:` is empty or all blockers are in Done/)?
+Does `docs/3. SUP-tasks/` have a `TNN_*.md` with YAML frontmatter `status: draft`, whose spec header says `**Статус:** active` (the person handed it off for work), and no blockers (frontmatter `depends_on:` is empty or every listed TNN is in Done/)? The schema is `task_decomposition_guide.md` §4.0: there is no `status: active` for tasks and no `blocked_by:`; `in_progress` is already being worked on — do not start it again.
 
 → Pick the task with the smallest NN. If there are several in one spec → invoke `/sprint S0X` (it will sort out the waves itself). If there is a single task — also via `/sprint S0X` (that is its contract).
 
@@ -200,7 +200,7 @@ Does `docs/3. SUP-tasks/` have a `TNN_*.md` with YAML frontmatter `status: activ
 
 ### Rule 4 — A draft spec for decomposition
 
-Does `docs/2. SUP-specifications/` have an `SNN_*.md` with `status: draft` and **without** corresponding TNN files in `docs/3. SUP-tasks/`?
+Does `docs/2. SUP-specifications/` have an `SNN_*.md` with the header line `**Статус:** draft` (specs keep the status in that line, not in YAML) and **without** corresponding TNN files in `docs/3. SUP-tasks/`?
 
 → Invoke `/sup-spec-writer` with the command "decompose SNN into tasks". **Mark this with ⚠️ in the log** — the person must review the result in the morning.
 
@@ -208,7 +208,7 @@ After decomposition — **do not run /sprint in the same tick**. Finish; the nex
 
 ### Rule 5 — An open PR with green CI
 
-Is there an open PR from `dev` (or `branch.work_branch` from the config) into `main` with `statusCheckRollup` = SUCCESS that you created earlier (there is a note in `autopilot_log.md`)?
+Is there an open PR from `branch.work_branch` (from the config) into `main` with `statusCheckRollup` = SUCCESS that you created earlier (there is a note in `autopilot_log.md`)?
 
 → **Do not merge**. Just note in the log "PR #X is ready for human review" and finish. A merge into main = your person.
 
@@ -255,7 +255,7 @@ Append a line to `docs/5. SUP-unsorted/autopilot_log.md` (create it if it does n
 - **Решение**: Rule 3 → /sprint S08
 - **Действие**: ran /sprint S08 → 3 tasks completed (T067, T068, T069)
 - **Verify**: ✅ pytest passed, git status clean
-- **Branch**: dev @ <sha>
+- **Branch**: <work_branch> @ <sha>
 - **Tokens**: ~340k
 - **Outcome**: success
 - **Next**: idle ожидается на следующем тике
@@ -354,7 +354,7 @@ On escalation:
 2. **Do not merge into main and do not create a ready-for-review PR.** A draft PR at most. The merge is the person's job.
 3. **Do not force-push / reset --hard / any destructive git operations.** Never. Even if review-loop suggests it.
 4. **Do not interpret CLAUDE.md instructions expansively.** If `migrations/` is not in whitelist-paths — do not touch it even if the task formally requires it.
-5. **Do not pick up tasks with `blocked_by` ≠ Done.** Be a stickler.
+5. **Do not pick up tasks with `depends_on` not all in Done.** Be a stickler.
 6. **Do not take two actions in one tick.** Decomposed a draft → STOP. Did /sprint → STOP. Finalized the branch via finishing-a-development-branch → STOP. The next tick will pick it up.
 7. **Do not lie in the log.** If verify did not pass — write "outcome: partial/blocked". The log is for you on the following ticks.
 

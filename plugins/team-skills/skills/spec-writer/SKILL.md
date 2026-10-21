@@ -65,8 +65,8 @@ glob docs/2. <ПРЕФИКС>-specifications/S*.md
 glob docs/backlog/S*.md
 ```
 
-From all matched file names, extract the numbers after `S` (two-digit format).
-Find the maximum number → next number = max + 1, in two-digit format (`01`, `02`, ..., `10`, `11`).
+From all matched file names, extract the numbers after `S`.
+Find the maximum number → next number = max + 1, at least two digits (`01` … `09`, `10`, … `59`, `100`).
 
 Example: if S01, S02, S05, S06 are found → next = S07.
 
@@ -79,9 +79,20 @@ glob docs/3. <ПРЕФИКС>-tasks/**/T*.md
 
 This covers both current tasks and files in `Done/` (nested folders).
 From all matched file names, extract the numbers after `T`.
-Find the maximum → next = max + 1, two-digit format.
+Find the maximum → next = max + 1, at least two digits.
 
-Example: if T01..T55 are found including Done/ → next = T56.
+Example: if the maximum found, including Done/, is T497 → next = T498.
+
+**The file scan is not enough.** A number can be taken before its file exists — in another worktree on an unpushed branch, or reserved in prose («Follow-up T<NN>»). Scan every worktree and grep the candidate:
+
+```bash
+git worktree list --porcelain | sed -n 's/^worktree //p' | while read -r d; do
+  find "$d/docs" -name 'T[0-9]*.md' -printf '%f\n' 2>/dev/null
+done | grep -oE '^T[0-9]+' | sed 's/T//' | sort -n -u | tail -3
+grep -rn "T<NN>\b" docs/ <ПРЕФИКС>-HANDOFF.md <ПРЕФИКС>-CHANGELOG.md
+```
+
+Take the first number with no file in any tree and no mention in prose.
 
 #### For a business requirement (BRNN):
 
@@ -91,7 +102,7 @@ glob docs/1. <ПРЕФИКС>-business requirements/<ПРЕФИКС>-BR*.md
 ```
 
 From the file names, extract the numbers after `BR`.
-Find the maximum → next = max + 1, two-digit format.
+Find the maximum → next = max + 1, at least two digits.
 
 ### Step 4 — Check for a conflict
 
@@ -179,12 +190,20 @@ The status of a new document is always = `draft`.
 
 #### Skeleton for a task (T):
 
+The task status lives in YAML frontmatter when the project's task decomposition guide defines one (as below — check the guide for the exact fields). A project without frontmatter keeps `**Статус:** draft` and `**Дата:** YYYY-MM-DD` lines under `**Спецификация:**` instead.
+
 ```markdown
+---
+spec: SNN_<spec_name>
+status: draft
+created: YYYY-MM-DD
+wave: 1
+depends_on: []
+---
+
 # TNN. <Название>
 
 **Спецификация:** docs/2. <ПРЕФИКС>-specifications/SNN_<spec_name>.md
-**Статус:** draft
-**Дата:** YYYY-MM-DD
 
 ---
 
@@ -277,7 +296,7 @@ Adapt "Следующие шаги" to the document type:
 - **Skeleton only.** Do not fill in the content for the user — structure only.
 - **The status of a new document is always `draft`.**
 - **Always read the guides at runtime** (Step 2) — do not rely on memory or previous reads.
-- **Numbering is always two-digit:** 01, 02, ..., 10, 11, 12...
+- **Numbering is at least two digits:** 01, 02, ..., 10, 11, ..., 497, 498...
 - **TNN: scan recursively including Done/.** The maximum number across all files — not only active tasks.
 - **SNN: scan both specs/ and backlog/.** Both sources.
 - If the type is not specified — ask first, do not guess.

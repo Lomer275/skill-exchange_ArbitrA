@@ -51,7 +51,7 @@ Stop right away, Step 4, when **K == 2** or when **one CRITICAL/HIGH finding is 
 
 The same as in `/codereview-dual` (Step 0):
 
-1. **Kill-switch.** Read `.claude/codex.json:enabled` + env `SUP_CODEX_ENABLED` (precedence matrix from CLAUDE.md). If disabled — graceful fallback: warn the user and delegate to the regular `/review-loop`:
+1. **Kill-switch.** Read `.claude/codex.json:enabled` + env `SUP_CODEX_ENABLED` (precedence matrix — the project's `runbook_codex_routing.md`). If disabled — graceful fallback: warn the user and delegate to the regular `/review-loop`:
 
    ```
    ⚠️ Codex отключён. Делаю одиночный /review-loop (только Claude).
@@ -219,7 +219,7 @@ A Step 4 exit is **not clean**: whoever called this loop must not go on to `/acc
 - **The 5-iteration limit is hard**, do not exceed it even on request; the plateau rule may stop the loop earlier, never later.
 - **`OLD-` rows don't count** — older bugs on main are outside the change: not in the stop criterion, not in K, not fixed by the loop. They are never copied into the blocker or MEDIUM/LOW tables; the final report lists the last review's `OLD-` rows in the «Старые баги main» line.
 - **Do not write git commit/push** — that is `/sup-push`.
-- **Do not call this skill from `/sprint-codex`** — there, per rule R5 of spec S11, the sprint calls `/review-loop` to avoid a double dual-review. This skill is for manual use by the user.
+- **Do not call this skill from `/sprint-codex`** — there, per spec S11 Phase 4 (rule R5 in `/sprint-codex`), the sprint calls `/review-loop` to avoid a double dual-review. This skill is for manual use by the user.
 
 ---
 

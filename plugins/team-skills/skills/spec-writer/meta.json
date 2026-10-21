@@ -2,7 +2,7 @@
   "name": "spec-writer",
   "display_name": "Spec Writer",
   "author": "kostya",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Создаёт документы проекта: спецификации (S), задачи (T), бизнес-требования (BR). Один вызов = один файл, только скелет.",
   "tags": [
     "documentation",

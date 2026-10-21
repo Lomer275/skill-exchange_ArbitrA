@@ -82,9 +82,12 @@ GET/POST ${BITRIX_WEBHOOK}METHOD
 ## Core API Methods Reference
 
 > For detailed method signatures, see references/api-methods.md
-> For CRM field structures, see references/crm-fields.md
+> For CRM methods and field structures, see references/crm-methods.md
 > For smart process patterns, see references/smart-processes.md
-> For business process patterns, see references/business-processes.md
+> For business process patterns, see references/bizproc.md
+> For Disk (folders, files, uploads), see references/disk.md
+> For n8n integration patterns, see references/n8n-patterns.md
+> For the expected env variables, see references/env.example.md
 > For known pitfalls, see references/pitfalls.md
 
 ### Quick Method Index

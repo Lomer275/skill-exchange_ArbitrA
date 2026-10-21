@@ -26,8 +26,8 @@ As of 2026-06-11 the worker launches Codex **through the `codex@openai-codex` pl
 | `lens` | for reviewer | `correctness` | review lens: `correctness,edge-cases,risks,security,style,...` |
 | `timeout_min` | no | `10` | watchdog timeout in minutes |
 | `task_id` | no | file name | prefix for prompt/output files (e.g. `T17`) |
-| `model` | no | — | Codex model override (`spark` → `gpt-5.3-codex-spark`); empty = default |
-| `effort` | no | — | reasoning effort: `none\|minimal\|low\|medium\|high\|xhigh`; empty = default |
+| `model` | no | — | Codex model override — a slug from the CLI catalog (`~/.codex/models_cache.json`); empty = default. Not `spark`: the companion maps it to `gpt-5.3-codex-spark`, which CLI 0.162 no longer lists |
+| `effort` | no | — | reasoning effort: `low\|medium\|high\|xhigh\|max\|ultra` (CLI 0.162); the companion accepts up to `xhigh`, so `max`/`ultra` are lowered to `xhigh` with a note; empty = default |
 | `inline` | no | `auto` | **legacy mode only** (Appendix A). Ignored in companion mode |
 | `inline_files` | no | — | **legacy mode only**. Ignored in companion mode |
 
@@ -209,7 +209,7 @@ WRITE_FLAG=""
 
 # model/effort: явный arg > ~/.codex/config.toml > пусто (app-server default).
 # ВАЖНО: companion (app-server) НЕ наследует config.toml автоматически — без этого
-# воркер ревьюит на лёгком дефолте, а legacy `codex exec` — на gpt-5.5/high. Пробрасываем для паритета.
+# воркер ревьюит на лёгком дефолте модели, а legacy `codex exec` — на модели и effort из конфига. Пробрасываем для паритета.
 CFG="$HOME/.codex/config.toml"
 if [ -z "$MODEL" ]  && [ -f "$CFG" ]; then
   MODEL=$(grep -E '^[[:space:]]*model[[:space:]]*=' "$CFG" | head -1 | sed -E 's/.*=[[:space:]]*"?([^"#]+)"?.*/\1/' | xargs)
@@ -217,8 +217,10 @@ fi
 if [ -z "$EFFORT" ] && [ -f "$CFG" ]; then
   EFFORT=$(grep -E '^[[:space:]]*model_reasoning_effort[[:space:]]*=' "$CFG" | head -1 | sed -E 's/.*=[[:space:]]*"?([^"#]+)"?.*/\1/' | xargs)
 fi
-# effort должен быть из {none,minimal,low,medium,high,xhigh}; иначе companion упадёт — отбрасываем невалидное
-case "$EFFORT" in none|minimal|low|medium|high|xhigh) ;; *) EFFORT="" ;; esac
+# companion (плагин 1.0.6) принимает effort только до xhigh, CLI 0.162 — ещё max и ultra. Их понижаем до xhigh:
+# companion на них падает, а отброшенный effort даёт дефолт модели (у gpt-6.1-sol это low). Прочее невалидное — отбрасываем.
+EFFORT_NOTE=""
+case "$EFFORT" in low|medium|high|xhigh) ;; max|ultra) EFFORT_NOTE="effort $EFFORT → xhigh (companion caps at xhigh)"; EFFORT="xhigh" ;; *) EFFORT="" ;; esac
 MODEL_FLAG="";  [ -n "$MODEL" ]  && MODEL_FLAG="--model $MODEL"
 EFFORT_FLAG=""; [ -n "$EFFORT" ] && EFFORT_FLAG="--effort $EFFORT"
 
@@ -258,7 +260,7 @@ while now() < deadline:
             data = json.load(RAW_JSON)
             write(OUTPUT_FILE, data.get("rawOutput", ""))
             status = "ok" if data.get("status") == 0 else "error"
-            notes  = "" if status == "ok" else f"companion status={data.get('status')}; see .err"
+            notes  = "; ".join(filter(None, [EFFORT_NOTE, "" if status == "ok" else f"companion status={data.get('status')}; see .err"]))
             return {status, output_file: OUTPUT_FILE, task_id, duration_s, notes}
         except JSONError:
             # частичный/битый stdout — подождать ещё цикл, при повторе → error

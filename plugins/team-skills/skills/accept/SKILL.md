@@ -52,7 +52,7 @@ If the Done folder does not exist — create it.
 
 ### Step 4 — Update the task file
 
-Add to the top of the task file (after the `# ...` heading):
+If the task file starts with YAML frontmatter, it is the source of truth for the status: set `status: done` and add `completed: YYYY-MM-DD`; do not add a status line under the heading. Without frontmatter — add to the top of the task file (after the `# ...` heading):
 
 ```markdown
 **Статус:** ✅ Выполнено
@@ -94,7 +94,7 @@ If the task was the current blocker — remove or update the `**Текущий �
 
 ### Step 8 — Update CHANGELOG.md
 
-In the `## [Не выпущено]` → `### Added` section, add a line:
+Under `## [Не выпущено]`, add a line to the subsection the project uses: when subsections are per initiative (`### Added (<тема>, YYYY-MM-DD)` / `### Fixed (…)`) — to this task's one, creating it at the top if there is none; otherwise to `### Added`:
 
 ```markdown
 - YYYY-MM-DD — TNN: <краткое описание что сделано>
