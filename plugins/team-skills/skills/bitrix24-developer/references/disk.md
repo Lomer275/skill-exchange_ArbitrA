@@ -1,5 +1,7 @@
 # Bitrix24 Disk API Reference
 
+All writes must follow the [Write policy](../SKILL.md#write-policy-mandatory).
+
 ## Rate limits ⚠️
 - 500ms between folder reads
 - 3000ms between folder writes (to avoid throttling)
@@ -71,6 +73,12 @@ PARAMS: {"id": 5678}
 Response includes `DOWNLOAD_URL` for direct download.
 
 ## Delete file/folder
+
+**Warning: deletion is destructive.** First read each target and, for folders,
+list all affected contents. Show an item-by-item list of IDs, names, methods
+and “present → deleted”, including descendants. Wait for the human's explicit
+“yes” to that exact list, then follow the Write policy. Any write batch uses
+`halt: 1`; stop on errors. The signatures below are not permission to delete.
 
 ```json
 METHOD: disk.file.delete

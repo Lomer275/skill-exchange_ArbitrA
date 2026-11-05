@@ -7,7 +7,26 @@ description: >
   "почини", "fix T01", or when fixes need to be applied after /codereview or
   /visualcheck. The skill first builds a fix plan and waits for confirmation,
   then makes minimal, targeted changes and verifies the result.
+  If the project or the user has its own `fix` skill, that one takes precedence — use this one only when the user typed `/team-skills:fix` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:fix` and a skill named `fix` exists in the project (`.claude/skills/fix/SKILL.md`) or in the user's skills (`~/.claude/skills/fix/SKILL.md`), stop: tell the user that their own `/fix` takes precedence, and do nothing else.
+
+## Codex model and effort (mandatory)
+
+Resolve each value independently: explicit invocation argument (`model=`, `effort=`) →
+`.claude/codex.json` → built-in `gpt-6-luna` / `medium`. Never use
+`~/.codex/config.toml` for model selection. Pass both resolved values on every
+worker call and model launch; probes, warm-up and smoke tests use the resolved
+model with effort `low`. Cache availability by model, probe effort and engine (TTL 1h);
+a different model requires a fresh probe. Log/report the model and effort actually sent.
+
+Luna: `gpt-6-luna`, effort `low|medium|high|xhigh|max` (no `ultra`).
+Sol: `gpt-6.1-sol`; Astra: `gpt-6-astra` (most expensive).
+A caller choosing a stronger model must explain why in one line to the user.
+Reject unsupported model/effort combinations; never silently drop or lower effort.
 
 # Fix Skill
 
@@ -84,7 +103,7 @@ The plan you just wrote *is* the brief — it already has root cause, file, exac
      - `DoD` — pass 1: only the tests from `ПРИМЕРЫ`, production code untouched; pass 2: every воспроизводящий тест is green, the scenario no longer reproduces, existing tests stay green, the test files are not edited. A finding that no test can reproduce (the list below) → the DoD says so and names the check that replaces the test.
    - `python3 scripts/staff/brief.py check ~/sup-codex/fix-<slug>-brief.md` → exit 0 before delegating (absent script → say so in one line and check by eye).
    - **Snapshots.** The tree is often dirty with other work, so `git status` and `git diff` cannot tell the worker's lines from someone else's. Take the `/impl` Step 3 snapshot (same command and cautions, names `fix-<slug>`) three times: `-before1.tree` before pass 1, `-after1.tree` after it, `-after2.tree` after pass 2. Below, `<before1>`, `<after1>`, `<after2>` are those tree ids; with a single pass, `<after1>` is `<before1>`.
-   - **Pass 1 — tests.** Append «Проход 1 из 2: только тесты из ПРИМЕРЫ, продовый код не трогай» to the brief, then `Skill(skill="codex-worker", args="role=implementer brief_file=$HOME/sup-codex/fix-<slug>-brief.md scope=edit:<тестовые файлы из ФАЙЛЫ> task_id=fix-<slug>-tests timeout_min=15")`. Only findings with a test take part; when none has one, there is no pass 1 (see «No test possible»).
+   - **Pass 1 — tests.** Append «Проход 1 из 2: только тесты из ПРИМЕРЫ, продовый код не трогай» to the brief, then `Skill(skill="codex-worker", args="role=implementer model=<resolved-model> effort=<resolved-effort> brief_file=$HOME/sup-codex/fix-<slug>-brief.md scope=edit:<тестовые файлы из ФАЙЛЫ> task_id=fix-<slug>-tests timeout_min=15")`. Only findings with a test take part; when none has one, there is no pass 1 (see «No test possible»).
    - **Red run — yours, not the worker's.** `git -C <repo> diff-tree -r --name-status <before1> <after1>` lists only test files from ФАЙЛЫ. Run the new tests (Step 4 says how) and keep the tail. Each воспроизводящий тест must be red as Step 2 defines it. What is not red:
      - an error before the test reaches the code — DB connection refused, `DuplicateDatabase`, an import the host's older Python lacks, a required env var not set at collection — is the environment: fix the run (`/impl` Step 4 item 4), do not send the worker back. The DB stays unreachable → that finding goes on as «без теста: БД недоступна»;
      - an error in the test's own code, or a SKIPPED / XFAIL result → send it back;
@@ -155,7 +174,7 @@ Under the table, for every ✅ FIXED row of executable code: the воспрои�
 
 ### Step 5b — Finding outcomes to the metrics log
 
-Each resolved finding gets an outcome, and the outcome goes to `~/sup-staff/metrics.jsonl`. The point is to learn, over weeks, which reviewer brings findings that survive — so the outcome is about the **finding**, not about effort:
+Each resolved finding gets an outcome in the summary table; if the project has `scripts/staff/metrics.py`, also log it through that helper. The point is to learn, over weeks, which reviewer brings findings that survive — so the outcome is about the **finding**, not about effort:
 
 | Fix status | Outcome |
 |---|---|
@@ -163,7 +182,7 @@ Each resolved finding gets an outcome, and the outcome goes to `~/sup-staff/metr
 | ❌ rejected — false positive, a phantom of a stale tree, the scenario does not reproduce, contradicts the task; **reason goes in the Комментарий column** | `rejected` |
 | ⏭️ SKIP by agreement (real, deferred) | not logged now — logged by the `/fix` run that finally resolves it |
 
-For every `accepted` / `rejected` row:
+If `scripts/staff/metrics.py` is present, for every `accepted` / `rejected` row; otherwise retain outcomes in the summary table:
 
 ```bash
 python3 scripts/staff/metrics.py log --task <KEY> --event review_finding_outcome \

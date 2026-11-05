@@ -6,7 +6,28 @@ description: >
   "прогони цикл ревью", "review until clean", "доведи до MEDIUM/LOW", "цикл ревью".
   The skill automatically repeats review and fixes until there are no
   CRITICAL and no HIGH findings left. Maximum 5 iterations; stops earlier on a plateau.
+  If the project or the user has its own `review-loop` skill, that one takes precedence — use this one only when the user typed `/team-skills:review-loop` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:review-loop` and a skill named `review-loop` exists in the project (`.claude/skills/review-loop/SKILL.md`) or in the user's skills (`~/.claude/skills/review-loop/SKILL.md`), stop: tell the user that their own `/review-loop` takes precedence, and do nothing else.
+
+## Codex model and effort (mandatory)
+
+Resolve each value independently: explicit invocation argument (`model=`, `effort=`) →
+`.claude/codex.json` → built-in `gpt-6-luna` / `medium`. Never use
+`~/.codex/config.toml` for model selection. Pass both resolved values on every
+worker call and model launch; probes, warm-up and smoke tests use the resolved
+model with effort `low`. Cache availability by model, probe effort and engine (TTL 1h);
+a different model requires a fresh probe. Log/report the model and effort actually sent.
+
+Luna: `gpt-6-luna`, effort `low|medium|high|xhigh|max` (no `ultra`).
+Sol: `gpt-6.1-sol`; Astra: `gpt-6-astra` (most expensive).
+A caller choosing a stronger model must explain why in one line to the user.
+Reject unsupported model/effort combinations; never silently drop or lower effort.
+
+Resolve the push skill from `commands.push` in `.claude/team-skills.json`; if the file/key is absent use `/team-skills:safe-push` (the only command default). References to `<push-command>` below mean this resolved command.
 
 # Review Loop Skill
 
@@ -68,6 +89,7 @@ Tell the user:
 
 #### 2.1 — Run `/codereview`
 
+Pass resolved model and effort through review routing and to every delegated fix.
 Perform the full multi-phase review (phases A, B, C, D) according to the `codereview` skill.
 Obtain the findings table with severity. From iteration 2 on, name to the review every file this
 loop's `/fix` runs changed outside the task's list (each fix in a `/fix` plan names its «**Файл:**»): those files
@@ -105,7 +127,7 @@ CRITICAL: X | HIGH: Y | MEDIUM: Z | LOW: W
 
 #### 2.4 — Run `/fix` in fast mode (CRITICAL and HIGH only)
 
-Apply fixes according to the `fix` skill (`/fix --fast --severity=CRITICAL,HIGH`) with the following constraints:
+Apply fixes according to the `fix` skill (`/fix model=<resolved-model> effort=<resolved-effort> --fast --severity=CRITICAL,HIGH`) with the following constraints:
 
 - **CRITICAL and HIGH only** — skip MEDIUM and LOW
 - **Fast mode** — show the fix plan, but do not wait for user confirmation, execute right away
@@ -173,7 +195,7 @@ nothing came back → «—». The recommendation follows the status:
 - survived two fix rounds → «Находка пережила два раунда фиксов: вероятно, причина в плане неверна или сама находка ложная. Перепроверь её, затем реши вручную.»
 
 A Step 4 exit is **not clean**. A caller (`/sprint`, `/sprint-codex`, the autopilot) must not
-go on to `/accept` or `/sup-push` for this work: it shows the blockers and stops.
+go on to `/accept` or `<push-command>` for this work: it shows the blockers and stops.
 
 ---
 

@@ -31,12 +31,17 @@
     "scripts/backup/**"
   ],
   "destructive_git_ops_forbidden": [
-    "push --force",
-    "push -f",
+    "commit",
+    "push",
+    "merge",
+    "rebase",
     "reset --hard",
     "checkout --",
+    "branch -d",
     "branch -D",
+    "tag",
     "clean -fd",
+    "pr create",
     "pr merge",
     "pr close --delete-branch"
   ]

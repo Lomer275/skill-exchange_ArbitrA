@@ -2,7 +2,7 @@
   "name": "visualcheck",
   "display_name": "Visual UI Check",
   "author": "kostya",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Визуальная проверка UI по скриншотам или коду: баги вёрстки, UX-проблемы, несоответствия дизайну. Анализ desktop+mobile.",
   "tags": [
     "ui",

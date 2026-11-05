@@ -2,8 +2,8 @@
   "name": "example-skill",
   "display_name": "Example Skill",
   "author": "team",
-  "version": "1.0.0",
-  "description": "Демонстрационный скилл — шаблон для создания своих",
+  "version": "1.1.0",
+  "description": "Демонстрационный скилл — шаблон для создания своих. Собственный одноимённый навык проекта или пользователя имеет приоритет.",
   "tags": ["example", "template"],
   "created": "2026-04-10"
 }

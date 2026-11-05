@@ -1,11 +1,31 @@
 ---
 name: codex-worker
-description: "Internal helper for launching a Codex worker. NOT invoked by the user directly — called from /impl, /fix, /codereview-dual and /sprint-codex via the Skill tool. Accepts either a TNN task file (spec-driven path) or an ad-hoc brief_file (the /impl path). Builds a prompt file and runs Codex through the codex@openai-codex plugin engine (app-server, no bubblewrap); fallback — legacy codex exec. Checks the kill-switch (.claude/codex.json + SUP_CODEX_ENABLED), watchdog via TaskStop. Returns {status, output_file, task_id, duration_s}. Part of spec S11, Phase 2."
+description: "Internal helper invoked only by team-skills skills through the Skill tool with explicit role, scope and task_file or brief_file arguments. Launches one Codex worker with explicit model and effort, kill-switch checks, health probes and watchdog; returns status and output_file."
 ---
+
+## Codex model and effort (mandatory)
+
+Resolve each value independently: explicit invocation argument (`model=`, `effort=`) →
+`.claude/codex.json` → built-in `gpt-6-luna` / `medium`. Never use
+`~/.codex/config.toml` for model selection. Pass both resolved values on every
+worker call and model launch; probes, warm-up and smoke tests use the resolved
+model with effort `low`. Cache availability by model, probe effort and engine (TTL 1h);
+a different model requires a fresh probe. Log/report the model and effort actually sent.
+
+Luna: `gpt-6-luna`, effort `low|medium|high|xhigh|max` (no `ultra`).
+Sol: `gpt-6.1-sol`; Astra: `gpt-6-astra` (most expensive).
+A caller choosing a stronger model must explain why in one line to the user.
+Reject unsupported model/effort combinations; never silently drop or lower effort.
+
+## Project paths
+
+No project profile is required. If `.claude/team-skills.json` exists, read only needed keys `handoff`, `changelog`.
+Missing profile/key → skip that project-document step and report it; never guess a prefix or use project-specific fallback paths.
+All document paths are repository-relative. Protect only configured `handoff` and `changelog` paths.
 
 # codex-worker — Internal helper for launching a Codex worker
 
-**This is an internal helper.** Do not run in response to a user message. The only trigger is a call via `Skill(skill="codex-worker", args="...")` from another skill.
+**This is an internal helper.** Do not run in response to a user message. The only trigger is a call via `Skill(skill="codex-worker", args="...")` from a team-skills skill with explicit arguments.
 
 As of 2026-06-11 the worker launches Codex **through the `codex@openai-codex` plugin engine** (`codex-companion.mjs task`, app-server protocol). This removes the dependency on the bubblewrap sandbox and the entire inline fallback. If the engine is not found — graceful fallback to legacy `codex exec` (see Appendix A).
 
@@ -26,8 +46,8 @@ As of 2026-06-11 the worker launches Codex **through the `codex@openai-codex` pl
 | `lens` | for reviewer | `correctness` | review lens: `correctness,edge-cases,risks,security,style,...` |
 | `timeout_min` | no | `10` | watchdog timeout in minutes |
 | `task_id` | no | file name | prefix for prompt/output files (e.g. `T17`) |
-| `model` | no | — | Codex model override — a slug from the CLI catalog (`~/.codex/models_cache.json`); empty = default. Not `spark`: the companion maps it to `gpt-5.3-codex-spark`, which CLI 0.162 no longer lists |
-| `effort` | no | — | reasoning effort: `low\|medium\|high\|xhigh\|max\|ultra` (CLI 0.162); the companion accepts up to `xhigh`, so `max`/`ultra` are lowered to `xhigh` with a note; empty = default |
+| `model` | no | project config → `gpt-6-luna` | Explicit Codex model override |
+| `effort` | no | project config → `medium` | Explicit reasoning effort, validated against the model |
 | `inline` | no | `auto` | **legacy mode only** (Appendix A). Ignored in companion mode |
 | `inline_files` | no | — | **legacy mode only**. Ignored in companion mode |
 
@@ -37,8 +57,10 @@ As of 2026-06-11 the worker launches Codex **through the `codex@openai-codex` pl
 status: ok | timeout | disabled | error
 output_file: <path>
 task_id: <claude-code-bash-task-id>
-duration_s: <число>
-notes: <если есть проблемы>
+duration_s: <seconds>
+model: <actual model>
+effort: <actual effort>
+notes: <warnings or errors>
 ```
 
 `output_file` always contains **Codex's final message** (in companion mode — the `rawOutput` field extracted from `--json`). The calling skill reads exactly this file.
@@ -48,6 +70,8 @@ notes: <если есть проблемы>
 ## Algorithm
 
 ### Step 1 — Parsing args
+
+Resolve MODEL and EFFORT using the Step 5 resolution snippet now, before any probe.
 
 Extract the variables from args. Validation:
 - `role` ∈ {reviewer, implementer}
@@ -60,7 +84,7 @@ Extract the variables from args. Validation:
 If invalid — return `status: error, notes: <reason>`.
 
 **Brief completeness (`brief_file` only).** A brief is the whole of the
-worker's understanding; a hole in it becomes a guess in the code. Run the checker from the
+worker's understanding; a hole in it becomes a guess in the code. If `scripts/staff/brief.py` is present, run it from the
 worktree (or the current repo root):
 
 ```bash
@@ -69,8 +93,7 @@ python3 scripts/staff/brief.py check "$BRIEF_FILE"
 
 - Exit `0` → continue.
 - Exit `1` → return `status: error, notes: brief incomplete: <the checker's output, one line per problem>`. Do not launch Codex.
-- `scripts/staff/brief.py` absent (not in this project or branch) → continue, with
-  `notes: brief.py absent, brief not machine-checked`.
+- `scripts/staff/brief.py` absent → manually verify the eleven /impl brief sections, at least two given/when/then examples, allowed files and DoD. Missing/empty required content → return error. Only after that check, continue with `notes: brief.py absent, brief manually checked`.
 
 `task_file` (TNN) is not checked here: `/sprint-codex` owns task-file quality.
 
@@ -103,6 +126,7 @@ COMPANION=$(ls -d "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/cod
 ```
 
 - `COMPANION` is non-empty, the file exists **and is healthy** → **companion mode** (Steps 4–7 below).
+- If the companion does not support the resolved model/effort, use legacy with the same values; if neither engine supports them, stop with error. Never lower effort.
 - Otherwise → **legacy mode** (Appendix A). Log `notes: companion <not found|unhealthy: reason>, legacy codex exec`.
 
 **Health probe — presence is not health.** The plugin bundles its *own* Codex engine, which can
@@ -117,7 +141,7 @@ re-probe on `/codex-setup` and `/codex-toggle`):
 
 ```bash
 # без --json: диагностика движка идёт в stdout человекочитаемо
-PROBE=$(timeout 120 node "$COMPANION" task --cwd "$PWD" --prompt-file <(echo "reply with: ok") 2>&1)
+PROBE=$(timeout 120 node "$COMPANION" task --model "$MODEL" --effort low --cwd "$PWD" --prompt-file <(echo "reply with: ok") 2>&1)
 case "$PROBE" in
   *"Turn failed"*|*"Codex error"*|*invalid_request_error*) COMPANION="" ;;  # → legacy
 esac
@@ -189,7 +213,7 @@ DO NOT:
 - Спавнить других воркеров.
 - Расширять scope.
 - Делать git commit/push.
-- Трогать .env*, CHANGELOG.md, HANDOFF.md.
+- Touch .env* or the configured profile handoff/changelog paths (omit missing document paths with a note).
 ```
 
 Write it via `Write` to `$PROMPT_FILE`.
@@ -207,22 +231,18 @@ WT_FLAG="--cwd ${WORKTREE:-$PWD}"
 WRITE_FLAG=""
 [ "$ROLE" = "implementer" ] && WRITE_FLAG="--write"
 
-# model/effort: явный arg > ~/.codex/config.toml > пусто (app-server default).
-# ВАЖНО: companion (app-server) НЕ наследует config.toml автоматически — без этого
-# воркер ревьюит на лёгком дефолте модели, а legacy `codex exec` — на модели и effort из конфига. Пробрасываем для паритета.
-CFG="$HOME/.codex/config.toml"
-if [ -z "$MODEL" ]  && [ -f "$CFG" ]; then
-  MODEL=$(grep -E '^[[:space:]]*model[[:space:]]*=' "$CFG" | head -1 | sed -E 's/.*=[[:space:]]*"?([^"#]+)"?.*/\1/' | xargs)
+# MODEL_ARG and EFFORT_ARG are parsed invocation arguments; missing config is {}.
+MODEL="$MODEL_ARG"
+EFFORT="$EFFORT_ARG"
+if [ -f .claude/codex.json ]; then
+  [ -n "$MODEL" ] || MODEL=$(jq -r '.model // "gpt-6-luna"' .claude/codex.json)
+  [ -n "$EFFORT" ] || EFFORT=$(jq -r '.effort // "medium"' .claude/codex.json)
 fi
-if [ -z "$EFFORT" ] && [ -f "$CFG" ]; then
-  EFFORT=$(grep -E '^[[:space:]]*model_reasoning_effort[[:space:]]*=' "$CFG" | head -1 | sed -E 's/.*=[[:space:]]*"?([^"#]+)"?.*/\1/' | xargs)
-fi
-# companion (плагин 1.0.6) принимает effort только до xhigh, CLI 0.162 — ещё max и ultra. Их понижаем до xhigh:
-# companion на них падает, а отброшенный effort даёт дефолт модели (у gpt-6.1-sol это low). Прочее невалидное — отбрасываем.
-EFFORT_NOTE=""
-case "$EFFORT" in low|medium|high|xhigh) ;; max|ultra) EFFORT_NOTE="effort $EFFORT → xhigh (companion caps at xhigh)"; EFFORT="xhigh" ;; *) EFFORT="" ;; esac
-MODEL_FLAG="";  [ -n "$MODEL" ]  && MODEL_FLAG="--model $MODEL"
-EFFORT_FLAG=""; [ -n "$EFFORT" ] && EFFORT_FLAG="--effort $EFFORT"
+MODEL="${MODEL:-gpt-6-luna}"
+EFFORT="${EFFORT:-medium}"
+# Validate model and effort as specified above. Stop on unsupported values.
+# Resolve these values in Step 1, BEFORE engine health probes; reuse them here.
+EFFORT_NOTE="model=$MODEL effort=$EFFORT"
 
 ERR_FILE="/tmp/sup-codex/${TASK_ID}-${ROLE}.err"
 ```
@@ -244,7 +264,7 @@ ENV_ARGS=""
 Launch via `Bash(run_in_background=true)`, redirecting stdout to `$RAW_JSON` and stderr to `$ERR_FILE`:
 
 ```bash
-env $ENV_ARGS node "$COMPANION" task --json $WT_FLAG $WRITE_FLAG $MODEL_FLAG $EFFORT_FLAG \
+env $ENV_ARGS node "$COMPANION" task --json $WT_FLAG $WRITE_FLAG --model "$MODEL" --effort "$EFFORT" \
   --prompt-file "$PROMPT_FILE" > "$RAW_JSON" 2> "$ERR_FILE"
 ```
 
@@ -261,7 +281,7 @@ while now() < deadline:
             write(OUTPUT_FILE, data.get("rawOutput", ""))
             status = "ok" if data.get("status") == 0 else "error"
             notes  = "; ".join(filter(None, [EFFORT_NOTE, "" if status == "ok" else f"companion status={data.get('status')}; see .err"]))
-            return {status, output_file: OUTPUT_FILE, task_id, duration_s, notes}
+            return {status, output_file: OUTPUT_FILE, task_id, duration_s, model: MODEL, effort: EFFORT, notes}
         except JSONError:
             # частичный/битый stdout — подождать ещё цикл, при повторе → error
             ...
@@ -287,10 +307,10 @@ In Claude Code: `Bash(run_in_background=true)` to start, then periodically `Read
 ### Step 7 — Final log + Return
 
 ```bash
-echo "$(date -Iseconds) ${ROLE} ${TASK_ID} engine=companion status=${STATUS} duration=${DURATION}s output=${OUTPUT_FILE}" >> /tmp/sup-codex/last-run.log
+echo "$(date -Iseconds) ${ROLE} ${TASK_ID} engine=${ENGINE} model=${MODEL} effort=${EFFORT} status=${STATUS} duration=${DURATION}s output=${OUTPUT_FILE}" >> /tmp/sup-codex/last-run.log
 ```
 
-Return the structured result (the contract from the "Call contract" section). The calling skill reads the result and decides what to do next (process the output, fallback, retry).
+Return the structured result (the contract from the "Call contract" section), including actual model and effort on every path, even timeout/error. The calling skill reads the result and decides what to do next (process the output, fallback, retry).
 
 ---
 
@@ -312,7 +332,7 @@ Return the structured result (the contract from the "Call contract" section). Th
 Used **only** when the plugin engine is not found (Step 3). Kept for environments without `codex@openai-codex` installed.
 
 Differences from companion mode:
-1. **Sandbox capability detection (T82/T83).** The Codex CLI requires `bubblewrap` for shell tools; it is not present on dev. Probe `codex exec --skip-git-repo-check "pwd"`, a three-state result (`true/false/unknown`), TTL cache of 1h in `.claude/codex.json:availability_cache.sandbox_works`. On `false`/`unknown` → inline mode.
+1. **Sandbox capability detection (T82/T83).** The Codex CLI requires `bubblewrap` for shell tools; it is not present on dev. Probe `codex exec -m "$MODEL" -c model_reasoning_effort=low --skip-git-repo-check "pwd" < /dev/null`, a three-state result (`true/false/unknown`), TTL cache of 1h in `.claude/codex.json:availability_cache.sandbox_works`. On `false`/`unknown` → inline mode.
 2. **Inline prompt assembly.** When `INLINE_MODE=true`, the content of `inline_files` (or TASK_FILE+SPEC_FILE) is embedded at the end of the prompt (limit ~100KB, priority TASK > SPEC > ARTEFACTS), with a "DO NOT use shell tools" note. The `inline`/`inline_files` parameters from the contract apply only here.
 3. **Launch:** `cli_flags` from codex.json (`output_last_message`, `skip_git_repo_check`).
    **`< /dev/null` is mandatory**, and for `role=implementer` **`-s workspace-write` is mandatory too** —
@@ -321,7 +341,7 @@ Differences from companion mode:
    cd <worktree-or-cwd>
    # implementer → -s workspace-write; reviewer → без флага (дефолт read-only и есть цель)
    SANDBOX_FLAG=""; [ "$ROLE" = "implementer" ] && SANDBOX_FLAG="-s workspace-write"
-   $ENV_PREFIX codex exec $SANDBOX_FLAG $SKIP_GIT_FLAG $OUTPUT_FLAG "$OUTPUT_FILE" "$(cat $PROMPT_FILE)" < /dev/null
+   env $ENV_ARGS codex exec -m "$MODEL" -c model_reasoning_effort="$EFFORT" $SANDBOX_FLAG $SKIP_GIT_FLAG $OUTPUT_FLAG "$OUTPUT_FILE" "$(cat $PROMPT_FILE)" < /dev/null
    ```
    Here Codex itself writes the final message to `$OUTPUT_FILE` via `--output-last-message` (no JSON parsing needed).
 
@@ -343,4 +363,4 @@ Differences from companion mode:
    > Verified on CLI 0.145.0, 2026-07-27.
 4. **Watchdog** — the same: `Bash(run_in_background)` → poll `OUTPUT_FILE` for non-emptiness → `TaskStop` at the deadline.
 
-The return contract is identical. In `notes` specify `engine=legacy`.
+The return contract is identical. Log both engines using Step 7 with ENGINE set to companion or legacy; return actual model and effort on every result. In `notes` specify `engine=legacy`.

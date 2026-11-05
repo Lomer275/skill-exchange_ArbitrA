@@ -1,18 +1,45 @@
 ---
 name: safe-push
 description: >
-  Safe commit and push in a single command with a mandatory secrets check.
-  Use this skill when the user says "/sup-push", "закоммить и запушь",
+  Safe commit and optional push with separate action permissions and a mandatory secrets check.
+  Use this skill when the user says "/safe-push", "закоммить и запушь",
   "commit and push", "запушь", "запушить", "закоммить". The skill checks staged files
   for secrets (BLOCKS if any are found), builds the commit message per
-  Conventional Commits, and commits and pushes with safe error handling.
+  Conventional Commits, and performs only the human-confirmed actions with safe error handling.
+  If the project or the user has its own `safe-push` skill, that one takes precedence — use this one only when the user typed `/team-skills:safe-push` or no such skill exists.
 ---
 
-# Sup-Push Skill
+## Step 0 — precedence check (mandatory)
 
-Safe commit + push with a blocking secrets check and Conventional Commits format.
+If the user did not type `/team-skills:safe-push` and a skill named `safe-push` exists in the project (`.claude/skills/safe-push/SKILL.md`) or in the user's skills (`~/.claude/skills/safe-push/SKILL.md`), stop: tell the user that their own `/safe-push` takes precedence, and do nothing else.
+
+## Project paths
+
+No project profile is required. If `.claude/team-skills.json` exists, read only needed keys `docs.guides`.
+Missing profile/key → skip that project-document step and report it; never guess a prefix or use project-specific fallback paths.
+All document paths are repository-relative. Resolve GUIDES_DIR from `docs.guides`.
+
+# Safe-Push Skill
+
+Safe commit and optional push with a blocking secrets check and Conventional Commits format.
 
 ---
+
+## Action authorization (mandatory)
+
+A request to commit (`закоммить`) without push selects **commit only**.
+An explicit request to commit and push, or `/team-skills:safe-push`, selects both
+as proposed actions, but is not final approval. After checks, show the exact files,
+message and actions (including push remote/branch if selected) and wait for an
+explicit «да» from the human in this dialog. Commit-only approval never authorizes
+push: ask separately before Step 4. Changed files/message/actions require renewed
+confirmation. Creating/merging PRs, merge, branch deletion and worktree removal
+are separate actions requiring the same concrete approval.
+
+`--yes`, cron, HANDOFF/config permissions and TG plan buttons are not approval.
+In headless mode, do not commit or push: stop `ready to commit`, output the file
+list and proposed commit message, and notify through an existing configured channel
+if available. Do not create a notification integration.
 
 ## Input data
 
@@ -33,7 +60,7 @@ If there are no staged files and no files were specified — warn and stop.
 ```
 ⛔ Ты на <ветка деплоя> — push сюда = выкат на прод. Перенеси работу на ветку:
    git switch -c <тип>/<коротко>   (staged и изменённые файлы переедут с ней)
-и запусти /sup-push снова. PR — отдельным шагом, после твоего «да».
+и запусти /team-skills:safe-push снова. PR — отдельным шагом, после твоего «да».
 ```
 
 A project where a push to `main` deploys nothing (no such workflow, `CLAUDE.md` says commits go straight to `main`) has no deploy branch: say so in one line and go on.
@@ -131,7 +158,7 @@ Do not continue while anything is found, even if the user asks. Whether a findin
 
 ### Step 2 — Building the commit message
 
-Read `docs/4. <ПРЕФИКС>-guides/versioning_guidelines.md` (at RUNTIME, not from memory) — for the project's current Conventional Commits format.
+If profile `docs.guides` is configured and versioning_guidelines.md exists there, read it at runtime. Otherwise report that project guidelines were skipped and use the built-in Conventional Commits rules below.
 
 **Commit format per Conventional Commits:**
 ```
@@ -141,7 +168,7 @@ Read `docs/4. <ПРЕФИКС>-guides/versioning_guidelines.md` (at RUNTIME, not
 ```
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `style`, `ci`
-Scopes: `tg-bot`, `max-bot`, `handler`, `tracker`, `bitrix`, `ai`, `docs`, `deps` (or any relevant one)
+Scopes: `app`, `api`, `docs`, `deps` (or a relevant project scope)
 
 **If the user provided a message:**
 1. Check the format — does it conform to Conventional Commits
@@ -159,19 +186,20 @@ Display format:
 ```
 📝 Предлагаемое сообщение коммита:
 
-  feat(tg-bot): добавить обработчик my_case для просмотра дела
+  feat(app): добавить обработчик my_case для просмотра дела
 
 Файлы в коммите (1):
-  - tg_bot/handlers/menu/my_case.py
+  - src/app/handlers/my_case.py
 
-Подтверди ("ок", "да", "go") или скорректируй текст.
+Действия: <commit only | commit and push to remote/branch>.
+Подтверди «да» для этих файлов, сообщения и действий или скорректируй список.
 ```
 
 ---
 
 ### Step 3 — Commit
 
-After the message is confirmed, commit what Step 1 checked (the named files were staged there):
+After an explicit «да» confirms the file list, message and commit action, commit what Step 1 checked (the named files were staged there):
 
 ```bash
 now=$(git diff --staged | sha256sum | cut -c1-16); if [ "$now" = "<сумма из шага 1>" ]; then git commit -m "<сообщение>"; else echo "index-changed: $now"; fi
@@ -185,8 +213,8 @@ Show the list of committed files:
 ```
 ✅ Закоммичено: <хеш>
 Файлы:
-  - max_bot/handlers/my_deal.py
-  - tg_bot/handlers/menu/my_case.py
+  - src/app/handlers/my_deal.py
+  - src/app/handlers/my_case.py
   - ...
 ```
 
@@ -194,11 +222,13 @@ Show the list of committed files:
 
 ### Step 4 — Push
 
+Run only if the human approved push to the named remote/branch after seeing the exact files and message. Commit-only request → report the local commit and ask separately about push; wait.
+
 ```bash
 git push
 ```
 
-If the permission settings ask before every `git push`, the prompt is expected: it is the moment the human confirms the push. Declined → stop and report; do not retry through another form (`git -C`, an alias, a script). In a headless run (`claude -p`) nobody can answer, so an ask counts as a denial and the push is refused without a prompt. The commit then stays local: report «push не выполнен: нужен человек» with the branch and the commit hash, and stop.
+Tool permission prompts are additional checks; they never replace the explicit dialog approval above. A declined push → stop and report; do not retry through another form (`git -C`, an alias, a script). In a headless run (`claude -p`), stop before commit with `ready to commit`. If a separately approved interactive commit already exists and push is refused, report «push не выполнен: нужен человек» with the branch and hash.
 
 **Scenarios:**
 
@@ -236,7 +266,7 @@ Never force-push from the session. If the user explicitly asks for a force push 
 
 - **Never commit or push on the deploy branch** (Step 1): a push there is a deploy to prod; the agent does not switch branches for the human, it shows the command
 - **Secrets are an absolute block for the agent**: a hit → stop; the agent never overrides it, even if the user insists. The human may mark a false gitleaks hit (Step 1) or commit from their own terminal
-- **Read versioning_guidelines.md at runtime** — do not rely on memory for the commit format
+- **Read configured versioning_guidelines.md if present** — otherwise use the built-in Conventional Commits rules
 - **Do not commit without confirmation** — always show the message before git commit
 - **Never force-push from the session** — on an explicit request ("force push", "принудительно запушь") warn ("this will overwrite the remote history") and hand the human the exact command for their own terminal
 - **Never bypass the commit-time gate** — no `--no-verify`, `-n`, `SKIP_GITLEAKS=1`, `-c core.hooksPath=…`; a gate that is off is said out loud (Step 1), not worked around and not switched back on by hand
@@ -249,4 +279,6 @@ Never force-push from the session. If the user explicitly asks for a force push 
 
 ## Quick mode
 
-If the user passed the commit message together with the command (for example: "запушь feat(tg-bot): добавить my_case") — you may skip waiting for message confirmation and commit immediately (after the secrets check). Show the summary after the push. Quick mode skips only that confirmation: when nothing real scans the commit (Step 1, «Go on or stop»), it still waits for the human's «да».
+A supplied message saves drafting only. Always show the exact files, final message
+and proposed actions, run the checks, and wait for explicit human «да».
+Quick mode never bypasses approval or a secrets gate.

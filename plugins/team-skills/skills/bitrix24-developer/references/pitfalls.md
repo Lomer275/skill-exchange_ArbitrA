@@ -1,5 +1,7 @@
 # Bitrix24 + n8n — Known Pitfalls & Gotchas
 
+All writes must follow the [Write policy](../SKILL.md#write-policy-mandatory).
+
 ## Bitrix24 API Pitfalls
 
 ### 1. bizproc.workflow.template.add/update — ACCESS_DENIED
@@ -36,7 +38,7 @@ Note: Some versions require numeric ID, some require string. Test both if issues
 **Debug:** Use `crm.deal.fields` or `crm.deal.userfield.list` to get actual field names.
 
 ### 7. batch result_error is not an exception
-**Problem:** If `halt: 0`, failed commands in batch don't throw — check `result.result_error`.
+**Problem:** In read-only batches with `halt: 0`, failed commands do not throw — check `result.result_error`. Write batches must use `halt: 1` and stop subsequent batches on errors.
 **Fix:**
 ```javascript
 const errors = response.result.result_error;

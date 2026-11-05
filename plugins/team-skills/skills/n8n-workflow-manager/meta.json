@@ -2,8 +2,8 @@
   "name": "n8n-workflow-manager",
   "display_name": "n8n Workflow Manager",
   "author": "kostya",
-  "version": "1.0.0",
-  "description": "Управление n8n workflows: search, inspect, create, edit, активация, выполнение. Шаблоны нод, паттерны интеграций.",
+  "version": "1.1.0",
+  "description": "Управление n8n workflows: поиск, чтение, создание, правка, активация и выполнение; для записи в Bitrix — песочница, маршрут проекта или явное подтверждение. Собственный одноимённый навык проекта или пользователя имеет приоритет.",
   "tags": [
     "n8n",
     "automation",

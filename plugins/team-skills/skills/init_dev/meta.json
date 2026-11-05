@@ -2,8 +2,8 @@
   "name": "init_dev",
   "display_name": "Init Project Docs",
   "author": "kostya",
-  "version": "1.0.0",
-  "description": "Создаёт базовую структуру документации проекта: docs/, гайды, architecture.md, HANDOFF.md, CHANGELOG.md, CLAUDE.md.",
+  "version": "1.1.0",
+  "description": "Создаёт структуру документации, architecture, HANDOFF, CHANGELOG, CLAUDE.md и профиль .claude/team-skills.json по выбранному префиксу. Копирует гайды только при наличии источника.",
   "tags": [
     "bootstrap",
     "documentation",

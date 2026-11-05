@@ -1,11 +1,21 @@
 ---
 name: spec-brainstorm
-description: Interactive co-creation of a new project specification in a question-and-answer mode. Does not generate a spec out of thin air — it guides the person through structured discovery (problem → goal → phases → architecture → risks → DoD), then delegates the final file write to /spec-writer. Use when the user says '/spec-brainstorm', 'давай распишем новую спеку', 'надо подумать над новой спекой', 'хочу набросать SNN', 'обсудим новый спек', 'давай спроектируем фичу', 'распиши со мной', 'набросаем спеку вместе', or when there is a raw idea for a large chunk of work that needs to be turned into SNN_*.md. Fundamentally interactive — asks questions one at a time via AskUserQuestion, does not write the file until the person has finalized the content.
+description: Interactive co-creation of a new project specification in a question-and-answer mode. Does not generate a spec out of thin air — it guides the person through structured discovery (problem → goal → phases → architecture → risks → DoD), then delegates the final file write to {commands.spec_writer}. Use when the user says '/spec-brainstorm', 'давай распишем новую спеку', 'надо подумать над новой спекой', 'хочу набросать SNN', 'обсудим новый спек', 'давай спроектируем фичу', 'распиши со мной', 'набросаем спеку вместе', or when there is a raw idea for a large chunk of work that needs to be turned into SNN_*.md. Fundamentally interactive — asks questions one at a time via AskUserQuestion, does not write the file until the person has finalized the content. If the project or the user has its own `spec-brainstorm` skill, that one takes precedence — use this one only when the user typed `/team-skills:spec-brainstorm` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:spec-brainstorm` and a skill named `spec-brainstorm` exists in the project (`.claude/skills/spec-brainstorm/SKILL.md`) or in the user's skills (`~/.claude/skills/spec-brainstorm/SKILL.md`), stop: tell the user that their own `/spec-brainstorm` takes precedence, and do nothing else.
+
+## Project profile (mandatory)
+
+After Step 0 and before any other action, read `.claude/team-skills.json` from the repository root. Require format `version: 1` and these keys: `docs.guides`, `docs.specifications`, `architecture`, `handoff`, `commands.spec_writer`. Read only the keys needed for this invocation. A missing file, unsupported version, or missing/empty required key means stop before reading or changing project documents: name the missing file/key and point to `team-skills:init_dev` and the catalog's `docs/team-skills-profile.md`. Never infer a prefix or substitute project paths.
+
+In this skill, `{key}` means the value of that profile key; resolve paths relative to the repository root. These are notation, not literal shell variables: substitute and shell-quote the resolved values before executing commands. Paths must stay inside the repository.
 
 # /spec-brainstorm — co-creating a new spec
 
-Specs are strategic decisions. They must not be generated from templates or thin air. This skill guides the person through structured discovery and at the end **hands off the result** to `/spec-writer` to write the file according to project conventions.
+Specs are strategic decisions. They must not be generated from templates or thin air. This skill guides the person through structured discovery and at the end **hands off the result** to `{commands.spec_writer}` to write the file according to project conventions.
 
 **Principle:** you don't write the spec **for** the person. You help them **formulate** it.
 
@@ -18,9 +28,9 @@ Specs are strategic decisions. They must not be generated from templates or thin
 | Mode | Interactive, questions → answers | Generative, from an input description |
 | When | New idea, no structure yet | Structure is clear, needs formatting |
 | Output | Final draft SNN with `status: draft` | File following all conventions |
-| Calls | `/spec-writer` at the end | Nothing |
+| Calls | `{commands.spec_writer}` at the end | Nothing |
 
-If the person already has a **complete spec description** (in a single message: goal, phases, tasks) — **do not use this skill**, go to `/spec-writer` directly.
+If the person already has a **complete spec description** (in a single message: goal, phases, tasks) — **do not use this skill**, go to `{commands.spec_writer}` directly.
 
 ---
 
@@ -35,11 +45,11 @@ If the person already has a **complete spec description** (in a single message: 
 
 Don't rely on memory. **Read these files** before starting:
 
-1. `docs/4. <ПРЕФИКС>-guides/specifications_guide.md` — spec structure
-2. `docs/4. <ПРЕФИКС>-guides/doc_conventions.md` — naming, numbering
-3. `docs/4. <ПРЕФИКС>-guides/business_requirements_template.md` — if the spec is high-level and needs a BR linkage
-4. `<ПРЕФИКС>-architecture.md` — where the new spec fits into the overall picture
-5. `<ПРЕФИКС>-HANDOFF.md` — what's in progress right now (not duplicating?)
+1. `{docs.guides}/specifications_guide.md` — spec structure
+2. `{docs.guides}/doc_conventions.md` — naming, numbering
+3. `{docs.guides}/business_requirements_template.md` — if the spec is high-level and needs a BR linkage
+4. `{architecture}` — where the new spec fits into the overall picture
+5. `{handoff}` — what's in progress right now (not duplicating?)
 
 This is your context. Don't relay it to the user — just use it when formulating questions.
 
@@ -98,11 +108,11 @@ Save the answers to your context. **Read the summary back to the person** — "d
 At this point you have the problem, the goal, and the boundaries. Time to sketch the "how."
 
 1. **Which layers will we touch?** (multi-select)
-   - TG bot / MAX bot (`tg_bot/`, `max_bot/`)
-   - Django (models, migrations, API — `Handler/`, `Tracker/`)
-   - AI pipeline (`shared/ai_pipeline/`)
-   - Bitrix integration (`bitrix/`)
-   - External services (Supabase, OpenAI, Tochka)
+   - Messaging adapters (`src/bots/`)
+   - Application backend (models, migrations, API — `src/app/`)
+   - AI pipeline (`src/shared/pipeline/`)
+   - CRM integration (`src/integrations/crm/`)
+   - External services (database, AI provider, payment provider)
    - Infra (docker, CI, migrations)
    - Documentation
 
@@ -115,7 +125,7 @@ At this point you have the problem, the goal, and the boundaries. Time to sketch
 
 4. **What could go wrong?** Name 2-3 risks off the top of your head — needed for the DoD section.
 
-If the person is stuck — **offer 2-3 architectural options** based on what you read in `<ПРЕФИКС>-architecture.md`, and ask them to choose. Don't make things up — use the project's patterns.
+If the person is stuck — **offer 2-3 architectural options** based on what you read in `{architecture}`, and ask them to choose. Don't make things up — use the project's patterns.
 
 ---
 
@@ -173,38 +183,38 @@ Now you have in your context:
 - <criterion 2>
 
 ## Связанные документы
-- <<ПРЕФИКС>-BRNN_xxx если применимо>
+- <actual linked BR path supplied by the project, if applicable>
 - <ссылки на прошлые SNN>
 ```
 
-**Ask:** "Is this final? Ready to hand off to /spec-writer to write the file? Or shall we iterate more?"
+**Ask:** "Is this final? Ready to hand off to {commands.spec_writer} to write the file? Or shall we iterate more?"
 
 If there are edits — iterate. If it's OK — move to Phase 6.
 
 ---
 
-## Phase 6 — Delegate the file write to /spec-writer
+## Phase 6 — Delegate the file write to {commands.spec_writer}
 
-**Don't write the file yourself.** Call `/spec-writer` via the Skill tool, passing it the final summary as input.
+**Don't write the file yourself.** Call `{commands.spec_writer}` via the Skill tool, passing it the final summary as input.
 
 Call contract (in a single message to it):
 ```
 Create a new specification from the following draft.
 Status: draft (not active!) — human confirmation is required before launching tasks.
-Next SNN number — determine it by scanning docs/2. <ПРЕФИКС>-specifications/ + docs/backlog/.
+Next SNN number — determine it by scanning `{docs.specifications}` recursively, including its backlog subdirectory if present.
 
 <insert the entire summary from Phase 5>
 ```
 
-After /spec-writer returns the file — **read it** and show the person:
+After {commands.spec_writer} returns the file — **read it** and show the person:
 ```
-✅ Spec created: docs/2. <ПРЕФИКС>-specifications/SNN_<slug>.md
+✅ Spec created: {docs.specifications}/SNN_<slug>.md
    Status: draft
 
 Next steps:
 1. Review the file — especially the numbering (SNN) and the wording
 2. When ready — promote it to active wherever the project keeps spec status: the `**Статус:** draft` line in the spec header, or the YAML frontmatter if the project uses one
-3. Once active, /auto-pilot can decompose it into TNN tasks on its own
+3. Once active, use the project-approved task decomposition workflow
 ```
 
 ---
@@ -213,18 +223,18 @@ Next steps:
 
 1. **Don't ask more than 2-3 questions in a single `AskUserQuestion` block.** Better to go sequentially, so each answer informs the next.
 2. **Don't propose a "solution" until the "problem" is nailed down.** This is a typical mistake.
-3. **Don't write the file directly** — always via `/spec-writer`. Conventions evolve, and a single write point enforces them.
+3. **Don't write the file directly** — always via `{commands.spec_writer}`. Conventions evolve, and a single write point enforces them.
 4. **Don't set the spec status to `active` automatically.** Only `draft`. The person promotes it to active when they're ready to hand it off for work.
-5. **Don't decompose into TNN tasks in this skill.** Decomposition is a separate step (via `/spec-writer` or `/auto-pilot` Rule 4).
+5. **Don't decompose into TNN tasks in this skill.** Decomposition is a separate step (via `{commands.spec_writer}` or `/auto-pilot` Rule 4).
 6. **Don't try to "extract" a spec that isn't ripe yet.** If after Phase 1 it's clear the person isn't sure about the problem — better to say "let's come back when it's clearer."
 
 ---
 
 ## Edge cases
 
-**The spec already partly exists in `docs/backlog/`** — ask the person whether we activate that one or create a new one. If we activate — skip Phases 1-4, go straight to Phase 6 with additions.
+**The spec already partly exists in a backlog under `{docs.specifications}`** — ask the person whether we activate that one or create a new one. If we activate — skip Phases 1-4, go straight to Phase 6 with additions.
 
-**This is a small single-task feature** — no spec needed. Suggest to the person: "This is TNN level, not SNN. Create a task in the existing spec S0X?" and go to `/spec-writer` with type T.
+**This is a small single-task feature** — no spec needed. Suggest to the person: "This is TNN level, not SNN. Create a task in the existing spec S0X?" and go to `{commands.spec_writer}` with type T.
 
 **The topic overlaps with an active spec** — flag it after Phase 0 ("this looks like work in S08, are you sure a separate SNN is needed?") — let the person decide.
 
@@ -234,6 +244,6 @@ Next steps:
 
 | Skill | When |
 |---|---|
-| `/spec-writer` | Phase 6 — final file write |
+| `{commands.spec_writer}` | Phase 6 — final file write |
 | `superpowers:brainstorming` | Can be plugged in as a stylistic reference for discovery in Phases 1-3 |
 | `/auto-pilot` | NOT directly — but the draft spec created will feed into its Rule 4 for auto-decomposition |

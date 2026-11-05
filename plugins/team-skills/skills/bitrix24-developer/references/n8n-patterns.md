@@ -1,5 +1,7 @@
 # n8n ↔ Bitrix24 Integration Patterns
 
+All writes must follow the [Write policy](../SKILL.md#write-policy-mandatory).
+
 ## Environment
 - n8n: `n8n.arbitra.online` (self-hosted, Docker)
 - Bitrix webhook: `${BITRIX_WEBHOOK}`
@@ -77,12 +79,18 @@ return Object.values(result).map(deal => ({json: deal}));
 
 ## SplitInBatches Pattern (large updates)
 
-For updating 100+ records without hitting 300s timeout:
+First run only reads with pagination to collect every candidate and its current
+values. Output the full list of methods, entity IDs and fields “before → after”.
+Show it and wait for the human's explicit “yes”. Use the project sandbox first
+if available and follow the production write route in the Write policy.
+Only the confirmed plan may enter the write phase below:
+
+For updating 100+ approved records without hitting 300s timeout:
 
 ```
-[Array of IDs]
+[Confirmed plan: approved IDs and field changes]
   → [SplitInBatches: batchSize=50]
-  → [Code/HTTP: process batch]
+  → [Code/HTTP: write batch with halt: 1; stop workflow on result_error]
   → [Wait: 500ms]
   → [SplitInBatches: loop back if hasMore]
 ```
@@ -228,11 +236,21 @@ const message = `<b>Отчёт за ${date}</b>\n\n<b>БФЛ</b>\n• Новые
 
 ## Termination Workflow Pattern
 
-Transfer checklist for fired employee:
-1. Activities (`crm.activity.list` → `crm.activity.update` RESPONSIBLE_ID)
-2. Tasks (`tasks.task.list` → `tasks.task.update` RESPONSIBLE_ID)  
-3. Deals (`crm.deal.list` → `crm.deal.update` ASSIGNED_BY_ID)
-4. Contacts/Companies (`crm.contact.list` → `crm.contact.update`)
-5. Access rights removal (`user.update` with `UF_DEPARTMENT` change or deactivation)
+1. Read-only dry run: list all affected activities, tasks, deals, contacts,
+   companies, and the employee's current account fields, following all pages.
+   Build a per-entity plan with method, ID and every field “before → after”,
+   including ownership transfers and account/access changes. No writes yet.
+2. Show the full plan and wait for the human's explicit “yes” to that list.
+   Use the project sandbox first if available and follow the production write
+   route in the Write policy. Do not add targets after confirmation.
+3. Only then execute the approved transfer checklist:
 
-Performance: use SplitInBatches(50) + batch API, not sequential updates with 5s waits.
+- Activities (`crm.activity.list` → `crm.activity.update` RESPONSIBLE_ID)
+- Tasks (`tasks.task.list` → `tasks.task.update` RESPONSIBLE_ID)
+- Deals (`crm.deal.list` → `crm.deal.update` ASSIGNED_BY_ID)
+- Contacts/Companies (`crm.contact.list` → `crm.contact.update`)
+- Access rights removal (`user.update` with `UF_DEPARTMENT` change or deactivation)
+
+Write phase: use SplitInBatches(50) + batch API with `halt: 1` and stop the
+whole workflow on any `result_error`. Read back results; obtain confirmation
+for a revised plan after a partial failure before retrying.

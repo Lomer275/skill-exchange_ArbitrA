@@ -1,5 +1,7 @@
 # CRM Methods Reference
 
+All writes must follow the [Write policy](../SKILL.md#write-policy-mandatory).
+
 ## Deal Fields (crm.deal.fields)
 
 ### System fields (select[]=*)

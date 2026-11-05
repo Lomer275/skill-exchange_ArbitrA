@@ -1,6 +1,6 @@
 # Auto-Pilot Orchestrator
 
-Continuous-mode autopilot который сам выбирает следующее действие (Rule 1-6),
+Автопилот для репозиториев с профилем team-skills и установленными скриптами, который выбирает следующее действие (Rule 1-6),
 self-heal'ит budget exhaustion, управляется через TG inline-buttons + slash-commands,
 и блокирует destructive git ops через git-guard.
 
@@ -26,13 +26,23 @@ Phase 4: execute selected skill
 Phase 5: verify + log
 Phase 6: escalate если застрял
     ↓
-Loop continues until: no-progress / pause / budget / 10 iterations
+Остановка: ready for review/commit / idle / pause / budget / ошибка
 ```
 
 Параллельно работает:
 - **heartbeat watchdog** (cron */2 min) — TG-ping на 5/15/25 мин, crash detection
 - **TG listener daemon** — принимает `/status`, `/sprint S14`, `/pause`, `/enable`, ...
-- **git-guard** — блокирует `push --force`, `reset --hard`, и т.д. (denylist в JSON)
+- **git-guard** — в тике разрешает `status`, `diff`, `log`, `show`, `rev-parse`, `ls-files`, `rev-list`, `merge-base`, `blame`, `cat-file`, `describe`, `for-each-ref`, `ls-tree`, `shortlog`, `grep`, `name-rev`, `show-ref`, `ls-remote`; просмотр `branch` (без аргументов, `--show-current`, `--list`, `-a`, `-r`, `-v`, `-vv`, `--contains`, `--merged`, `--no-merged`, последние три принимают ref), только `worktree list`, `remote` без аргументов/с `-v`, `remote show` (с `-n`), `remote get-url` (с `--push`/`--all`), `config --get/--get-all/--get-regexp/--list/-l`. Fetch разрешён без `--upload-pack` и `-u` (включая присоединённые значения и комбинации коротких опций). Остальные команды/формы, запись, неизвестные алиасы и ведущий `-c` блокируются кодом 100; ошибка конфига тоже означает отказ. Ведущие `-C`, `--git-dir`, `--work-tree`, `--no-pager`, `--paginate`, `--no-optional-locks` сохранены.
+
+## Профиль и согласие человека
+
+Собственный навык `auto-pilot` проекта или пользователя имеет приоритет. Этот используется при явном `/team-skills:auto-pilot` или отсутствии собственного.
+
+До установки нужен `.claude/team-skills.json` версии 1 с `handoff`, `docs.specifications`, `docs.tasks`, `docs.tasks_done`, `docs.unsorted`, `commands.spec_writer`. Нет профиля/ключа — остановка с ошибкой. Формат: `team-skills:init_dev` и `docs/team-skills-profile.md` каталога. Пути относительны корню репозитория. Защищённые пути берутся из `.claude/autopilot.json:require_human_approval_paths`.
+
+Тик заканчивается статусом `ready for review/commit`: список файлов, сообщение коммита, фактические проверки и уведомление TG, если настроено. Коммит, пуш, мерж, создание/мерж PR и удаление веток/worktree требуют явного «да» в этом чате на конкретное действие и файлы; согласие на коммит не разрешает пуш. `--yes`, cron, HANDOFF и TG-кнопки плана не дают такого разрешения. Тик не вызывает `/accept` и навыки финализации ветки.
+
+`bypassPermissions` сохранён; PATH git-guard — единственный технический барьер Git в тике. Абсолютный путь к Git обходит PATH, поэтому обход запрещён инструкцией. `gh` гард не перехватывает: `gh pr create`, `gh pr merge` и другие операции записи в тике запрещены текстом навыка.
 
 ## Bootstrap (1 раз)
 
@@ -68,7 +78,7 @@ Loop continues until: no-progress / pause / budget / 10 iterations
 ```
 .claude/autopilot.json           # State + budget + denylist
 .env.dev                          # TG bot token + user_id (gitignored!)
-docs/5. SUP-unsorted/autopilot_log.md  # Хронологический лог тиков
+<docs.unsorted>/autopilot_log.md  # Хронологический лог тиков
 
 scripts/autopilot/
 ├── run_tick.sh                  # Wrapper continuous mode v4
@@ -87,7 +97,7 @@ scripts/autopilot/
 
 - `enabled=false` в JSON — kill-switch (cron-тики выходят на Phase 0)
 - `⛔ AUTOPILOT_PAUSE` в HANDOFF — мягкая пауза без потери конфига
-- `destructive_git_ops_forbidden` в JSON — denylist enforced через git-guard
+- В тике git-guard блокирует запись независимо от содержимого denylist; ошибка чтения конфига означает отказ
 - Auth по numeric `user_id` (R2 codereview), username только для логов
 - `--max-budget-usd 5` cap per attempt, 4 retry max = $20 на macro-tick
 - `--permission-mode bypassPermissions` — required для cron-headless, но защищён git-guard и denylist в SKILL.md

@@ -1,35 +1,23 @@
 #!/usr/bin/env bash
 # /auto-pilot tick runner — invoked by cron / manually / from TG /sprint.
 #
-# v4 (post-codereview):
-#   R4: trap on TERM/INT/EXIT — финальный статус всегда пишется,
-#       SIGTERM пробрасывается в process group claude.
-#   R5/R6: PID-file /tmp/autopilot_wrapper.pid + wrapper_id (PID-startclk) в логах.
-#       Heartbeat читает PID-file (не pgrep -f), привязан к конкретному запуску.
-#   R14: FINAL_RC=0 init + explicit для pause/budget exit.
-#   R15: после macro-tick проверяем dirty tree — если есть uncommitted
-#        работа без commit и progress=false → escalate, не следующий macro.
-#
-# v3 (2026-05-14): continuous mode.
-#   Wrapper выполняет внешний цикл macro-ticks пока:
-#     • спека не завершена (нет новых коммитов 2 макро-тика подряд)
-#     • OR ⛔ AUTOPILOT_PAUSE в HANDOFF
-#     • OR daily token budget (.claude/autopilot.json:budget) почти исчерпан (>=90%)
-#     • OR OUTER_MAX=10 макро-тиков (safety cap)
-#     • OR macro-tick завершился rc!=0 (escalation already sent)
-#     • OR dirty tree без progress (R15)
-#
-#   Внутри каждого macro-tick: v2 retry-loop (до 4× $5 = $20 cap) при budget exhaust.
+# Run one action, retrying only on budget exhaustion. Prepared changes stop
+# the wrapper for human review; commits are never a progress condition.
 
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${REPO_ROOT}"
 
-export HOME="${HOME:-/home/zhigalovka}"
+# Resolve required project paths before loading credentials or starting a tick.
+HANDOFF_PATH="$(python3 "${REPO_ROOT}/scripts/autopilot/project_profile.py" "${REPO_ROOT}" handoff)" || exit 3
+UNSORTED_PATH="$(python3 "${REPO_ROOT}/scripts/autopilot/project_profile.py" "${REPO_ROOT}" docs.unsorted)" || exit 3
+export AUTOPILOT_TICK=1
 # R1+R18: PATH-override чтобы git-guard.sh перехватывал destructive git ops у
 # spawned claude --print. Shim читает .claude/autopilot.json denylist.
 export PATH="${REPO_ROOT}/scripts/autopilot/path-overrides:${HOME}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Do not launch Claude if guard configuration or repository reads fail.
+git status --porcelain >/dev/null || exit $?
 
 LOCK_FILE="${REPO_ROOT}/.claude/autopilot.lock"
 PID_FILE="/tmp/autopilot_wrapper.pid"
@@ -57,7 +45,6 @@ FINAL_RC=0
 STOP_REASON=""
 OUTER_COUNT=0
 TOTAL_ATTEMPTS=0
-TOTAL_COMMITS=0
 MACRO_ATTEMPTS=0
 MACRO_REASON=""
 MACRO_PRE_HEAD=""
@@ -110,7 +97,7 @@ trap 'cleanup INT'  INT
 trap 'cleanup EXIT' EXIT
 
 LAST_COMMIT_TITLE="$(git log -1 --format='%s' 2>/dev/null | head -c 80)"
-HANDOFF_DIRECTIVE="$(grep -m1 -A1 '^## 🤖 Автопилот: следующее' "${REPO_ROOT}/SUP-HANDOFF.md" 2>/dev/null | tail -1 | sed 's/^[[:space:]]*//' | head -c 100)"
+HANDOFF_DIRECTIVE="$(grep -m1 -A1 '^## 🤖 Автопилот: следующее' "${HANDOFF_PATH}" 2>/dev/null | tail -1 | sed 's/^[[:space:]]*//' | head -c 100)"
 
 {
   echo
@@ -124,7 +111,7 @@ HANDOFF_DIRECTIVE="$(grep -m1 -A1 '^## 🤖 Автопилот: следующе
 Последний коммит: ${LAST_COMMIT_TITLE}
 Из HANDOFF: ${HANDOFF_DIRECTIVE:-«нет директивы»}
 
-Continuous mode v4: до 10 макро-тиков подряд пока есть прогресс.
+Один тик до ready for review/commit; без автоматических коммитов/пушей.
 EOF
 )" >> "${LOG_FILE}" 2>&1
 
@@ -140,7 +127,8 @@ try:
         sys.exit(1)
     sys.exit(0)
 except Exception:
-    sys.exit(0)  # на ошибке чтения — не блокируем
+    sys.stderr.write("autopilot: cannot read budget config; refusing tick\n")
+    sys.exit(1)
 PY
 }
 
@@ -190,7 +178,7 @@ run_one_macro_tick() {
         --permission-mode bypassPermissions \
         --max-budget-usd 5 \
         --no-session-persistence \
-        "/auto-pilot" \
+        "/team-skills:auto-pilot" \
       >> "${LOG_FILE}" 2>&1 &
     CHILD_TIMEOUT_PID=$!
     wait "${CHILD_TIMEOUT_PID}"
@@ -254,17 +242,14 @@ run_one_macro_tick() {
   echo "[${MACRO_END_TS}] MACRO-TICK end final_rc=${FINAL_RC} wrapper_id=${WRAPPER_ID} attempts=${MACRO_ATTEMPTS} reason=${MACRO_REASON:-success} pre_head=${MACRO_PRE_HEAD} post_head=${MACRO_POST_HEAD}" >> "${LOG_FILE}"
 }
 
-# ---- OUTER LOOP — continuous mode ----
-OUTER_MAX=10
-NO_PROGRESS_RUNS=0
-NO_PROGRESS_LIMIT=2
-PREV_OUTER_HEAD="${INITIAL_HEAD}"
+# ---- One action per wrapper invocation ----
+OUTER_MAX=1
 
 while (( OUTER_COUNT < OUTER_MAX )); do
   OUTER_COUNT=$((OUTER_COUNT + 1))
 
   # Pre-check: AUTOPILOT_PAUSE in HANDOFF
-  if grep -q "AUTOPILOT_PAUSE" "${REPO_ROOT}/SUP-HANDOFF.md" 2>/dev/null; then
+  if grep -q "AUTOPILOT_PAUSE" "${HANDOFF_PATH}" 2>/dev/null; then
     STOP_REASON="pause-set"
     FINAL_RC=0  # R14: explicit
     echo "[$(date -u +%FT%TZ)] CONTINUOUS stop: AUTOPILOT_PAUSE detected" >> "${LOG_FILE}"
@@ -279,7 +264,7 @@ while (( OUTER_COUNT < OUTER_MAX )); do
     break
   fi
 
-  echo "[$(date -u +%FT%TZ)] CONTINUOUS iteration ${OUTER_COUNT}/${OUTER_MAX} (no-progress: ${NO_PROGRESS_RUNS}/${NO_PROGRESS_LIMIT})" >> "${LOG_FILE}"
+  echo "[$(date -u +%FT%TZ)] TICK iteration ${OUTER_COUNT}/${OUTER_MAX}" >> "${LOG_FILE}"
 
   # Run one macro-tick
   run_one_macro_tick
@@ -295,32 +280,18 @@ while (( OUTER_COUNT < OUTER_MAX )); do
   # сделал работу но не закоммитил → опасно для следующего тика).
   DIRTY="$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
   if (( DIRTY > 0 )); then
-    STOP_REASON="dirty-tree-uncommitted"
-    FINAL_RC=2  # отличный rc — escalation, не success
+    STOP_REASON="ready-for-review/commit"
+    FINAL_RC=0  # Prepared changes are expected; verification is reported separately.
     echo "[$(date -u +%FT%TZ)] CONTINUOUS stop: dirty tree (${DIRTY} files uncommitted)" >> "${LOG_FILE}"
     "${TG_NOTIFY}" "⚠️ Автопилот оставил uncommitted работу (${DIRTY} файлов)
 Останавливаю continuous-loop чтобы не усугубить состояние.
-Проверь: git status; либо commit, либо checkout." >/dev/null 2>&1
+Статус: ready for review/commit. Проверь diff и результаты тестов в чате; commit/push требуют отдельного явного да." >/dev/null 2>&1
     break
   fi
 
-  # Check progress (HEAD change)
-  if [[ "${MACRO_POST_HEAD}" == "${PREV_OUTER_HEAD}" ]]; then
-    NO_PROGRESS_RUNS=$((NO_PROGRESS_RUNS + 1))
-    echo "[$(date -u +%FT%TZ)] CONTINUOUS: no new commits this iteration (count ${NO_PROGRESS_RUNS}/${NO_PROGRESS_LIMIT})" >> "${LOG_FILE}"
-    if (( NO_PROGRESS_RUNS >= NO_PROGRESS_LIMIT )); then
-      STOP_REASON="no-progress"
-      FINAL_RC=0  # R14: no-progress = успешное завершение (спека сделана)
-      break
-    fi
-  else
-    NO_PROGRESS_RUNS=0
-    TOTAL_COMMITS=$((TOTAL_COMMITS + $(git log --oneline "${PREV_OUTER_HEAD}..${MACRO_POST_HEAD}" 2>/dev/null | wc -l)))
-    PREV_OUTER_HEAD="${MACRO_POST_HEAD}"
-  fi
-
-  # Brief pause between macro-ticks
-  sleep 10
+  # A tick is one action; absence of commits is expected under the approval rule.
+  STOP_REASON="tick-complete"
+  break
 done
 
 # Hit OUTER_MAX without other stop reason?
@@ -345,9 +316,8 @@ echo "[${WRAPPER_END_TS}] CONTINUOUS exit reason=${STOP_REASON} wrapper_id=${WRA
 case "${STOP_REASON}" in
   pause-set)            EMOJI="⏸" ;;
   daily-budget-90pct)   EMOJI="💰" ;;
-  no-progress)          EMOJI="✅" ;;
   outer-max-reached)    EMOJI="🛑" ;;
-  dirty-tree-uncommitted) EMOJI="⚠️" ;;
+  ready-for-review/commit) EMOJI="📝" ;;
   killed-by-signal-*)   EMOJI="🛑" ;;
   macro-tick-failed:*)  EMOJI="🔴" ;;
   *)                    EMOJI="ℹ️" ;;

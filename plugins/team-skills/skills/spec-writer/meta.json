@@ -2,8 +2,8 @@
   "name": "spec-writer",
   "display_name": "Spec Writer",
   "author": "kostya",
-  "version": "1.1.0",
-  "description": "Создаёт документы проекта: спецификации (S), задачи (T), бизнес-требования (BR). Один вызов = один файл, только скелет.",
+  "version": "2.0.0",
+  "description": "Создаёт спецификации (S), задачи (T) и бизнес-требования (BR) по обязательному профилю .claude/team-skills.json и гайдам проекта. Один вызов — один файл, только скелет.",
   "tags": [
     "documentation",
     "spec",

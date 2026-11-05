@@ -2,8 +2,8 @@
   "name": "auto-pilot",
   "display_name": "Auto-Pilot Orchestrator",
   "author": "kostya",
-  "version": "1.1.0",
-  "description": "Continuous-mode autopilot для проектов с SUP-конвенциями: cron-headless оркестратор который сам выбирает следующее действие (Rule 1-6), self-heal на budget exhaustion, TG control plane (inline-buttons + slash-commands), git-guard на destructive ops. Включает SKILL.md, 10 helper-скриптов, JSON-schema для config и install.sh для setup.",
+  "version": "2.0.0",
+  "description": "Автопилот для репозиториев с профилем team-skills и установленными скриптами: выбирает одно действие, проверяет результат и оставляет изменения на ревью. TG-уведомления, бюджет и git-guard; без автоматических коммитов, пушей и PR.",
   "tags": [
     "autopilot",
     "orchestration",
@@ -22,12 +22,16 @@
     "templates/.env.template": "TG bot creds env-vars (пустые)"
   },
   "requirements": {
-    "binary": ["python3 >= 3.10", "claude (Claude Code CLI)", "git"],
+    "binary": [
+      "python3 >= 3.10",
+      "claude (Claude Code CLI)",
+      "git"
+    ],
     "telegram": "@BotFather bot + private chat",
     "system": "Linux/macOS (использует flock, cron, ps -o etime)"
   },
   "security_notes": [
-    "claude --print запускается с --permission-mode bypassPermissions — это explicit user-authorized для cron-headless. Smacking защищён git-guard.sh (denylist destructive ops).",
+    "bypassPermissions нужен для cron; PATH git-guard — единственный технический барьер Git в тике. Ошибки конфига блокируют операции; gh-запись запрещена инструкцией.",
     "Auth по numeric user_id (R2 codereview-dual fix) — username только для логов.",
     ".env.dev должен быть в .gitignore (token + user_id никогда не коммитить)."
   ]

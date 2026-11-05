@@ -6,8 +6,34 @@ description: >
   required fields. Use when the user says "/codex-setup", "поставь codex",
   "установи codex cli", "настрой codex", "init codex", "включи кодекс". The skill
   is idempotent — a repeat run updates cli_version with a warning on mismatch.
-  Part of spec S11 (docs/2. <ПРЕФИКС>-specifications/S11_claude_codex_orchestration_done.md), Phase 1.
+  If the project or the user has its own `codex-setup` skill, that one takes precedence — use this one only when the user typed `/team-skills:codex-setup` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:codex-setup` and a skill named `codex-setup` exists in the project (`.claude/skills/codex-setup/SKILL.md`) or in the user's skills (`~/.claude/skills/codex-setup/SKILL.md`), stop: tell the user that their own `/codex-setup` takes precedence, and do nothing else.
+
+## Codex model and effort (mandatory)
+
+Resolve each value independently: explicit invocation argument (`model=`, `effort=`) →
+`.claude/codex.json` → built-in `gpt-6-luna` / `medium`. Never use
+`~/.codex/config.toml` for model selection. Pass both resolved values on every
+worker call and model launch; probes, warm-up and smoke tests use the resolved
+model with effort `low`. Cache availability by model, probe effort and engine (TTL 1h);
+a different model requires a fresh probe. Log/report the model and effort actually sent.
+
+Luna: `gpt-6-luna`, effort `low|medium|high|xhigh|max` (no `ultra`).
+Sol: `gpt-6.1-sol`; Astra: `gpt-6-astra` (most expensive).
+A caller choosing a stronger model must explain why in one line to the user.
+Reject unsupported model/effort combinations; never silently drop or lower effort.
+
+## Project paths
+
+No project profile is required. If `.claude/team-skills.json` exists, read only needed keys `handoff`, `changelog`, `docs.tasks_done`, `docs.guides`.
+Missing profile/key → skip that project-document step and report it; never guess a prefix or use project-specific fallback paths.
+All document paths are repository-relative. Resolve GUIDES_DIR from `docs.guides`; populate document rules only from configured `handoff`, `changelog` and `docs.tasks_done`.
+
+Resolve the push skill from `commands.push` in `.claude/team-skills.json`; if the file/key is absent use `/team-skills:safe-push` (the only command default). References to `<push-command>` below mean this resolved command.
 
 # /codex-setup — Install and verify the Codex CLI
 
@@ -96,42 +122,10 @@ OUTPUT_FLAG=$(echo "$HELP" | grep -oE '\-\-output-last-message' | head -1)
 
 ---
 
-### Step 4.4 — Check project trust in `~/.codex/config.toml`
+### Step 4.4 — Model configuration boundary
 
-Closes AC 3 (config.toml is valid, the project is marked `trusted`).
-
-```bash
-REPO_ROOT="$(pwd)"
-CONFIG_DIR="$HOME/.codex"
-CONFIG_PATH="$CONFIG_DIR/config.toml"
-
-# Создать каталог и файл если их нет (свежая система — codex auth login создаст auth.json, но не обязательно config.toml)
-mkdir -p "$CONFIG_DIR"
-touch "$CONFIG_PATH"
-
-# Robust-проверка через awk: парсим TOML-блок [projects."<repo>"] до следующего [...] или EOF.
-# Это устойчиво к произвольному порядку ключей внутри блока (в отличие от grep -A1).
-HAS_TRUST=$(awk -v repo="$REPO_ROOT" '
-  $0 == "[projects.\"" repo "\"]" { in_block = 1; next }
-  /^\[/ && in_block { in_block = 0 }
-  in_block && /^[[:space:]]*trust_level[[:space:]]*=[[:space:]]*"trusted"[[:space:]]*$/ { print "yes"; exit }
-' "$CONFIG_PATH")
-
-if [ -z "$HAS_TRUST" ]; then
-  cat >> "$CONFIG_PATH" <<TOML
-
-[projects."$REPO_ROOT"]
-trust_level = "trusted"
-TOML
-  echo "✅ Добавлен trust_level=trusted для $REPO_ROOT в $CONFIG_PATH"
-else
-  echo "✅ Project trust already set: $REPO_ROOT"
-fi
-```
-
-**Edge case:** if config.toml already has a `[projects."$REPO_ROOT"]` block **without** `trust_level=trusted`, the script will append another block below. TOML validators treat this as an error (duplicate table). If you have an old invalid state on hand, the user must merge the blocks manually. We consider this edge case rare (usually the user either does not edit config.toml themselves, or knows what they are doing); a full TOML merge is deferred to a follow-up.
-
-To chat — a short message: "✅ Project trust: trusted".
+Do not read or modify `~/.codex/config.toml`; never use it to select a model.
+Resolve model/effort from explicit arguments, project config, then built-in defaults.
 
 ---
 
@@ -213,6 +207,8 @@ Write/update:
 ```json
 {
   "enabled": true,
+  "model": "gpt-6-luna",
+  "effort": "medium",
   "disabled_reason": null,
   "disabled_at": null,
   "cli_version": "<output of codex --version>",
@@ -228,7 +224,7 @@ Write/update:
 }
 ```
 
-If the file already existed with `enabled: false` or `disabled_reason` — **preserve** them (do not reset to defaults). Change only `cli_version` and `cli_flags`.
+If the file already existed with `enabled: false` or `disabled_reason` — **preserve** them (do not reset to defaults). Preserve existing model/effort too; fill missing fields with `gpt-6-luna` and `medium`. Explicit model=/effort= arguments update only the corresponding fields. Update `cli_version` and `cli_flags`.
 
 `availability_cache.checked_at: null` — forces a re-check on the first routing trigger. `sandbox_works` will be set by `codex-worker` after the probe (T83 three-state probe: `true` / `false` / `null` if not yet checked).
 
@@ -248,35 +244,34 @@ If `AGENTS.md` exists — find the block between the markers:
 
 Overwrite **only** this block. If the file does not exist — create it with the template below.
 
+Before creating AGENTS.md, derive project name, description and stack from the project CLAUDE.md/README; ask if missing. Read guides only from profile `docs.guides` if configured and present; otherwise report that guide synchronization was skipped. Substitute profile document paths below only for configured keys; omit missing document rules with a note.
+
 **`AGENTS.md` template:**
 
 ```markdown
 # AGENTS.md — инструкции для Codex CLI воркеров
 
-> Этот файл читается автоматически каждым `codex exec` запуском в проекте Arbitra_support (SUP).
+> Этот файл читается автоматически каждым `codex exec` запуском в проекте <project name from CLAUDE.md/README>.
 > Оркестратор — Claude Code; Codex выступает как узкоспециализированный воркер.
 
 ## Контекст проекта
 
-- **Проект:** SupportBots (SUP) — AI-боты сопровождения клиентов по банкротству физических лиц.
-- **Стек:** Python/Django, Aiogram 3.x (Telegram), MAX Platform SDK, PostgreSQL, Redis, Supabase, OpenAI API, Bitrix24.
+- **Проект:** <project name and description from CLAUDE.md/README>.
+- **Стек:** <project stack from CLAUDE.md/README>.
 - **Главный документ:** [CLAUDE.md](CLAUDE.md) — читай его в первую очередь.
 
 ## Гайды (читай по необходимости)
 
-- [docs/4. <ПРЕФИКС>-guides/doc_conventions.md](docs/4.%20<ПРЕФИКС>-guides/doc_conventions.md) — правила именования файлов.
-- [docs/4. <ПРЕФИКС>-guides/specifications_guide.md](docs/4.%20<ПРЕФИКС>-guides/specifications_guide.md) — структура спек.
-- [docs/4. <ПРЕФИКС>-guides/task_decomposition_guide.md](docs/4.%20<ПРЕФИКС>-guides/task_decomposition_guide.md) — структура задач.
-- [docs/4. <ПРЕФИКС>-guides/versioning_guidelines.md](docs/4.%20<ПРЕФИКС>-guides/versioning_guidelines.md) — SemVer + Conventional Commits.
+<links to existing guides under profile docs.guides; omit if not configured>
 
 ## Запреты
 
 Эти правила обязательны для всех Codex-воркеров:
 
-1. **Не делать `git commit` или `git push`** — коммиты делает оркестратор Claude через `/sup-push`.
+1. **Не делать `git commit` или `git push`** — коммиты делает оркестратор Claude через `<push-command>`.
 2. **Не трогать секреты:** `.env*`, `.servers`, любые токены/ключи.
-3. **Не править `<ПРЕФИКС>-CHANGELOG.md` и `<ПРЕФИКС>-HANDOFF.md`** — это шаги `/accept` (оркестратор).
-4. **Не лезть в `docs/3. <ПРЕФИКС>-tasks/Done/`** — там завершённые задачи, их трогать нельзя.
+3. **Не править `<profile:changelog>` и `<profile:handoff>`** — это шаги `/accept` (оркестратор).
+4. **Не лезть в `<profile:docs.tasks_done>/`** — там завершённые задачи, их трогать нельзя.
 5. **Не спавнить других Codex-воркеров** — оркестрацию ведёт только Claude.
 6. Использовать `python` из `$VIRTUAL_ENV/bin/python` для всех запусков (если работаешь в worktree).
 
@@ -363,7 +358,7 @@ PY
 Uses `$SKIP_FLAG` from Step 4 (not a hardcode — otherwise the skill breaks when the CLI flag is renamed, see C7 from the review):
 
 ```bash
-timeout 30 codex exec "$SKIP_FLAG" "echo ok"
+timeout 30 codex exec -m "$MODEL" -c model_reasoning_effort=low "$SKIP_FLAG" "echo ok" < /dev/null
 ```
 
 - Passed in <30s — ✅ smoke ok.
@@ -391,7 +386,7 @@ Output to chat:
 ✅ **Установка:** <команда> (или existing — если был установлен)
 ✅ **Auth:** <apikey | chatgpt> (только режим, без значений ключа)
 ✅ **Файлы созданы/обновлены:**
-  - `.claude/codex.json` — все 6 полей
+  - `.claude/codex.json` — enabled, model, effort и служебные поля
   - `AGENTS.md` (корень репо) — запреты + AUTO-SYNCED блок
   - `/tmp/sup-codex/setup.log` — лог установки
 ✅ **Smoke:** echo ok прошёл за <X>s

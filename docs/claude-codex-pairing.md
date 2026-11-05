@@ -7,7 +7,7 @@
 > **Как установить (агенту достаточно этого файла):**
 > 1. Прочитай раздел «Предпосылки» и проверь, что Codex CLI стоит и авторизован.
 > 2. Забери три навыка из каталога команды: `impl`, `codex-worker`, `fix`
->    (`scripts/skill_sync.sh pull <имя>` или вручную из `plugins/team-skills/skills/`).
+>    (через marketplace или CLI каталога: `python cli/skill_exchange.py install <имя>`).
 > 3. Пройди по маркерам `[АДАПТИРУЙ]` — подставь пути и границы своего проекта (~10 минут).
 > 4. Скажи агенту «поправь X» — дальше он делегирует сам.
 >
@@ -23,7 +23,7 @@
 | Что | Проверка | Если нет |
 |---|---|---|
 | Codex CLI ≥ 0.143.0 | `codex --version` | `npm i -g @openai/codex@latest` |
-| Авторизация | `codex exec --skip-git-repo-check "ok"` | `codex login` (ChatGPT-подписка) |
+| Авторизация | `codex exec -m gpt-6-luna -c model_reasoning_effort=low --skip-git-repo-check "ok" < /dev/null` | `codex login` (ChatGPT-подписка) |
 | Движок-компаньон (желательно) | `ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs` | работает и без него — `codex-worker` откатится на legacy `codex exec` |
 
 **Версия 0.143.0 — не каприз.** До неё параллельные воркеры гоняют общий `auth.json` и
@@ -43,6 +43,8 @@
 ```json
 {
   "enabled": true,
+  "model": "gpt-6-luna",
+  "effort": "medium",
   "disabled_reason": null,
   "cli_version": "codex-cli 0.143.0",
   "cli_flags": {
@@ -59,6 +61,32 @@ Precedence: переменная окружения `SUP_CODEX_ENABLED` со з�
 
 **Зачем kill-switch:** Codex ложится (auth, лимиты, сеть) — одним тумблером возвращаешься
 к обычной работе, не переписывая навыки.
+
+### Выбор модели и effort
+
+Каждое поле выбирается отдельно: явный аргумент `model=` / `effort=` →
+`.claude/codex.json` → встроенные `gpt-6-luna` / `medium`.
+Не использовать модель и effort из `~/.codex/config.toml`.
+Luna (`gpt-6-luna`) поддерживает low, medium, high, xhigh, max; ultra нет.
+Sol — `gpt-6.1-sol`, Astra — `gpt-6-astra` (самый дорогой ярус).
+Вызывающий навык при выборе более сильной модели одной строкой объясняет причину.
+В логах и результате воркера указываются фактически переданные модель и effort.
+
+Каждый запуск передаёт оба значения явно:
+
+```bash
+node "$COMPANION" task --model gpt-6-luna --effort medium --cwd "$PWD" --prompt-file "$PROMPT_FILE"
+codex exec -m gpt-6-luna -c model_reasoning_effort=medium --skip-git-repo-check "Implement the brief" < /dev/null
+```
+
+Для проб доступности, прогрева и smoke-теста использовать ту же выбранную модель
+с effort low; кешировать доступность с учётом модели и движка. Неподдерживаемые
+сочетания отклоняются, effort молча не снижается.
+
+`impl` требует `.claude/codex.json` с enabled=true; иначе останавливается
+с подсказкой `/team-skills:codex-setup`. Проектные документы берутся только из
+`.claude/team-skills.json`; при отсутствии необязательного пути шаг пропускается
+с пометкой. Формат — `docs/team-skills-profile.md` каталога и `/team-skills:init_dev`.
 
 ### 2. `AGENTS.md` в корне репо — Codex читает его автоматически
 
@@ -77,7 +105,7 @@ Claude думает и решает. Ты программируешь.
 
 ## Запреты
 
-1. Никаких `git commit` / `git push` без прямой команды.
+1. Воркер не коммитит и не пушит. Оркестратор ждёт явного «да» человека в этом диалоге на конкретные файлы, сообщение и действие; commit не разрешает push. Безголовый режим — «ready to commit».
 2. Не трогать секреты: [АДАПТИРУЙ: .env*, .servers, ваши файлы кредов].
 3. Не править [АДАПТИРУЙ: CHANGELOG.md, HANDOFF.md, папку завершённых задач].
 4. Не спавнить других воркеров — оркестрацию ведёт только Claude.
@@ -89,7 +117,7 @@ Claude думает и решает. Ты программируешь.
 Внутренний хелпер, пользователь его не зовёт. Контракт:
 
 ```
-Skill(codex-worker, "role=implementer brief_file=<путь> scope=edit:<файлы> task_id=<slug> timeout_min=15")
+Skill(codex-worker, "role=implementer brief_file=<путь> scope=edit:<файлы> task_id=<slug> timeout_min=15 model=gpt-6-luna effort=medium")
 → status: ok|timeout|disabled|error, output_file: <путь>, task_id, duration_s
 ```
 
@@ -114,7 +142,7 @@ Claude не пишет исполняемый код ([АДАПТИРУЙ: сп�
 пишет бриф, отдаёт /impl → Codex реализует → Claude читает дифф и гоняет тесты.
 [АДАПТИРУЙ: доки/спеки/конфиги/память] остаются за Claude — это и есть «думает и решает».
 
-Карман исключений (объявлять вслух одной строкой): Codex недоступен · правка ≤3 строк
+Карман исключений (объявлять вслух одной строкой): Ошибка/таймаут запущенного Codex · правка ≤3 строк
 в открытом файле · Codex дважды промахнулся · нужен диалог по ходу · пользователь сказал «сам».
 ```
 
@@ -155,7 +183,7 @@ Claude не пишет исполняемый код ([АДАПТИРУЙ: сп�
 
 ## Карман исключений (иначе режим станет догмой и будет мешать)
 
-1. Codex недоступен / kill-switch выключен → Claude пишет сам, работа не встаёт.
+1. В `impl` нет конфига или enabled=false → стоп и `/team-skills:codex-setup`; ошибка/таймаут уже запущенного воркера допускает объявленный переход к Claude.
 2. Правка ≤3 строк в файле, уже открытом в сессии, без проектного содержания.
 3. Codex дважды промахнулся мимо брифа на одной правке → Claude доделывает. Не зацикливаться.
 4. Правка требует живого диалога с пользователем по ходу.

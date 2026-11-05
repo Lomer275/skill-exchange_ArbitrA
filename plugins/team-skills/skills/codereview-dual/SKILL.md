@@ -8,7 +8,34 @@ description: >
   "/codereview-dual", "двойной ревью", "ревью с codex", "две линзы", "ревью с кодексом",
   or when routing decides on dual mode (Codex available and enabled). When Codex is
   unavailable — graceful fallback to single-review with an explicit marker. Part of spec S11, Phase 3.
+  If the project or the user has its own `codereview-dual` skill, that one takes precedence — use this one only when the user typed `/team-skills:codereview-dual` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:codereview-dual` and a skill named `codereview-dual` exists in the project (`.claude/skills/codereview-dual/SKILL.md`) or in the user's skills (`~/.claude/skills/codereview-dual/SKILL.md`), stop: tell the user that their own `/codereview-dual` takes precedence, and do nothing else.
+
+## Codex model and effort (mandatory)
+
+Resolve each value independently: explicit invocation argument (`model=`, `effort=`) →
+`.claude/codex.json` → built-in `gpt-6-luna` / `medium`. Never use
+`~/.codex/config.toml` for model selection. Pass both resolved values on every
+worker call and model launch; probes, warm-up and smoke tests use the resolved
+model with effort `low`. Cache availability by model, probe effort and engine (TTL 1h);
+a different model requires a fresh probe. Log/report the model and effort actually sent.
+
+Luna: `gpt-6-luna`, effort `low|medium|high|xhigh|max` (no `ultra`).
+Sol: `gpt-6.1-sol`; Astra: `gpt-6-astra` (most expensive).
+A caller choosing a stronger model must explain why in one line to the user.
+Reject unsupported model/effort combinations; never silently drop or lower effort.
+
+## Project paths
+
+No project profile is required. If `.claude/team-skills.json` exists, read only needed keys `handoff`, `docs.tasks`, `docs.specifications`.
+Missing profile/key → skip that project-document step and report it; never guess a prefix or use project-specific fallback paths.
+All document paths are repository-relative. Resolve TASKS_DIR from `docs.tasks`, SPECS_DIR from `docs.specifications`, and HANDOFF from `handoff`.
+
+Resolve the push skill from `commands.push` in `.claude/team-skills.json`; if the file/key is absent use `/team-skills:safe-push` (the only command default). References to `<push-command>` below mean this resolved command.
 
 # /codereview-dual — Parallel dual code review with Codex
 
@@ -18,11 +45,11 @@ Runs a Codex reviewer and a Claude reviewer in parallel, then merges the finding
 
 ## Input
 
-- `/codereview-dual` — the task is determined automatically from `*HANDOFF.md` (the first 🟡)
+- `/codereview-dual` — the task is determined automatically from the profile `handoff` document (if configured) (the first 🟡)
 - `/codereview-dual T17` — an explicit task number
 - `/codereview-dual T17 +files: a.py b.py` — from a review loop: files the loop's `/fix` runs changed outside the task's list; they are part of the change (Step 1 item 4)
 
-If nothing is passed and there is no 🟡 in HANDOFF — ask the user.
+If no task was passed, use the configured handoff only if available. Otherwise skip that lookup with a note and ask for the task/file scope.
 
 ---
 
@@ -61,7 +88,7 @@ Read `availability_cache` from `.claude/codex.json`:
 - Get the current Claude Code session_id (via the `CLAUDE_SESSION_ID` env variable or metadata; if unavailable — generate a UUID per run).
 - Compare `availability_cache.session_id` and `checked_at`:
   - session_id matches AND `checked_at` ≤ 1 hour ago → use the cached `available`.
-  - otherwise → run the check: `codex --version && timeout 10 codex exec --skip-git-repo-check "echo ok"`. Update `availability_cache`. This `codex exec` also warms the shared app-server daemon and refreshes the OAuth token serially, so a subsequent worker launch never triggers a cold-start refresh race.
+  - otherwise → run the check: `codex --version && timeout 10 codex exec -m "$MODEL" -c model_reasoning_effort=low --skip-git-repo-check "echo ok" < /dev/null`. Update `availability_cache`. This `codex exec` also warms the shared app-server daemon and refreshes the OAuth token serially, so a subsequent worker launch never triggers a cold-start refresh race.
 - **Min CLI version:** require `codex --version` ≥ **0.143.0** (adds the cross-process OAuth `refresh.lock`, [openai/codex#10332](https://github.com/openai/codex/issues/10332)); on older CLIs concurrent Codex work is unstable — hint the user to run `npm i -g @openai/codex@latest`.
 
 If `available=false` — graceful fallback to single-review: skip Steps 2 and 4, run 0.3 and Steps 1 and 3, then 5.0 and 5b (Claude rows only, codex counts 0).
@@ -76,7 +103,7 @@ The Codex reviewer reads the same tree and is not told it is behind main or dirt
 
 ### Step 1 — Gather context
 
-1. Find the task file: glob `docs/3. <ПРЕФИКС>-tasks/T<NN>_*.md` (or from HANDOFF).
+1. If TASKS_DIR is configured, find the task file: glob `${TASKS_DIR}/T<NN>_*.md` (or from configured handoff). Without these keys, skip automatic lookup, report it and use the user-provided task/file scope.
 2. Read the task file: acceptance criteria, description, affected files.
 3. Determine the specification path (from the `**Спецификация:**` line).
 4. Read the change — the files the task names plus any `+files:` from the args, compared with the fork point as in `/codereview` Step 0 — and the code around it.
@@ -89,8 +116,10 @@ If the code is not provided and not specified in the task — ask the user to at
 
 In a single message (without delays):
 
+Use a supplied task_file or a path resolved from docs.tasks. Omit spec_file when docs.specifications is absent and report that lookup as skipped. Never pass an unresolved path; for a user-provided file scope without a task file, write a read-only review brief and use brief_file instead.
+
 ```
-Skill(skill="codex-worker", args="role=reviewer task_file=docs/3. <ПРЕФИКС>-tasks/T<NN>_<name>.md spec_file=docs/2. <ПРЕФИКС>-specifications/S<NN>_<name>.md scope=read-only lens=correctness,edge-cases,risks timeout_min=5 task_id=T<NN>")
+Skill(skill="codex-worker", args="role=reviewer model=<resolved-model> effort=<resolved-effort> task_file=${TASKS_DIR}/T<NN>_<name>.md spec_file=${SPECS_DIR}/S<NN>_<name>.md scope=read-only lens=correctness,edge-cases,risks timeout_min=5 task_id=T<NN>")
 ```
 
 **Codex lens:** `correctness`, `edge-cases`, `risks` — **different from Claude's**, to provide a complementary signal.
@@ -191,7 +220,7 @@ Use only your own findings. The marker `[fallback: claude-only, Codex unavailabl
 
 ### Step 6 — Write to the task file
 
-In the task file (`docs/3. <ПРЕФИКС>-tasks/T<NN>_*.md`) add/update the section:
+Only if a task file was supplied or resolved from profile, in the task file (`${TASKS_DIR}/T<NN>_*.md`) add/update the section:
 
 ```markdown
 ## Code Review (dual)
@@ -241,7 +270,7 @@ If the section already existed — add a new one (don't overwrite old reviews), 
 **Dropped as snapshot phantoms:** <count> (claude: a, codex: b) — only when sorted against main
 **Older bugs on main:** <count> `OLD-` rows, not counted above — fix them in a worktree off origin/main
 
-**Task file updated:** docs/3. <ПРЕФИКС>-tasks/T<NN>_*.md (section `## Code Review (dual)`)
+**Task file updated (only if supplied or resolved from profile; otherwise report skipped):** ${TASKS_DIR}/T<NN>_*.md (section `## Code Review (dual)`)
 
 **Next step:**
 - If there are CRITICAL/HIGH — run `/fix` or `/review-loop`.
@@ -260,4 +289,4 @@ If the section already existed — add a new one (don't overwrite old reviews), 
 - **No `файл:строка` or no failure scenario → not a finding.** Dropped before the table, counted under it. Severity scale and the `[both]/[claude]/[codex]` logic are unchanged.
 - **Sort before matching.** On a tree behind main, ahead of it, or dirty outside the change, 5.0 checks both sources against main by `/codereview` Step 0; phantoms are dropped and counted, `OLD-` rows stay out of the verdict, `/fix` and the loops.
 - **Fallback to single-review when Codex is unavailable.** Don't crash — degrade with a clear message.
-- **Don't write a direct git commit/push** — that's `/sup-push`.
+- **Don't write a direct git commit/push** — that's `<push-command>`.

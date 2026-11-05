@@ -2,8 +2,13 @@
   "name": "impl",
   "display_name": "Impl — Claude решает, Codex реализует",
   "author": "kostya",
-  "version": "1.1.0",
-  "description": "Точка входа режима «Claude думает — Codex программирует». Делегирует написание кода Codex-имплементеру для ЛЮБОЙ правки, файл задачи не нужен: Claude находит код и пишет бриф, Codex реализует, Claude читает дифф и гоняет тесты. Без него делегирование существует только внутри /sprint-codex и /codereview-dual.",
-  "tags": ["codex", "workflow", "delegation", "core"],
+  "version": "2.0.0",
+  "description": "Точка входа режима «Claude думает — Codex программирует». Делегирует написание кода Codex-имплементеру для правки по запросу, файл задачи не нужен: Claude находит код и пишет бриф, Codex реализует, Claude читает дифф и гоняет тесты. Без него делегирование существует только внутри /sprint-codex и /codereview-dual. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет. Требует enabled=true в .claude/codex.json; иначе останавливается.",
+  "tags": [
+    "codex",
+    "workflow",
+    "delegation",
+    "core"
+  ],
   "created": "2026-07-27"
 }

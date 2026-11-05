@@ -1,11 +1,19 @@
 ---
 name: sprint
-description: "Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from the spec, groups them into waves by dependencies, and runs each wave in parallel. Supports a headless `/sprint --yes <Sxx>` mode: at each checkpoint it consults `scripts/autopilot/check_authz.py` (which reads the ```yaml autopilot``` block from <ПРЕФИКС>-HANDOFF.md) and decides auto-go vs TG-ask-and-wait instead of waiting on stdin. Use when the user says '/sprint S02', 'прогони спринт', 'выполни спеку', '/sprint --yes S14', 'запусти спринт в cron-режиме', 'автономный спринт'."
+description: "Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from the spec, groups them into waves by dependencies, and runs each wave in parallel. Supports a headless `/sprint --yes <Sxx>` mode: at each checkpoint it consults `scripts/autopilot/check_authz.py` (which reads the ```yaml autopilot``` block from the profile handoff file) and decides auto-go vs TG-ask-and-wait instead of waiting on stdin. Use when the user says '/sprint S02', 'прогони спринт', 'выполни спеку', '/sprint --yes S14', 'запусти спринт в cron-режиме', 'автономный спринт'. If the project or the user has its own `sprint` skill, that one takes precedence — use this one only when the user typed `/team-skills:sprint` or no such skill exists."
 ---
 
-# Sprint Skill (project-local with --yes mode)
+# Sprint Skill
 
-> **Project version.** This file overrides the marketplace `team-skills:sprint`. If a pure interactive sprint (without `--yes`) is needed, the behavior is fully identical to the marketplace version. The differences are the "Headless --yes mode" section below plus the checkpoint patches in Phase 1 and Steps 3/4/5.
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:sprint` and a skill named `sprint` exists in the project (`.claude/skills/sprint/SKILL.md`) or in the user's skills (`~/.claude/skills/sprint/SKILL.md`), stop: tell the user that their own `/sprint` takes precedence, and do nothing else.
+
+## Project profile (mandatory)
+
+Read `.claude/team-skills.json` at the repository root, version 1. Paths are relative to that root; reject absolute paths and paths escaping it.
+Require `handoff`, `docs.specifications`, and `docs.tasks`; read `commands.push` to select the commit/push skill (the sole permitted default is `/team-skills:safe-push` if that key is missing). If the profile or any required path key is missing or invalid, stop and name the file/key. Format: `team-skills:init_dev` and `docs/team-skills-profile.md` in the catalog. Do not guess prefixes or use project-specific fallback paths. Resolve `HANDOFF_PATH` to the absolute path from `handoff` and pass it to every `check_authz.py` call. Find task files only under `docs.tasks`, and specifications only under `docs.specifications`.
+
 
 Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from the spec, groups them into waves by dependencies, and runs each wave in parallel.
 
@@ -15,7 +23,7 @@ Autonomous orchestrator for executing a specification. Reads all 🟡 tasks from
 
 - `/sprint S02` — interactive mode: show the plan, wait for "да/ок/go" from the user at each checkpoint
 - `/sprint S02 --dry-run` — only show the wave plan, execute nothing
-- `/sprint --yes S14` — **headless mode for cron/auto-pilot.** The plan is auto-confirmed; at checkpoints, instead of stdin, the pre-authorization is read from <ПРЕФИКС>-HANDOFF.md (see the "Headless --yes mode" section). When pre-auth does not permit auto-go, `/sprint` pings TG via `scripts/autopilot/tg_ask.sh` and waits for a human click for up to 2 hours via `tg_wait_answer.sh`. For design docs and the checkpoint contract, see `.claude/skills/auto-pilot/SKILL.md`.
+- `/sprint --yes S14` — **headless mode for cron/auto-pilot.** The plan checkpoint uses HANDOFF pre-authorization; at checkpoints, instead of stdin, the pre-authorization is read from the profile handoff file (see the "Headless --yes mode" section). When pre-auth does not permit auto-go, `/sprint` pings TG via `scripts/autopilot/tg_ask.sh` and waits for a human click for up to 2 hours via `tg_wait_answer.sh`. For design docs and the checkpoint contract, see `.claude/skills/auto-pilot/SKILL.md`.
 
 If no spec number is passed — report an error and stop:
 
@@ -27,7 +35,7 @@ If no spec number is passed — report an error and stop:
 
 ## Headless --yes mode
 
-Under `--yes`, every checkpoint that "waits for an answer" in interactive mode goes through a **three-way decision**:
+Under `--yes`, implementation checkpoints (never commit/push/merge/PR/branch or worktree deletion) that wait for an answer in interactive mode go through a **three-way decision**:
 
 | Decision | Source | What to do |
 |---|---|---|
@@ -38,13 +46,13 @@ Under `--yes`, every checkpoint that "waits for an answer" in interactive mode g
 **Technical contract:** at each checkpoint the skill calls:
 
 ```bash
-DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint <key>)
+DECISION=$(python3 scripts/autopilot/check_authz.py --handoff "$HANDOFF_PATH" --task <TNN> --checkpoint <key>)
 ```
 
 Possible values of `<key>`: `risky_default`, `deploy_default`, `manual_test_default`, `test_failure_default`, `unplanned_risk_default`. Plan-confirm is checked separately:
 
 ```bash
-PLAN_OK=$(python3 scripts/autopilot/check_authz.py --checkpoint plan_confirmed)  # yes|no
+PLAN_OK=$(python3 scripts/autopilot/check_authz.py --handoff "$HANDOFF_PATH" --checkpoint plan_confirmed)  # yes|no
 ```
 
 If `--yes` is passed but there is no `yaml autopilot` block in HANDOFF → EVERYTHING defaults to `ask`. This is safe.
@@ -81,9 +89,9 @@ ANSWER is in {yes|no|skip|timeout}. The skill interprets it by the checkpoint's 
 
 **TG logging (normal operation, no blocking):**
 
-In `--yes` mode, ping TG on:
+In `--yes` mode, ping TG on these events if the channel is configured (log a skipped notification otherwise):
 - Wave start: `🟡 Sprint S14 Волна 2/4 — 5 задач [T125 T126 T127 T128 T130]`
-- Wave end: `✅ Sprint S14 Волна 2/4 готова — коммит <sha>`
+- Wave end: `✅ Sprint S14 Волна 2/4 готова — ready to commit`
 - Sprint finish: `✅ Sprint S14 закончен — 16/16 задач` (or partial)
 
 For templates and style, see the "TG logging" section in `.claude/skills/auto-pilot/SKILL.md`. Do not duplicate with jargon; keep it to one or two short lines.
@@ -106,14 +114,14 @@ Extract:
 Run the search:
 
 ```text
-glob docs/2. <ПРЕФИКС>-specifications/SNN_*.md
+glob <docs.specifications>/SNN_*.md
 ```
 
-If the file is not found — check `docs/backlog/` and `docs/2. <ПРЕФИКС>-specifications/*_done.md`.
+If the file is not found — check `<docs.specifications>/*_done.md`.
 If still not found → STOP:
 
 ```text
-❌ Спецификация S02 не найдена в docs/2. <ПРЕФИКС>-specifications/
+❌ Спецификация S02 не найдена в <docs.specifications>/
 ```
 
 ### 0.2 — Collect tasks with status 🟡
@@ -196,7 +204,7 @@ Output the plan and finish. Execute nothing. Do not request confirmation.
 **`--yes` mode:**
 
 ```bash
-PLAN_OK=$(python3 scripts/autopilot/check_authz.py --checkpoint plan_confirmed)
+PLAN_OK=$(python3 scripts/autopilot/check_authz.py --handoff "$HANDOFF_PATH" --checkpoint plan_confirmed)
 ```
 
 - `PLAN_OK == "yes"` → continue, log to TG `→ Беру: /sprint S14, план auto-confirmed`
@@ -216,7 +224,9 @@ Announce the wave start:
 
 In `--yes`, additionally: `scripts/autopilot/tg_notify.sh "🟡 Sprint <Spec> Волна N/M — <K задач>"`
 
-If the wave contains more than one task — run them in parallel via `superpowers:dispatching-parallel-agents`. Each agent receives:
+When `AUTOPILOT_TICK=1`, never route to `/sprint-codex`, regardless of Codex availability or wave size. Execute all tasks sequentially through `/impl` in the current working tree, without creating worktrees or committing. This tick rule overrides the parallel dispatch below and Step 4's normal implementation routing. Finish with `ready to commit`, the exact file list, proposed commit message and actual verification results under Step 7 (R4); no automatic commit/push.
+
+Outside an autopilot tick, if the wave contains more than one task — run them in parallel via `superpowers:dispatching-parallel-agents`. Each agent receives:
 
 - The TNN task number
 - The path to the task file
@@ -227,7 +237,7 @@ If the wave contains a single task — execute it directly (without dispatching 
 
 ### 2.2 — Wait for all tasks of the wave to complete
 
-The next wave starts only after ALL tasks of the current wave have completed (status: ✅ done or ⚠️ blocked or ⛔ skipped).
+The next wave starts only after ALL tasks of the current wave have completed locally (status: ✅ prepared for review, ⚠️ blocked, or ⛔ skipped). Preparation is not human acceptance or a commit.
 
 ### 2.3 — Handling blocked tasks
 
@@ -238,11 +248,11 @@ If a task finished with status ⚠️ blocked or ⛔ skipped:
 
 ### 2.4 — After the wave
 
-In `--yes`: `scripts/autopilot/tg_notify.sh "✅ Sprint <Spec> Волна N/M готова — коммит <sha> → <ветка>"` — only when every task of the wave is ✅ done. A wave with a ⚠️ blocked or ⛔ skipped task sends `⚠️ Sprint <Spec> Волна N/M: закрыто K из L, заблокированы: <TNN, …>` instead.
+In `--yes`: `scripts/autopilot/tg_notify.sh "✅ Sprint <Spec> Волна N/M готова — ready to commit"` — only when every task of the wave is ✅ prepared for review. A wave with a ⚠️ blocked or ⛔ skipped task sends `⚠️ Sprint <Spec> Волна N/M: готово к ревью K из L, заблокированы: <TNN, …>` instead.
 
 ### 2.5 — After all waves
 
-Output the final report. In `--yes`: TG summary `✅ Sprint <Spec> закончен — <K>/<Total> задач`.
+Output the final report, exact file list and proposed commit message. In `--yes`, stop at `ready to commit` and send the same summary through `tg_notify.sh` if configured.
 
 ---
 
@@ -252,7 +262,7 @@ Output the final report. In `--yes`: TG summary `✅ Sprint <Spec> законч�
 
 Read in parallel:
 
-- The task file: `docs/3. <ПРЕФИКС>-tasks/TNN_*.md`
+- The task file: `<docs.tasks>/TNN_*.md`
 - The spec file (already read in Phase 0 — reuse it)
 - All code files mentioned in the task
 - Related files (imports, configs) if mentioned
@@ -290,7 +300,7 @@ For each risk, determine the checkpoint key:
 - RISKY → `risky_default`
 
 ```bash
-DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint <key>)
+DECISION=$(python3 scripts/autopilot/check_authz.py --handoff "$HANDOFF_PATH" --task <TNN> --checkpoint <key>)
 ```
 
 - `DECISION=auto` → continue, log to TG `✓ T125 pre-auth для <checkpoint> — продолжаю`
@@ -312,7 +322,7 @@ If an **unplanned risk** is discovered in the process (a pattern from "Risk dete
 **`--yes` mode:**
 
 ```bash
-DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint unplanned_risk_default)
+DECISION=$(python3 scripts/autopilot/check_authz.py --handoff "$HANDOFF_PATH" --task <TNN> --checkpoint unplanned_risk_default)
 ```
 
 Then proceed as in Step 3 (auto/skip/ask).
@@ -336,7 +346,7 @@ After 3 failures:
 **`--yes` mode:**
 
 ```bash
-DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint test_failure_default)
+DECISION=$(python3 scripts/autopilot/check_authz.py --handoff "$HANDOFF_PATH" --task <TNN> --checkpoint test_failure_default)
 ```
 
 - `auto` → mark ⚠️ blocked (we don't take risks without explicit auth), log to TG
@@ -354,7 +364,7 @@ If the task is marked MANUAL_TEST (UI changes without auto-tests):
 **`--yes` mode:**
 
 ```bash
-DECISION=$(python3 scripts/autopilot/check_authz.py --task <TNN> --checkpoint manual_test_default)
+DECISION=$(python3 scripts/autopilot/check_authz.py --handoff "$HANDOFF_PATH" --task <TNN> --checkpoint manual_test_default)
 ```
 
 - `auto` → skip the manual check (we trust that the task is tested by auto-tests/sub-agent)
@@ -367,24 +377,15 @@ Run the `review-loop` skill for the current task.
 The `codereview → fix` loop until `CRITICAL==0 AND HIGH==0`, maximum 5 iterations.
 Fixes are applied in fast mode (without waiting for confirmation).
 
-### Step 7 — Accept + Push
+### Step 7 — Prepare for review and explicit approval
 
-After a clean review-loop only. One that ended in its Step 4 — limit, plateau, or a finding that survived two fix rounds — is not clean: skip this step, show its blockers, and set the task to ⚠️ blocked, so 2.3 marks its dependents ⛔ skipped. In `--yes`, additionally a TG escalation `🔴 T05 — review-loop не чисто (<статус>)`; in the autopilot, `outcome=blocked`. The changes stay uncommitted for a human.
+Only after a clean review-loop. A loop ending at its limit, plateau, or with a surviving finding leaves the task ⚠️ blocked; show blockers, preserve the changes, and notify TG in `--yes`. Never finalize a blocked task.
 
-When clean:
+After clean review, keep acceptance pending for human review; do not invoke `/accept` as an automatic route to commit/push. Collect the exact files with `git diff --name-only` and `git ls-files --others --exclude-standard`, show the proposed commit message and actual verification results, and finish all waves with a reviewable file list.
 
-1. Run `/accept TNN` — the skill closes the task, moves the file, updates HANDOFF and CHANGELOG
-2. Commit and push — `/sup-push` checks secrets, builds the commit, and pushes. **Interactive mode:** commit only on the human's explicit word: show the files and the ready message and wait for «да»; no answer → the task stays ⚠️ «не запушено», nothing is committed. **`--yes` mode:** the owner launching `/sprint --yes` is the standing request for this run — run `/sup-push`. It refuses the deploy branch (usually `main`, where a push deploys to prod), so the sprint works on a branch.
+Interactive mode: report `ready to commit`, show the concrete file list, proposed message and proposed action, then wait for an explicit human “yes” in this dialogue. Only then invoke the skill selected by `commands.push` (default `/team-skills:safe-push`), limiting it to the approved action/files. Approval for commit alone does not authorize push: ask separately before pushing. Merge, PR creation/merge, branch deletion and worktree deletion each require explicit approval for the concrete action and files too.
 
-Any `/sup-push` result other than its «✅ Запушено!» (Step 4, scenario C) — «push не выполнен: нужен человек», a stop on its secrets-gate question, a 🚫 СТОП on secrets, `index-changed`, a push rejected or waiting for an upstream choice — means the task is not finished. `/accept` has already marked it done in the files: leave that as it is, the human finishes with `/sup-push`, not a second `/accept`. Do not announce it closed; show the local commit hash (if there is one) and the branch, set the task to ⚠️ blocked, in `--yes` a TG escalation `🔴 T05 — push не выполнен`, in the autopilot `outcome=blocked`, and stop.
-
-Announce completion:
-
-```text
-✅ T05 — выполнено и закрыто
-```
-
-In `--yes`, additionally: TG log `✓ T05 закрыт → коммит <sha>`.
+`--yes`, cron, HANDOFF/config permissions and TG plan buttons never count as commit/push permission. In headless mode stop with `ready to commit`, report files and the proposed message, and notify via `scripts/autopilot/tg_notify.sh` if configured. Notification failure must be reported; it does not authorize proceeding. No human in chat → no commit/push. Tasks prepared locally can satisfy dependency checks for subsequent waves, but must not be announced as committed, pushed, or accepted.
 
 ---
 
@@ -394,9 +395,9 @@ Scan the files planned to be changed. Risk is determined by patterns:
 
 | Type | Patterns |
 |-----|----------|
-| `DEPLOY` | `docker-compose.yml`, `nginx.conf`, `.github/workflows/`, `Dockerfile`, `gunicorn` configs |
+| `DEPLOY` | deployment manifests, reverse-proxy configs, `.github/workflows/`, container build files |
 | `RISKY` | files with `migration`, `migrate`, `auth`, `password`, `token`, `SECRET`, env variables, external APIs (Bitrix, YooKassa, Supabase) |
-| `MANUAL_TEST` | changes in `tg_bot/keyboards`, `tg_bot/texts`, message templates, UI handlers without unit tests |
+| `MANUAL_TEST` | changes in `src/app/keyboards/`, `src/app/texts/`, message templates, UI handlers without unit tests |
 
 **Unplanned risk** — a pattern discovered during implementation (step 4) that was not in the step 2 plan.
 
@@ -409,11 +410,16 @@ After all waves are complete:
 ```text
 ## Sprint S02 — Итог
 
+Статус: ready to commit
+Файлы: <конкретный список>
+Сообщение коммита: <предложение>
+Коммит/пуш: ожидают явного согласия в чате
+
 | Задача | Статус     | Точки остановки        | Комментарий                   |
 |--------|------------|------------------------|-------------------------------|
-| T05    | ✅ done    | 1 (RISKY — pre-auth)   | --yes auto                    |
-| T07    | ✅ done    | 2 (DEPLOY, MANUAL_TEST)| --yes ask → yes (TG ответ)    |
-| T06    | ✅ done    | 0                      | —                             |
+| T05    | ✅ prepared | 1 (RISKY — pre-auth)   | --yes auto                    |
+| T07    | ✅ prepared | 2 (DEPLOY, MANUAL_TEST)| --yes ask → yes (TG ответ)    |
+| T06    | ✅ prepared | 0                      | —                             |
 | T08    | ⚠️ blocked | —                      | TG-ask timeout 2h             |
 
 Волн: 2 | Задач выполнено: 3/4 | Точек остановки: 3 (1 auto, 1 ask-yes, 1 timeout)
@@ -422,7 +428,7 @@ After all waves are complete:
   ⚠️ T08 — нет ответа в TG за 2 часа. Запусти /sprint S02 заново когда сможешь.
 ```
 
-In `--yes`: a one-line TG summary `<emoji> Sprint <Spec> закончен — <K>/<Total> done, <B> blocked, <S> skipped`.
+In `--yes`: a one-line TG summary `<emoji> Sprint <Spec> закончен — <K>/<Total> prepared, <B> blocked, <S> skipped`.
 
 ---
 
@@ -437,7 +443,7 @@ In `--yes`: a one-line TG summary `<emoji> Sprint <Spec> закончен — <K
 - **Dependency cycle → STOP at the start**
 - **--dry-run → plan only** (even with --yes — the plan is output with markers, nothing is executed)
 - **Fallback without dependencies → sequentially**
-- **One commit per accepted task**: do not accumulate commits between tasks; in interactive mode each one waits for the human's «да» (Step 7)
+- **Every commit/push requires explicit human approval** for the exact action/files (Step 7); headless stops at `ready to commit`.
 - **Code goes through `/impl`** when the project splits roles (Step 4): Claude writes the brief and reads the diff; writing code itself only under the exceptions pocket, announced
 - **--yes without a HANDOFF YAML block → everything defaults to `ask`**. If TG creds are also not configured — `/sprint --yes` refuses to start with the error "No HANDOFF authz + no TG creds = no autonomy possible"
 
@@ -446,7 +452,7 @@ In `--yes`: a one-line TG summary `<emoji> Sprint <Spec> закончен — <K
 ## See also
 
 - **`/auto-pilot`** — orchestrator-router. In cron mode it is the one that calls `/sprint --yes`. The TG template design and checkpoint contract are there.
-- **`/sprint-codex`** — parallel implementation of wave tasks via Codex workers in a git worktree. Routing selects it automatically if Codex is available and the wave has ≥2 tasks. See spec S11.
+- **`/sprint-codex`** — parallel implementation of wave tasks via Codex workers in a git worktree. Outside an autopilot tick, routing selects it automatically if Codex is available and the wave has ≥2 tasks. With `AUTOPILOT_TICK=1`, always use sequential `/impl` in the current tree instead (Phase 2.1), ending at `ready to commit`. See spec S11.
 - **`/codex-toggle`** — switching classic ↔ codex.
 - **`/review-loop`** — the review loop after implementing a task (Step 6).
-- **`/accept`** + **`/sup-push`** — closing the task and committing (Step 7).
+- **`commands.push`** — the profile-selected skill, invoked only for an explicitly approved action (Step 7).

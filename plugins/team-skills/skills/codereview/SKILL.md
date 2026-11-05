@@ -7,7 +7,26 @@ description: >
   "посмотри что не так", "найди баги", "code review". The skill covers all phases:
   acceptance criteria check, adversarial review, user walkthrough, architectural
   fit. The result is a structured table of findings with severity and an entry in the task file.
+  If the project or the user has its own `codereview` skill, that one takes precedence — use this one only when the user typed `/team-skills:codereview` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:codereview` and a skill named `codereview` exists in the project (`.claude/skills/codereview/SKILL.md`) or in the user's skills (`~/.claude/skills/codereview/SKILL.md`), stop: tell the user that their own `/codereview` takes precedence, and do nothing else.
+
+## Codex model and effort (mandatory)
+
+Resolve each value independently: explicit invocation argument (`model=`, `effort=`) →
+`.claude/codex.json` → built-in `gpt-6-luna` / `medium`. Never use
+`~/.codex/config.toml` for model selection. Pass both resolved values on every
+worker call and model launch; probes, warm-up and smoke tests use the resolved
+model with effort `low`. Cache availability by model, probe effort and engine (TTL 1h);
+a different model requires a fresh probe. Log/report the model and effort actually sent.
+
+Luna: `gpt-6-luna`, effort `low|medium|high|xhigh|max` (no `ultra`).
+Sol: `gpt-6.1-sol`; Astra: `gpt-6-astra` (most expensive).
+A caller choosing a stronger model must explain why in one line to the user.
+Reject unsupported model/effort combinations; never silently drop or lower effort.
 
 # Code Review Skill
 
@@ -209,7 +228,7 @@ A brief explanation + a concrete code example where the problem is.
 
 ## See also
 
-- **`/codereview-dual`** — a dual independent review with Codex as a second lens (correctness/edge-cases/risks). Routing selects it automatically if Codex is available and `enabled: true` in `.claude/codex.json`. See spec S11.
+- **`/codereview-dual`** — a dual independent review with Codex as a second lens (correctness/edge-cases/risks). Pass resolved model and effort when routing. Routing selects it automatically if Codex is available and `enabled: true` in `.claude/codex.json`. See spec S11.
 - **`/codex-toggle`** — switching between classic review and dual.
 - **`/review-loop`** — the `codereview → fix` loop until clean of CRITICAL/HIGH.
 - **`/fix`** — applying fixes from the findings table.

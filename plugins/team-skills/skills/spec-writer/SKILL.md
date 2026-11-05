@@ -3,12 +3,25 @@ name: spec-writer
 description: >
   Creates project documents: specifications (S), tasks (T), and business requirements (BR)
   following all project conventions. Reads guides at runtime — does not rely on memory.
-  Use when the user says "/sup-spec-writer", "создай спеку", "создай задачу",
+  Use when the user says "/spec-writer", "создай спеку", "создай задачу",
   "новая спека", "новая задача", "напиши спецификацию", "создай BR",
   "задекомпозируй спеку на задачи".
+  If the project or the user has its own `spec-writer` skill, that one takes precedence — use this one only when the user typed `/team-skills:spec-writer` or no such skill exists.
 ---
 
-# Sup-Spec-Writer Skill
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:spec-writer` and a skill named `spec-writer` exists in the project (`.claude/skills/spec-writer/SKILL.md`) or in the user's skills (`~/.claude/skills/spec-writer/SKILL.md`), stop: tell the user that their own `/spec-writer` takes precedence, and do nothing else.
+
+## Project profile (mandatory)
+
+After Step 0 and before any other action, read `.claude/team-skills.json` from the repository root. Require format `version: 1` and these keys: `docs.guides`, `commands.spec_writer`; additionally `docs.specifications` for S or T, `docs.tasks`, `docs.tasks_done`, `handoff`, `changelog` for T, and `docs.business_requirements`, `prefix` for BR. Read only the keys needed for this invocation. A missing file, unsupported version, or missing/empty required key means stop before reading or changing project documents: name the missing file/key and point to `team-skills:init_dev` and the catalog's `docs/team-skills-profile.md`. Never infer a prefix or substitute project paths.
+
+If the document type is unknown, validate the common keys first, ask for the type in Step 1, then validate its additional keys before proceeding.
+
+In this skill, `{key}` means the value of that profile key; resolve paths relative to the repository root. These are notation, not literal shell variables: substitute and shell-quote the resolved values before executing commands. Paths must stay inside the repository.
+
+# Spec Writer Skill
 
 Creates one document per invocation (a spec, task, or BR) with correct numbering and structure.
 Reads guides at runtime — does not rely on memory. Skeleton only — the user fills in the content.
@@ -17,10 +30,10 @@ Reads guides at runtime — does not rely on memory. Skeleton only — the user 
 
 ## Inputs
 
-- `/sup-spec-writer` — ask the user for the document type
-- `/sup-spec-writer spec "Title"` — create a specification
-- `/sup-spec-writer task "Title" S03` — create a task (linked to a spec)
-- `/sup-spec-writer br "Title"` — create a business requirement
+- `/spec-writer` — ask the user for the document type
+- `/spec-writer spec "Title"` — create a specification
+- `/spec-writer task "Title" S03` — create a task (linked to a spec)
+- `/spec-writer br "Title"` — create a business requirement
 - "создай задачу для S05" — create a task linked to spec S05
 - "задекомпозируй спеку S04 на задачи" — create a single task (not all at once — one per invocation)
 
@@ -34,9 +47,9 @@ If the type is not explicitly specified — **ask one question**:
 
 ```
 Какой документ создать?
-1. Спецификация (S) — docs/2. <ПРЕФИКС>-specifications/
-2. Задача (T) — docs/3. <ПРЕФИКС>-tasks/
-3. Бизнес-требование (BR) — docs/1. <ПРЕФИКС>-business requirements/
+1. Specification (S)
+2. Task (T)
+3. Business requirement (BR)
 ```
 
 Do not proceed until the user answers.
@@ -45,13 +58,13 @@ Do not proceed until the user answers.
 
 **Always read** (regardless of type):
 ```
-docs/4. <ПРЕФИКС>-guides/doc_conventions.md
+{docs.guides}/doc_conventions.md
 ```
 
 **Additionally, depending on the type:**
-- If type=S → read `docs/4. <ПРЕФИКС>-guides/specifications_guide.md`
-- If type=T → read `docs/4. <ПРЕФИКС>-guides/task_decomposition_guide.md`
-- If type=BR → read `docs/4. <ПРЕФИКС>-guides/business_requirements_template.md`
+- If type=S → read `{docs.guides}/specifications_guide.md`
+- If type=T → read `{docs.guides}/task_decomposition_guide.md`
+- If type=BR → read `{docs.guides}/business_requirements_template.md`
 
 **Never skip this step** — do not rely on cached knowledge.
 
@@ -59,11 +72,12 @@ docs/4. <ПРЕФИКС>-guides/doc_conventions.md
 
 #### For a specification (SNN):
 
-Run a glob over both directories:
+Scan the configured specification directory recursively, including its backlog subdirectory if present:
 ```
-glob docs/2. <ПРЕФИКС>-specifications/S*.md
-glob docs/backlog/S*.md
+glob {docs.specifications}/**/S*.md
 ```
+
+If project documentation mentions specs in a backlog outside this configured directory, stop and request a profile layout that includes that backlog; do not assume its location.
 
 From all matched file names, extract the numbers after `S`.
 Find the maximum number → next number = max + 1, at least two digits (`01` … `09`, `10`, … `59`, `100`).
@@ -74,7 +88,8 @@ Example: if S01, S02, S05, S06 are found → next = S07.
 
 Run a recursive glob:
 ```
-glob docs/3. <ПРЕФИКС>-tasks/**/T*.md
+glob {docs.tasks}/**/T*.md
+glob {docs.tasks_done}/**/T*.md
 ```
 
 This covers both current tasks and files in `Done/` (nested folders).
@@ -85,12 +100,7 @@ Example: if the maximum found, including Done/, is T497 → next = T498.
 
 **The file scan is not enough.** A number can be taken before its file exists — in another worktree on an unpushed branch, or reserved in prose («Follow-up T<NN>»). Scan every worktree and grep the candidate:
 
-```bash
-git worktree list --porcelain | sed -n 's/^worktree //p' | while read -r d; do
-  find "$d/docs" -name 'T[0-9]*.md' -printf '%f\n' 2>/dev/null
-done | grep -oE '^T[0-9]+' | sed 's/T//' | sort -n -u | tail -3
-grep -rn "T<NN>\b" docs/ <ПРЕФИКС>-HANDOFF.md <ПРЕФИКС>-CHANGELOG.md
-```
+List worktrees with `git worktree list --porcelain`. In each tree, read that tree's profile and scan its configured `docs.tasks` and `docs.tasks_done` recursively. If a tree's required keys are missing, stop and name the tree/key instead of guessing. Search candidate TNN mentions in the configured task/specification directories, `{handoff}`, and `{changelog}` with `rg`. Shell-quote all resolved paths. Do not create or delete worktrees for this scan.
 
 Take the first number with no file in any tree and no mention in prose.
 
@@ -98,7 +108,7 @@ Take the first number with no file in any tree and no mention in prose.
 
 Run a glob:
 ```
-glob docs/1. <ПРЕФИКС>-business requirements/<ПРЕФИКС>-BR*.md
+glob {docs.business_requirements}/{prefix}-BR*.md
 ```
 
 From the file names, extract the numbers after `BR`.
@@ -136,9 +146,9 @@ Convert the title into `snake_case`:
 
 | Type | Path |
 |-----|------|
-| S | `docs/2. <ПРЕФИКС>-specifications/SNN_<snake_case>.md` |
-| T | `docs/3. <ПРЕФИКС>-tasks/TNN_<snake_case>.md` |
-| BR | `docs/1. <ПРЕФИКС>-business requirements/<ПРЕФИКС>-BRNN_<snake_case>.md` |
+| S | `{docs.specifications}/SNN_<snake_case>.md` |
+| T | `{docs.tasks}/TNN_<snake_case>.md` |
+| BR | `{docs.business_requirements}/{prefix}-BRNN_<snake_case>.md` |
 
 ### Step 7 — Create the skeleton file
 
@@ -203,7 +213,7 @@ depends_on: []
 
 # TNN. <Название>
 
-**Спецификация:** docs/2. <ПРЕФИКС>-specifications/SNN_<spec_name>.md
+**Спецификация:** {docs.specifications}/SNN_<spec_name>.md
 
 ---
 
@@ -227,7 +237,7 @@ depends_on: []
 #### Skeleton for a business requirement (BR):
 
 ```markdown
-# <ПРЕФИКС>-BRNN. <Название>
+# {prefix}-BRNN. <Название>
 
 **Статус:** draft
 **Дата:** YYYY-MM-DD
@@ -271,7 +281,7 @@ depends_on: []
 After creating the file, output a summary in the format:
 
 ```
-✅ Создан файл: docs/2. <ПРЕФИКС>-specifications/S07_my_feature.md
+✅ Создан файл: {docs.specifications}/S07_my_feature.md
 
 Структура:
   - Статус: draft
@@ -280,7 +290,7 @@ After creating the file, output a summary in the format:
 
 Следующие шаги:
   - Заполни секции контентом
-  - При готовности запусти /sup-spec-writer для задач (TNN)
+  - При готовности запусти {commands.spec_writer} для задач (TNN)
   - Для закрытия задачи запусти /accept
 ```
 
@@ -298,7 +308,7 @@ Adapt "Следующие шаги" to the document type:
 - **Always read the guides at runtime** (Step 2) — do not rely on memory or previous reads.
 - **Numbering is at least two digits:** 01, 02, ..., 10, 11, ..., 497, 498...
 - **TNN: scan recursively including Done/.** The maximum number across all files — not only active tasks.
-- **SNN: scan both specs/ and backlog/.** Both sources.
+- **SNN: scan `{docs.specifications}` recursively, including its backlog subdirectory if present.**
 - If the type is not specified — ask first, do not guess.
 - If content clarifications are needed — ask **one question** at a time.
 - If a file with that number already exists — report it and ask what to do.

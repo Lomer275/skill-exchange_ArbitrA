@@ -1,5 +1,7 @@
 # Bitrix24 REST API — Method Reference
 
+All writes must follow the [Write policy](../SKILL.md#write-policy-mandatory).
+
 ## CRM — Deals (crm.deal.*)
 
 ### crm.deal.list
@@ -374,18 +376,34 @@ Available events: ONCRMDEALADD, ONCRMDEALEDIT, ONCRMDEALDELETE, ONCRMLEAD*, etc.
 Use `$result[commandKey][fieldName]` to reference previous results.
 
 ### Mass update pattern
-```javascript
-// Build batch of up to 50 updates
-const cmd = {};
-items.slice(0, 50).forEach((item, i) => {
-  cmd[`upd${i}`] = `crm.deal.update?id=${item.id}&fields[STAGE_ID]=C4:WON`;
-});
 
-const response = await this.helpers.httpRequest({
-  method: 'POST',
-  url: '${BITRIX_WEBHOOK}batch',
-  body: { halt: 0, cmd }
-});
-// response.result.result — object with each command's result
-// response.result.result_error — object with each command's error (if any)
+1. Read every candidate deal with `crm.deal.list`, following all `next` pages;
+   select `ID`, `TITLE`, and `STAGE_ID`. No writes in this phase.
+2. Show the full plan: method `crm.deal.update`, each deal ID and title,
+   and `STAGE_ID: <current value> → C4:WON` for every affected deal.
+3. Wait for the human's explicit “yes” to that list. Use the project sandbox
+   first if available; follow the production write route in the Write policy.
+4. Only after confirmation, pass the approved list as `approvedItems` to the
+   write phase below. Do not discover new targets during the write phase.
+
+```javascript
+// Write phase only: approvedItems is the complete human-approved plan.
+for (let offset = 0; offset < approvedItems.length; offset += 50) {
+  const cmd = {};
+  approvedItems.slice(offset, offset + 50).forEach((item, i) => {
+    cmd[`upd${i}`] = `crm.deal.update?id=${item.ID}&fields[STAGE_ID]=C4:WON`;
+  });
+  const response = await this.helpers.httpRequest({
+    method: 'POST',
+    url: '${BITRIX_WEBHOOK}batch',
+    body: { halt: 1, cmd }
+  });
+  const errors = response.result.result_error;
+  if (errors && Object.keys(errors).length) throw new Error('Batch failed; stop and review');
+  await new Promise(resolve => setTimeout(resolve, 500));
+}
 ```
+
+`halt: 1` stops within a batch; the error check stops subsequent batches.
+After a partial failure, read current state and obtain confirmation for a revised
+plan before retrying; do not replay already successful writes blindly.

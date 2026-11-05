@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "prefix": "PREFIX",
+  "handoff": "PREFIX-HANDOFF.md",
+  "changelog": "PREFIX-CHANGELOG.md",
+  "architecture": "PREFIX-architecture.md",
+  "docs": {
+    "business_requirements": "docs/1. PREFIX-business requirements",
+    "specifications": "docs/2. PREFIX-specifications",
+    "tasks": "docs/3. PREFIX-tasks",
+    "tasks_done": "docs/3. PREFIX-tasks/Done",
+    "guides": "docs/4. PREFIX-guides",
+    "unsorted": "docs/5. PREFIX-unsorted"
+  },
+  "commands": {
+    "push": "/team-skills:safe-push",
+    "spec_writer": "/team-skills:spec-writer"
+  },
+  "shared_paths": []
+}

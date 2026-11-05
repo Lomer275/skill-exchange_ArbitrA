@@ -32,3 +32,8 @@ python cli/skill_exchange.py install example-skill
 ## Автор
 
 team
+
+## Приоритет навыка
+
+Если у проекта или пользователя есть собственный `/example-skill`, он имеет приоритет.
+Этот вариант используется при явном вызове `/team-skills:example-skill` или отсутствии собственного навыка.

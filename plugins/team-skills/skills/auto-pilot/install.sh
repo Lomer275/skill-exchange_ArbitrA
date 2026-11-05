@@ -25,6 +25,10 @@ if [[ ! -d "${REPO_ROOT}/.git" ]]; then
   exit 1
 fi
 
+# Validate project paths before copying scripts or offering external setup.
+python3 "${SKILL_DIR}/scripts/project_profile.py" "${REPO_ROOT}" handoff >/dev/null
+python3 "${SKILL_DIR}/scripts/project_profile.py" "${REPO_ROOT}" docs.unsorted >/dev/null
+
 echo "🚀 Autopilot installer"
 echo "   Source: ${SKILL_DIR}"
 echo "   Target: ${REPO_ROOT}"

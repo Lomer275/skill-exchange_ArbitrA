@@ -2,8 +2,13 @@
   "name": "codereview-dual-loop",
   "display_name": "Code Review (Dual) Loop",
   "author": "kostya",
-  "version": "1.1.1",
-  "description": "Цикл /codereview-dual → /fix до полной чистоты от CRITICAL и HIGH. Принудительный dual (Claude + Codex) на каждой итерации, максимум 5 итераций. При недоступности Codex — graceful fallback на /review-loop.",
-  "tags": ["code-review", "codex", "fix", "automation"],
+  "version": "1.2.0",
+  "description": "Цикл /codereview-dual → /fix до полной чистоты от CRITICAL и HIGH. Принудительный dual (Claude + Codex) на каждой итерации, максимум 5 итераций. При недоступности Codex — graceful fallback на /review-loop. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет.",
+  "tags": [
+    "code-review",
+    "codex",
+    "fix",
+    "automation"
+  ],
   "created": "2026-05-03"
 }

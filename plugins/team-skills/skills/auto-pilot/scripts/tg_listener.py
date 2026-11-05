@@ -2,7 +2,7 @@
 """Autopilot TG control daemon — listens for slash-commands from authorized user.
 
 Architecture:
-    Long-poll Telegram getUpdates → match `/command` from @Lobster_21 → dispatch
+    Long-poll Telegram getUpdates → match `/command` from the allowed user → dispatch
     handler → reply in same chat.
 
 Authorized user: AUTOPILOT_TG_ALLOWED_USERNAME (single human, hard-checked by
@@ -41,12 +41,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from project_profile import profile_path
+
 # -------- Configuration --------
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-HANDOFF_PATH = REPO_ROOT / "SUP-HANDOFF.md"
+try:
+    HANDOFF_PATH = profile_path(REPO_ROOT, "handoff")
+    AUTOPILOT_LOG = profile_path(REPO_ROOT, "docs.unsorted") / "autopilot_log.md"
+except ValueError as exc:
+    sys.stderr.write(f"tg_listener: {exc}\n")
+    sys.exit(3)
 AUTOPILOT_JSON = REPO_ROOT / ".claude" / "autopilot.json"
-AUTOPILOT_LOG = REPO_ROOT / "docs" / "5. SUP-unsorted" / "autopilot_log.md"
 HEARTBEAT_STATE = Path("/tmp/autopilot_heartbeat_state.json")
 RUN_TICK = REPO_ROOT / "scripts" / "autopilot" / "run_tick.sh"
 TG_NOTIFY = REPO_ROOT / "scripts" / "autopilot" / "tg_notify.sh"
@@ -823,8 +829,8 @@ def main() -> int:
             k, v = ln.split("=", 1)
             os.environ.setdefault(k.strip(), v.strip())
 
-    token = os.environ.get("AUTOPILOT_TG_BOT_TOKEN")
-    allowed_username = os.environ.get("AUTOPILOT_TG_ALLOWED_USERNAME") or "Lobster_21"
+    token: str | None = os.environ.get("AUTOPILOT_TG_BOT_TOKEN")
+    allowed_username = os.environ.get("AUTOPILOT_TG_ALLOWED_USERNAME")
     # R2: strong auth — numeric user_id из env, fallback на username.
     allowed_user_id_raw = os.environ.get("AUTOPILOT_TG_ALLOWED_USER_ID")
     allowed_user_id = None

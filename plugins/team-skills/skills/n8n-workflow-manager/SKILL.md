@@ -9,9 +9,14 @@ description: >
   when the user says "сделай воркфлоу", "измени воркфлоу", "добавь ноду",
   "отредактируй", "создай workflow", "поправь n8n", or any similar phrase in Russian
   or English about automations in n8n.
+  If the project or the user has its own `n8n-workflow-manager` skill, that one takes precedence — use this one only when the user typed `/team-skills:n8n-workflow-manager` or no such skill exists.
 ---
 
 # n8n Workflow Manager
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:n8n-workflow-manager` and a skill named `n8n-workflow-manager` exists in the project (`.claude/skills/n8n-workflow-manager/SKILL.md`) or in the user's skills (`~/.claude/skills/n8n-workflow-manager/SKILL.md`), stop: tell the user that their own `/n8n-workflow-manager` takes precedence, and do nothing else.
 
 Skill for reading and modifying n8n workflows at `n8n.arbitra.online`.
 
@@ -148,7 +153,8 @@ n8n:execute_workflow(
 
 ### Bitrix24 HTTP calls
 - Webhook base: `${BITRIX_WEBHOOK}`
-- Batch API: `METHOD: batch` + `PARAMS: {"halt":0,"cmd":{...}}` — up to 50 ops
+- Batch API: up to 50 ops; reads may use `halt: 0`, writes require `halt: 1`.
+  Before any Bitrix write, follow [Writes to Bitrix](references/bitrix-api.md#writes-to-bitrix).
 - Add Retry on Fail (5 retries, 3000ms) on all Bitrix HTTP nodes (DNS flapping)
 
 ### Code node rules

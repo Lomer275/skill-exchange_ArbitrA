@@ -6,7 +6,12 @@ description: >
   "/codex-toggle", "/codex-toggle on", "/codex-toggle off", "/codex-toggle status",
   "выключи codex", "включи codex", "отключи кодекс", "верни classic-режим",
   "статус codex". Part of spec S11, Phase 5.
+  If the project or the user has its own `codex-toggle` skill, that one takes precedence — use this one only when the user typed `/team-skills:codex-toggle` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:codex-toggle` and a skill named `codex-toggle` exists in the project (`.claude/skills/codex-toggle/SKILL.md`) or in the user's skills (`~/.claude/skills/codex-toggle/SKILL.md`), stop: tell the user that their own `/codex-toggle` takes precedence, and do nothing else.
 
 # /codex-toggle — Managing the Codex kill-switch
 

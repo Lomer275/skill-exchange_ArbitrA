@@ -6,150 +6,81 @@ description: >
   skills, prepares the day's commit with a secret scan, and sweeps temporary junk.
   Use when the user says "/close", "заверши сессию", "заверши день", "зафиксируй
   всё", "закрываемся", "конец дня". Paired with /intro, which restores the context
-  next morning. Works in any project: the prefix and the canonical state file are
-  discovered, never assumed (source: кокпит Алексея).
+  next morning.
+  If the project or the user has its own `close` skill, that one takes precedence — use this one only when the user typed `/team-skills:close` or no such skill exists.
 ---
 
-# /close — завершение сессии: контекст → статусы → коммит → уборка
+## Step 0 — precedence check (mandatory)
 
-Цель: после `/close` новую сессию можно начать «с нуля» и мгновенно вернуться в контекст.
-Выполняй фазы по порядку, молча по шагам; в конце — единый краткий отчёт (один экран).
+If the user did not type `/team-skills:close` and a skill named `close` exists in the project (`.claude/skills/close/SKILL.md`) or in the user's skills (`~/.claude/skills/close/SKILL.md`), stop: tell the user that their own `/close` takes precedence, and do nothing else.
 
-**Адаптация под проект.** Скилл не знает заранее, в каком проекте запущен, поэтому
-сначала определяет две вещи и только потом пишет:
+## Project profile (mandatory)
 
-- **Префикс** — короткий код проекта из имён существующих корневых файлов (`<ПРЕФИКС>-HANDOFF.md`,
-  `<ПРЕФИКС>-CHANGELOG.md`) или из того, что объявлено в `CLAUDE.md` / `AGENTS.md`. Не нашёл —
-  **спроси человека**, не придумывай сам.
-- **Канон состояния** — один файл текущего состояния, в порядке: объявленный в `CLAUDE.md`
-  или `AGENTS.md` → `<ПРЕФИКС>-HANDOFF.md` в корне → `docs/<ПРЕФИКС>-HANDOFF.md`. Датированная
-  серия (`handoffs/HANDOFF_<дата>.md`) — **журнал, а не канон**: он ведётся как раньше,
-  а канон дополнительно обновляется. Канона нет — скажи об этом и спроси, куда писать.
+After Step 0 and before any other action, read `.claude/team-skills.json` from the repository root. Require format `version: 1` and these keys: `handoff`, `changelog`, `docs.tasks`, `docs.specifications`, `docs.unsorted`. Read only the keys needed for this invocation. A missing file, unsupported version, or missing/empty required key means stop before reading or changing project documents: name the missing file/key and point to `team-skills:init_dev` and the catalog's `docs/team-skills-profile.md`. Never infer a prefix or substitute project paths.
 
-Ниже `<ПРЕФИКС>` означает код вашего проекта (в SUP это `SUP`, в других проектах — свой).
+In this skill, `{key}` means the value of that profile key; resolve paths relative to the repository root. These are notation, not literal shell variables: substitute and shell-quote the resolved values before executing commands. Paths must stay inside the repository.
 
-Универсальная версия навыка создаёт `docs/handoffs/HANDOFF-<дата>.md` и коммитит автоматически.
-У нас это заменено на:
-- хендофф → **канон состояния** (без дублирования истории; история — в `<ПРЕФИКС>-CHANGELOG.md`);
-- закрытие задачи целиком → существующий **`/accept`** (перенос в `Done/`, CHANGELOG, HANDOFF), `/close` его не дублирует;
-- автокоммит → **предложение коммита**, потому что правило проекта: «коммитить ТОЛЬКО по явной просьбе пользователя».
+Read `commands.push` if present; if the profile or that key is absent, the command defaults to `/team-skills:safe-push`. This command default never bypasses the mandatory document profile or authorizes a commit or push.
 
----
+# /close — end the session: context, statuses, proposed commit, cleanup
 
-## Фаза 0 — Отсечка пустых сессий
+The goal is to resume in a fresh session without losing verified context. Run phases in order and give one concise report at the end. The canonical current state lives at `{handoff}`; history belongs at `{changelog}`. Task closure is handled by `/accept`, not duplicated here.
 
-Произошло ли что-то durable (решения, изменения в системах, артефакты/ID, новые правила, находки)?
+## Phase 0 — Skip empty sessions
 
-- **Нет** (тривиальные вопросы-ответы) → выведи «Фиксировать нечего» + назови незакрытый тред, если есть. Конец.
-- **Да** → собери для себя итог сессии: что сделано (ID/пути) · что решил владелец и почему ·
-  что осталось + следующий шаг · грабли/границы (проверенные факты) · ⚠️ незавершённые рискованные действия.
-  Не выдумывай; чего не делал — так и пиши. Этот итог питает все фазы.
+Did the session produce durable decisions, changes, artifacts, rules, or findings?
+If not, report "Nothing to record" and name any open thread, then stop.
+Otherwise collect what was done (IDs/paths), the owner's decisions and reasons,
+remaining work and next step, verified pitfalls, and unfinished risky actions.
+Do not invent evidence. Use this summary in every phase below.
 
----
+## Phase 1 — Harvest repeated work
 
-## Фаза 1 — Харвест повторов (компаундинг)
+1. Work repeated at least twice is a candidate for a skill or script. List repeated code, routines, and pitfalls.
+2. Check existing project skills and scripts if the project has them. Extend existing mechanisms instead of duplicating them.
+3. Record candidates in the project's documented candidate registry or backlog. If no such location is documented, list candidates in the report and ask where to record them; do not invent a path. Rank by frequency × cost × longevity. Build the top candidate only with the owner's approval.
+4. Register what was built in the project's existing skill registry and mark the candidate as built.
+5. If the project has a skill exchange script such as `scripts/skill_sync.sh`, mention its documented sharing procedure. Do not execute its push operation without explicit approval for the concrete files and action in this chat.
 
-Повторяющаяся работа (руками ≥2 раза) → кандидат в навык/скрипт.
+## Phase 2 — Context and factual task statuses
 
-1. Выпиши повторы сессии: код/флоу, ручные ритуалы, грабли.
-2. Сверься с существующими навыками (`.claude/skills/`) и скриптами (`scripts/`, `scripts/ops/`) —
-   покрытое не строй заново, почти покрытое — расширь.
-3. Кандидатов занеси в накопительный реестр **`docs/backlog/skill_candidates.md`**
-   (создай, если его ещё нет) с рангом = частота × стоимость × долговечность.
-   Топ-1 строй сейчас (с добро владельца), остальное — в очередь.
-4. Построенное **зарегистрируй**: строка в `CLAUDE.md` + пометка «ПОСТРОЕНО» в реестре.
-   Навык, о котором никто не знает, — впустую.
-5. Если навык полезен команде — напомни про `scripts/skill_sync.sh push <skill>`
-   (порядок обмена скиллами — в руководстве `runbook_skill_exchange.md` вашего проекта).
+1. Review session-related open tasks under `{docs.tasks}` and task tables in `{docs.specifications}`:
+   - Progressed: keep 🟡 and update the progress comment.
+   - Completed AND verified by an artifact or actual test output: suggest `/accept T<NN>` for the move to Done and updates to history/current state.
+   - Waiting: state exactly what is missing. Unverified completion stays 🟡 and gets a separate report line.
+2. Update the current-state section of `{handoff}` without appending a history log:
+   - Put a 2–4 line resume prompt in the existing RESUME-PROMPT section, or at the top of the current-state section if none exists. State the work, current point, and next action. `/intro` reads it there.
+   - Include unfinished risks, verified results and paths, remaining work, pitfalls, blockers, and git state (branch and uncommitted changes).
+3. Update only the current project's agent memory, using its established memory location and format. Store 2–5 durable facts not already recoverable from repository files or git. Extend an existing topic instead of duplicating it, and maintain the memory index. Never use another project's memory path.
+4. Record ideas or deferred specs in the project's documented backlog. If no location is documented, include them in the report instead.
 
----
+If the project has parallel session tooling such as `scripts/ops/session.sh`, serialize shared state and memory writes using an atomic `mkdir .close-lock` lock and release it with `rmdir` after writing. For one session, skip the lock.
 
-## Фаза 2 — Контекст + актуализация статусов
+## Phase 3 — Executor effectiveness
 
-1. **Статусы — по факту, не по памяти.** Пройди по открытым задачам `docs/3. <ПРЕФИКС>-tasks/T*.md`
-   и таблицам задач в спеках `docs/2. <ПРЕФИКС>-specifications/S*.md`, которых касалась сессия:
-   - двигалась → отметь прогресс (🟡 остаётся, комментарий обновляется);
-   - завершена **И ПРОВЕРЕНА фактом** (зелёные тесты / артефакт на проде / файл в системе-источнике)
-     → **не закрывай руками — предложи `/accept T<NN>`**, он сделает перенос в `Done/`, CHANGELOG и HANDOFF;
-   - ждёт → отметь чего именно.
-   **Не выдумывай «сделано»** — непроверенное оставь 🟡 и вынеси в отчёт отдельной строкой.
-2. **Канон состояния** (`<ПРЕФИКС>-HANDOFF.md` или объявленный путь) — обнови секцию текущего состояния (не приписывай историю снизу, её дом — CHANGELOG):
-   - строка возобновления (2–4 строки) наверху: «Продолжаем <X>. Мы на: <точка>. Следующий шаг: <что>.» —
-     в секцию RESUME-PROMPT, если канон её ведёт, иначе первой строкой верхней секции текущего состояния
-     (например «## Открытое / активное»); отдельную секцию не заводи. `/intro` читает её оттуда.
-   - ⚠️ незавершённое/рискованное · что сделано (ID/пути) · что осталось · грабли (проверенные факты) ·
-     блокеры/что нужно от владельца · git-состояние (ветка, есть ли незакоммиченное).
-3. **Память агента** — каталог памяти **текущего** проекта: `~/.claude/projects/<кодированный
-   путь проекта>/memory/`, где имя каталога получается из абсолютного пути проекта заменой всего,
-   кроме букв и цифр, на `-`. Не подставляй чужой путь: если каталога нет — создай его для своего.
-   2–5 самых ценных durable-фактов — новые ID, утверждённые решения, изменённые правила,
-   проверенные границы. Один факт = один файл с frontmatter (`name`/`description`/`metadata.type`),
-   строка-указатель в `MEMORY.md`. Дополняй существующий файл, если тема уже есть, — не плоди дубли.
-   **Не сохраняй то, что уже записано в репо/git/CLAUDE.md.**
-4. **Бэклог** `docs/backlog/` — если сессия родила идею или заморозила спеку, положи туда датированной строкой.
+If the project documents executor tiers and delegation rules, follow those rules.
+Record delegated code changes, direct changes with their authorized exceptions,
+and brief mismatches with concrete evidence. Do not impose another project's
+executor hierarchy. Give 1–2 actionable recommendations and record them in the
+project's documented registry/backlog/runbook, or flag the missing destination
+in the report. If no tiers are defined, skip this phase and say so.
 
-> Работаешь в нескольких worktree-сессиях параллельно (`scripts/ops/session.sh`)? Сериализуй записи
-> в общие файлы (канон состояния, `MEMORY.md`) простым локом: атомарный `mkdir .close-lock` → работа → `rmdir`.
-> Одна сессия — пропусти.
+## Phase 4 — Proposed commit, cleanup, report
 
----
-
-## Фаза 3 — Карточка эффективности ярусов AI
-
-В SUP три яруса исполнителей: **Claude** (оркестратор, дорогой), **Codex** (кодер),
-**AI-пайплайн ботов** (`AI_BACKEND`, Claude CLI по подписке). Сними факт за сессию:
-
-1. **Соблюдение режима «Claude думает — Codex программирует»** (главная метрика):
-   - сколько правок исполняемого кода ушло Codex'у через `/impl` / `/fix` / `/sprint-codex`;
-   - сколько Claude сделал сам и **по какому пункту кармана исключений** (Codex недоступен /
-     ≤3 строк / два промаха / диалог по ходу / явное «сам»);
-   - правки без основания = нарушение режима → назови их прямо.
-2. Промахи Codex мимо брифа: что именно не сходилось → это дефект **брифа**, а не воркера.
-   Вывод пиши как правило для будущих брифов.
-3. 1–2 конкретные рекомендации на завтра. **Каждую сразу занеси в её дом**
-   (`docs/backlog/skill_candidates.md` / бэклог / правка runbook'а) — текст отчёта не память,
-   не занесённая рекомендация испаряется.
-
----
-
-## Фаза 4 — Коммит + уборка + отчёт
-
-1. **Секрет-скан изменённых файлов** (обязателен): паттерны `eyJ…` (JWT), `sk-…`, `-----BEGIN`,
-   `bearer …`, `password=…`, `client_secret`, `access_token`. Нашёл секрет → **файл не коммитить**,
-   вынести в отчёт (только ГДЕ лежит, никогда — значение). Проверь, что `.env*`, `.servers`,
-   `tools/skill-exchange/` в `.gitignore`.
-   Новые файлы проверь `git check-ignore -v <файл>`: что скрыто `.gitignore`, в коммит не попадёт.
-   Скрыт вывод (логи, дампы, отчёты) — так и задумано; скрыт исходник — назови это в отчёте, не подкладывай `git add -f` молча.
-2. **Коммит дня — предлагай, не делай.** Правило проекта: коммит только по явной просьбе владельца.
-   Собери сообщение по Conventional Commits из итога Фазы 0 и покажи готовую строку:
-   «Готов коммит: `feat(scope): …` (N файлов). Сказать `/sup-push` или "коммить" — сделаю».
-   Владелец сказал «да» → передай в **`/sup-push`** (он повторит секрет-скан и запушит).
-   **Push сам не инициируй никогда.**
-3. **🧹 Уборка** (идемпотентна — метёт всё накопленное):
-   - **Тир 1, авто-удаление** (регенерируемое/одноразовое):
-     `.playwright-mcp/*` (браузерные снапшоты) · `/tmp/sup-codex/*` старше 7 дней
-     (промпты/выводы Codex-воркеров) · скратчпад сессии `/tmp/claude-*/…/scratchpad` ·
-     `*.pyc`/`__pycache__` вне git · временные `results*.json` от `quality_run.py`.
-     Свежие (< 7 дней) не трогать — там выводы живых фоновых задач. Посчитай освобождённое.
-   - **Тир 2, показать-и-решить**: разовые скриншоты и артефакты тестирования в
-     `docs/5. <ПРЕФИКС>-unsorted/` · файлы с осмысленным именем в корне репо · untracked-каталоги.
-     Списком в отчёт — решает владелец.
-   - **НИКОГДА не трогать:** `.env*`, `.servers`, `bitrix_local/`, `tools/skill-exchange/`,
-     память агента, `docs/` (кроме явного согласия), git-worktree других сессий,
-     `~/.codex/`, `~/.claude/`. Сомнение → показать, не удалять.
-4. **Единый отчёт (один экран):**
-   🧰 харвест (построено / в очереди) · 📌 контекст+статусы (что готово к `/accept` / что требует
-   подтверждения / следующий шаг · «возврат: `/intro`») · ⚡ режим Claude×Codex (N правок Codex /
-   M сам, основания) · 💾 коммит (предложен / сделан по просьбе, хеш) · 🧹 уборка (N файлов / X МБ,
-   что вынесено на решение).
-
----
+1. Scan the changed files for secrets without exposing their values: JWT-like strings, private-key headers, bearer tokens, passwords, client secrets, and access tokens. Report only locations. Do not include secret files in the proposed commit. Check new files with `git check-ignore -v <file>`; report an ignored source file instead of silently forcing it into git.
+2. **Prepare a commit; do not authorize it yourself.** Show the exact file list and proposed Conventional Commit message. Commit, push, merge, PR creation/merge, branch deletion, and worktree deletion each require an explicit human "yes" in this chat for that concrete file list and action. A request to commit does not authorize push. Flags such as `--yes`, cron, configuration/HANDOFF permissions, and plan approval through a notification button do not count.
+   Use `{commands.push}` (default `/team-skills:safe-push`) only after approval for the specific action; pass through its limits. If only commit was approved, require the command to stop after commit; if it cannot, do not invoke it and report the limitation. Ask separately before push.
+   Without a human in chat, stop at **ready to commit** with the file list and proposed message; send a notification only if a channel is configured and authorized.
+3. Cleanup is idempotent, bounded, and based on inspected files:
+   - Regenerable session artifacts may be removed after checking they are disposable and unused: browser snapshots, ignored Python caches, session scratchpads, temporary quality-run results, and `/tmp/sup-codex/` worker artifacts older than seven days. Keep fresh worker results and files owned by live tasks. Report count and reclaimed size.
+   - Show meaningful root files, untracked directories, and testing artifacts under `{docs.unsorted}` for the owner's decision.
+   - Never remove secrets, project memory, source or documentation without explicit approval, other sessions' worktrees, or agent configuration directories. Branch/worktree deletion always needs the separate approval above. When uncertain, list it instead of deleting it.
+4. Report in one screen: harvested candidates/built skills; context and statuses (ready for `/accept`, unverified items, next step, return via `/intro`); executor summary or skipped phase; commit proposal/approved action and actual hash; cleanup counts and items awaiting a decision.
 
 ## Guardrails
 
-- Статусы закрывать ТОЛЬКО по проверенному факту (артефакт, не самоотчёт). Полное закрытие — через `/accept`.
-- Не приукрашивай: не доделано / не проверено — так и пиши.
-- Секреты открытым текстом не выносить никуда (только ГДЕ лежат).
-- **Боевые системы на `/close` не менять** — только фиксировать контекст. Никаких деплоев, миграций, правок прода.
-- Коммит — по просьбе; push — только `/sup-push` по просьбе.
-- Из `/close` не выходит ни одна рекомендация без «дома» (реестр/бэклог) — иначе испарится.
+- Close statuses only against verified facts; complete task closure goes through `/accept`.
+- State unfinished and unverified work plainly.
+- Never expose secret values.
+- Do not change production systems, deploy, or migrate during `/close`.
+- Keep each recommendation in an established home or explicitly report that its destination is unresolved.

@@ -7,40 +7,55 @@ description: >
   automation, batch API calls, or any REST API method. Also trigger for questions about
   Bitrix24 structure, field names, entity types, funnel configuration, workflow templates,
   webhook setup, or integration patterns. This skill contains API references, proven patterns,
-  environment-specific constants, and common pitfalls. Always use this skill when the user
+  environment-specific constants, and common pitfalls. The domain, funnel IDs and entity types
+  are constants for the express-bankrot.ru portal. Use this skill when the user
   mentions "битрикс", "bitrix", "CRM", "смарт-процесс", "бизнес-процесс", "воронка",
   "сделки", "лиды", "Битрикс24", or anything about the express-bankrot portal.
+  If the project or the user has its own `bitrix24-developer` skill, that one takes precedence — use this one only when the user typed `/team-skills:bitrix24-developer` or no such skill exists.
 ---
 
 # Bitrix24 Developer Skill
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:bitrix24-developer` and a skill named `bitrix24-developer` exists in the project (`.claude/skills/bitrix24-developer/SKILL.md`) or in the user's skills (`~/.claude/skills/bitrix24-developer/SKILL.md`), stop: tell the user that their own `/bitrix24-developer` takes precedence, and do nothing else.
+
+## Write policy (mandatory)
+
+1. Reads (`*.get`, `*.list`, `*.fields`, and batches containing only reads) are unrestricted.
+2. Every write, including `crm.*.add/update/delete`, batches containing writes,
+   `bizproc.workflow.start/terminate/kill`, `bizproc.task.complete`,
+   `tasks.task.add/update`, `task.commentitem.add`, `disk.*.upload/delete/rename`,
+   `user.update`, `event.bind/unbind`, and `placement.bind`, must first use the
+   project's sandbox if one exists. Production writes must use the write route
+   declared by the project (for example, its integration pipeline), or wait for
+   the human's explicit “yes” in this conversation to a concrete list of methods,
+   entity IDs, and fields with “before → after” values.
+3. Bulk operations (any batch or a loop over more than one entity) require a
+   read-only dry run listing every affected entity and planned change first.
+   Show the complete list and wait for the human's explicit “yes” before writing.
+   Every write batch must use `halt: 1`.
+4. Deletion and stopping business processes always require an item-by-item list
+   for human confirmation before execution.
 
 ## Environment Constants (express-bankrot.ru)
 
 ```
 Portal:       bitrix.express-bankrot.ru
 Webhook base: ${BITRIX_WEBHOOK}
-
-### Откуда берётся вебхук
-
-Значение живёт **только** в файле у каждого на машине и подставляется переменной окружения —
-в текст скилла его вписывать нельзя ни при каких обстоятельствах: обменник публичный,
-и однажды это уже случилось (вебхук пролежал открытым три недели, историю пришлось переписывать).
-
-```bash
-mkdir -p ~/.secrets && chmod 700 ~/.secrets
-printf 'export BITRIX_WEBHOOK="https://<портал>/rest/<id>/<токен>/"\n' > ~/.secrets/bitrix_webhook.env
-chmod 600 ~/.secrets/bitrix_webhook.env
-grep -q bitrix_webhook.env ~/.bashrc || echo '[ -f ~/.secrets/bitrix_webhook.env ] && . ~/.secrets/bitrix_webhook.env' >> ~/.bashrc
-```
-
-Проверка, что подхватилось: `curl -s "${BITRIX_WEBHOOK}user.current"` отдаёт вашего пользователя.
-При ротации меняется **один этот файл** — больше нигде значения быть не должно.
-
-**Права зависят от того, чей вебхук.** Часть методов доступна только админскому:
-`task.checklistitem.add`, `tasks.task.delete`, управление стадиями. Если метод отвечает
-«действие недоступно» — дело не в синтаксисе, а в том, под кем выписан вебхук.
 n8n bridge:   Workflow ID = fsX-zC0M_SUTbcCUowIxY  ("Bitrix24 Explorer for Claude")
 ```
+
+### Webhook source and storage
+
+`BITRIX_WEBHOOK` is supplied as an environment variable by the project's secret
+store: a password manager or a git-ignored env file filled in an editor, never
+through `echo` or another shell command that records the value in shell history.
+Never print it, commit it, put it in skill files, or paste it into chat.
+
+Permissions depend on the webhook owner. Methods such as `task.checklistitem.add`,
+`tasks.task.delete`, and stage management may require administrator permissions.
+An access-denied response can be a permission issue rather than a syntax issue.
 
 ### Key Funnel IDs (CATEGORY_ID)
 | Funnel | CATEGORY_ID |
@@ -147,7 +162,7 @@ PARAMS: {
 }
 ```
 
-- `halt: 0` — continue even if one request fails
+- `halt: 0` — continue even if one request fails; read-only batches only
 - `halt: 1` — stop on the first error
 - Response: `result.result.{key}` for each request
 - Max 50 operations per batch

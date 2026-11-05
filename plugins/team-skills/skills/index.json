@@ -4,8 +4,8 @@
       "name": "accept",
       "display_name": "Accept Task",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Закрывает задачу: помечает done в файле/спеке/HANDOFF, добавляет в CHANGELOG, переносит в Done/. Адаптируется к префиксу проекта.",
+      "version": "2.0.0",
+      "description": "Закрывает задачу в документации по обязательному профилю .claude/team-skills.json: статусы в задаче, спеке и хендоффе, запись в журнале, перенос в настроенный каталог завершённых задач. Без коммита и push.",
       "tags": [
         "workflow",
         "documentation"
@@ -16,8 +16,8 @@
       "name": "agents-context",
       "display_name": "Agents Context",
       "author": "Костя",
-      "version": "1.0.0",
-      "description": "Раскладывает общий контекст команды по обоим агентам — Claude Code и Codex",
+      "version": "1.1.0",
+      "description": "Раскладывает общий контекст команды по обоим агентам — Claude Code и Codex. Собственный одноимённый навык проекта или пользователя имеет приоритет.",
       "tags": [
         "agents",
         "codex",
@@ -30,8 +30,8 @@
       "name": "auto-pilot",
       "display_name": "Auto-Pilot Orchestrator",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Continuous-mode autopilot для проектов с SUP-конвенциями: cron-headless оркестратор который сам выбирает следующее действие (Rule 1-6), self-heal на budget exhaustion, TG control plane (inline-buttons + slash-commands), git-guard на destructive ops. Включает SKILL.md, 10 helper-скриптов, JSON-schema для config и install.sh для setup.",
+      "version": "2.0.0",
+      "description": "Автопилот для репозиториев с профилем team-skills и установленными скриптами: выбирает одно действие, проверяет результат и оставляет изменения на ревью. TG-уведомления, бюджет и git-guard; без автоматических коммитов, пушей и PR.",
       "tags": [
         "autopilot",
         "orchestration",
@@ -59,7 +59,7 @@
         "system": "Linux/macOS (использует flock, cron, ps -o etime)"
       },
       "security_notes": [
-        "claude --print запускается с --permission-mode bypassPermissions — это explicit user-authorized для cron-headless. Smacking защищён git-guard.sh (denylist destructive ops).",
+        "bypassPermissions нужен для cron; PATH git-guard — единственный технический барьер Git в тике. Ошибки конфига блокируют операции; gh-запись запрещена инструкцией.",
         "Auth по numeric user_id (R2 codereview-dual fix) — username только для логов.",
         ".env.dev должен быть в .gitignore (token + user_id никогда не коммитить)."
       ]
@@ -68,8 +68,8 @@
       "name": "bitrix24-developer",
       "display_name": "Bitrix24 Developer",
       "author": "kostya",
-      "version": "1.0.1",
-      "description": "Generic-набор паттернов работы с Bitrix24 REST API: CRM, smart processes, business processes, disk, batch API, n8n integration.",
+      "version": "1.1.0",
+      "description": "Паттерны Bitrix24 REST API с обязательным порядком согласования записи: песочница, маршрут проекта или явное подтверждение; константы домена, воронок и типов относятся к порталу express-bankrot.ru. Собственный одноимённый навык проекта или пользователя имеет приоритет.",
       "tags": [
         "bitrix24",
         "crm",
@@ -81,8 +81,8 @@
       "name": "close",
       "display_name": "Close — завершение рабочего дня",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Завершает рабочую сессию одной командой: харвест повторов в навыки, фиксация контекста (хендофф + память агента + статусы задач ПО ФАКТУ), карточка эффективности ярусов AI, секрет-скан и подготовка коммита дня, уборка временного мусора. Парный к /intro. Источник — кокпит Алексея, версия адаптирована под конвенции SUP.",
+      "version": "2.0.0",
+      "description": "Завершает сессию: сохраняет проверенный контекст и статусы по профилю .claude/team-skills.json, собирает повторы, готовит коммит и убирает временные файлы. Коммит и push — только с отдельным явным согласием на файлы и действие. Парный к /intro.",
       "tags": [
         "workflow",
         "context",
@@ -94,8 +94,8 @@
       "name": "codereview",
       "display_name": "Code Review",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Многофазный придирчивый код-ревью задачи: критерии приёмки + adversarial + user walkthrough + архитектурный fit. Только анализ, без фиксов.",
+      "version": "1.2.0",
+      "description": "Многофазный придирчивый код-ревью задачи: критерии приёмки + adversarial + user walkthrough + архитектурный fit. Только анализ, без фиксов. Собственный одноимённый навык имеет приоритет.",
       "tags": [
         "code-review",
         "quality"
@@ -106,8 +106,8 @@
       "name": "codereview-dual",
       "display_name": "Code Review (Dual)",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Двойной независимый код-ревью: Claude + Codex параллельно, мерж findings в одну severity-ranked таблицу с метками [both]/[claude]/[codex].",
+      "version": "1.2.0",
+      "description": "Двойной независимый код-ревью: Claude + Codex параллельно, мерж findings в одну severity-ranked таблицу с метками [both]/[claude]/[codex]. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет.",
       "tags": [
         "code-review",
         "codex",
@@ -119,8 +119,8 @@
       "name": "codereview-dual-loop",
       "display_name": "Code Review (Dual) Loop",
       "author": "kostya",
-      "version": "1.1.1",
-      "description": "Цикл /codereview-dual → /fix до полной чистоты от CRITICAL и HIGH. Принудительный dual (Claude + Codex) на каждой итерации, максимум 5 итераций. При недоступности Codex — graceful fallback на /review-loop.",
+      "version": "1.2.0",
+      "description": "Цикл /codereview-dual → /fix до полной чистоты от CRITICAL и HIGH. Принудительный dual (Claude + Codex) на каждой итерации, максимум 5 итераций. При недоступности Codex — graceful fallback на /review-loop. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет.",
       "tags": [
         "code-review",
         "codex",
@@ -133,8 +133,8 @@
       "name": "codex-setup",
       "display_name": "Codex CLI Setup",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Одноразовая установка и проверка Codex CLI для связки Claude × Codex. Создаёт AGENTS.md и .claude/codex.json. Идемпотентен.",
+      "version": "1.1.0",
+      "description": "Одноразовая установка и проверка Codex CLI для связки Claude × Codex. Создаёт AGENTS.md и .claude/codex.json. Идемпотентен. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет.",
       "tags": [
         "codex",
         "bootstrap"
@@ -145,8 +145,8 @@
       "name": "codex-toggle",
       "display_name": "Codex Toggle",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Управление kill-switch'ем связки Claude × Codex. on / off [причина] / status.",
+      "version": "1.1.0",
+      "description": "Управление kill-switch'ем связки Claude × Codex. on / off [причина] / status. Собственный одноимённый навык имеет приоритет.",
       "tags": [
         "codex",
         "config"
@@ -157,8 +157,8 @@
       "name": "codex-worker",
       "display_name": "Codex Worker (internal helper)",
       "author": "kostya",
-      "version": "1.4.0",
-      "description": "Internal helper для запуска Codex-воркера. Вызывается из /impl, /fix, /codereview-dual и /sprint-codex. Принимает файл задачи либо разовый brief_file (путь /impl). Движок выбирается по ЗДОРОВЬЮ, а не по наличию: плагин codex@openai-codex несёт свой движок, который может быть старше глобального CLI и молча возвращать пустой результат — тогда воркер уходит на legacy codex exec (обязательно с < /dev/null, иначе CLI ждёт EOF на stdin и висит до таймаута).",
+      "version": "1.5.0",
+      "description": "Внутренний помощник для запуска Codex-воркера. Вызывается только из навыков team-skills с явными аргументами. Принимает файл задачи либо разовый brief_file (путь /impl). Движок выбирается по ЗДОРОВЬЮ, а не по наличию: плагин codex@openai-codex несёт свой движок, который может быть старше глобального CLI и молча возвращать пустой результат — тогда воркер уходит на legacy codex exec (обязательно с < /dev/null, иначе CLI ждёт EOF на stdin и висит до таймаута). Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium.",
       "tags": [
         "internal",
         "codex",
@@ -170,8 +170,8 @@
       "name": "dashboards",
       "display_name": "Dashboards — принципы и источники данных",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Как строить внутренние дашборды, которым можно верить. Не про то, как написать вьюху: про провенанс чисел, пустые и протухшие состояния, обе темы, доступ до первого рендера и владельца-человека. Плюс каталог источников данных контура — что откуда читается и что откуда НЕ достаётся. Каждый принцип оплачен инцидентом: молчаливо протухшие снапшоты стоили четырёх суток веры в старые числа, а витрина, открытая «просто дали ссылку», простояла публичной год.",
+      "version": "1.1.0",
+      "description": "Принципы надёжных дашбордов: происхождение и свежесть чисел, пустые состояния, темы, доступ и владелец. Источники данных и сетевые ограничения определяются по документации текущего проекта; профиль необязателен.",
       "tags": [
         "dashboards",
         "observability",
@@ -185,8 +185,8 @@
       "name": "env-audit",
       "display_name": "Env Audit",
       "author": "Костя",
-      "version": "3.4.2",
-      "description": "Приёмка рабочего места: коллектор фактов + бриф до 20 КБ + справочники по темам. Одиннадцать регламентов, секреты и 1Password, сеть, расход токенов и связка с Codex, архитектура проектов, знакомство с человеком. Клинап применяется только после показанного диффа и «да», запись HANDOFF и CHANGELOG проверяется по факту в песочнице; в финале — отчёт и инструкция человеку",
+      "version": "3.5.0",
+      "description": "Приёмка рабочего места: коллектор фактов + бриф до 20 КБ + справочники по темам. Одиннадцать регламентов, секреты и 1Password, сеть, расход токенов и связка с Codex, архитектура проектов, знакомство с человеком. Клинап применяется только после показанного диффа и «да», запись HANDOFF и CHANGELOG проверяется по факту в песочнице; в финале — отчёт и инструкция человеку. Собственный одноимённый навык проекта или пользователя имеет приоритет.",
       "tags": [
         "audit",
         "onboarding",
@@ -202,8 +202,8 @@
       "name": "example-skill",
       "display_name": "Example Skill",
       "author": "team",
-      "version": "1.0.0",
-      "description": "Демонстрационный скилл — шаблон для создания своих",
+      "version": "1.1.0",
+      "description": "Демонстрационный скилл — шаблон для создания своих. Собственный одноимённый навык проекта или пользователя имеет приоритет.",
       "tags": [
         "example",
         "template"
@@ -214,8 +214,8 @@
       "name": "fix",
       "display_name": "Fix Bugs",
       "author": "kostya",
-      "version": "1.2.0",
-      "description": "Планирование и применение фиксов по findings из ревью или визуальной проверки. План строит Claude и ждёт подтверждения; правки исполняемого кода делегируются Codex-воркеру, дифф Claude сверяет с планом. CRITICAL → HIGH → MEDIUM, минимальные точечные изменения.",
+      "version": "1.3.0",
+      "description": "Планирование и применение фиксов по findings из ревью или визуальной проверки. План строит Claude и ждёт подтверждения; правки исполняемого кода делегируются Codex-воркеру, дифф Claude сверяет с планом. CRITICAL → HIGH → MEDIUM, минимальные точечные изменения. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет.",
       "tags": [
         "code-review",
         "fix",
@@ -227,8 +227,8 @@
       "name": "impl",
       "display_name": "Impl — Claude решает, Codex реализует",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Точка входа режима «Claude думает — Codex программирует». Делегирует написание кода Codex-имплементеру для ЛЮБОЙ правки, файл задачи не нужен: Claude находит код и пишет бриф, Codex реализует, Claude читает дифф и гоняет тесты. Без него делегирование существует только внутри /sprint-codex и /codereview-dual.",
+      "version": "2.0.0",
+      "description": "Точка входа режима «Claude думает — Codex программирует». Делегирует написание кода Codex-имплементеру для правки по запросу, файл задачи не нужен: Claude находит код и пишет бриф, Codex реализует, Claude читает дифф и гоняет тесты. Без него делегирование существует только внутри /sprint-codex и /codereview-dual. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет. Требует enabled=true в .claude/codex.json; иначе останавливается.",
       "tags": [
         "codex",
         "workflow",
@@ -241,8 +241,8 @@
       "name": "init_dev",
       "display_name": "Init Project Docs",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Создаёт базовую структуру документации проекта: docs/, гайды, architecture.md, HANDOFF.md, CHANGELOG.md, CLAUDE.md.",
+      "version": "1.1.0",
+      "description": "Создаёт структуру документации, architecture, HANDOFF, CHANGELOG, CLAUDE.md и профиль .claude/team-skills.json по выбранному префиксу. Копирует гайды только при наличии источника.",
       "tags": [
         "bootstrap",
         "documentation",
@@ -254,8 +254,8 @@
       "name": "intro",
       "display_name": "Intro — возврат в контекст",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Загружает контекст проекта в начале сессии — парный к /close. Читает хендофф (RESUME-PROMPT), открытые задачи и состояние git, выводит: где остановились, следующий шаг, открытые блокеры. Ловит расхождение хендоффа с репо и говорит о нём прямо. Ничего не меняет — только читает.",
+      "version": "2.0.0",
+      "description": "Загружает контекст по обязательному профилю .claude/team-skills.json: хендофф, журнал, открытые задачи и состояние git. Показывает следующий шаг, блокеры и расхождения. Только чтение; парный к /close.",
       "tags": [
         "workflow",
         "context"
@@ -266,8 +266,8 @@
       "name": "n8n-workflow-manager",
       "display_name": "n8n Workflow Manager",
       "author": "kostya",
-      "version": "1.0.0",
-      "description": "Управление n8n workflows: search, inspect, create, edit, активация, выполнение. Шаблоны нод, паттерны интеграций.",
+      "version": "1.1.0",
+      "description": "Управление n8n workflows: поиск, чтение, создание, правка, активация и выполнение; для записи в Bitrix — песочница, маршрут проекта или явное подтверждение. Собственный одноимённый навык проекта или пользователя имеет приоритет.",
       "tags": [
         "n8n",
         "automation",
@@ -279,8 +279,8 @@
       "name": "review-loop",
       "display_name": "Review Loop",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Цикл codereview → fix до полной чистоты от CRITICAL и HIGH. Максимум 5 итераций; досрочный стоп, когда фиксы ходят по кругу.",
+      "version": "1.2.0",
+      "description": "Цикл codereview → fix до полной чистоты от CRITICAL и HIGH. Максимум 5 итераций; досрочный стоп, когда фиксы ходят по кругу. Собственный одноимённый навык имеет приоритет.",
       "tags": [
         "code-review",
         "fix",
@@ -292,8 +292,8 @@
       "name": "safe-push",
       "display_name": "Safe Commit & Push",
       "author": "kostya",
-      "version": "1.2.0",
-      "description": "Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits. Не делает force push без явной просьбы и не коммитит в ветку деплоя (обычно main).",
+      "version": "2.0.0",
+      "description": "Безопасный commit + push с блокирующей проверкой секретов и форматом Conventional Commits. Не делает force push без явной просьбы и не коммитит в ветку деплоя (обычно main). Собственный одноимённый навык имеет приоритет. Commit и push требуют подтверждения конкретных файлов и действий; просьба только о commit не разрешает push.",
       "tags": [
         "git",
         "safety"
@@ -304,8 +304,8 @@
       "name": "spec-brainstorm",
       "display_name": "Spec Brainstorm",
       "author": "kostya",
-      "version": "1.0.1",
-      "description": "Интерактивное со-создание новой спецификации проекта в режиме «вопрос-ответ». Проводит через структурированную разведку (проблема → цель → фазы → архитектура → DoD), затем делегирует финальную запись файла в /spec-writer. Принципиально интерактивный — задаёт вопросы по одному через AskUserQuestion, не пишет файл пока человек не финализировал.",
+      "version": "2.0.0",
+      "description": "Помогает сформулировать новую спецификацию через вопросы: проблема, цель, архитектура, риски и DoD. Требует профиль .claude/team-skills.json; финальную запись делегирует команде commands.spec_writer после подтверждения черновика человеком.",
       "tags": [
         "spec",
         "brainstorm",
@@ -319,8 +319,8 @@
       "name": "spec-writer",
       "display_name": "Spec Writer",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Создаёт документы проекта: спецификации (S), задачи (T), бизнес-требования (BR). Один вызов = один файл, только скелет.",
+      "version": "2.0.0",
+      "description": "Создаёт спецификации (S), задачи (T) и бизнес-требования (BR) по обязательному профилю .claude/team-skills.json и гайдам проекта. Один вызов — один файл, только скелет.",
       "tags": [
         "documentation",
         "spec",
@@ -332,8 +332,8 @@
       "name": "sprint",
       "display_name": "Sprint",
       "author": "kostya",
-      "version": "1.3.0",
-      "description": "Автономно выполняет все задачи спецификации: имплементация → тесты → review-loop → accept → push. Поддерживает --dry-run и --yes (headless mode для cron-автопилота с check_authz из HANDOFF YAML, TG-ask retry-loop).",
+      "version": "2.0.0",
+      "description": "Выполняет задачи спецификации волнами: реализация, тесты и review-loop. Требует профиль team-skills; --yes готовит изменения до ready to commit, коммит и пуш только по явному согласию в чате.",
       "tags": [
         "workflow",
         "automation",
@@ -345,8 +345,8 @@
       "name": "sprint-codex",
       "display_name": "Sprint (Codex)",
       "author": "kostya",
-      "version": "1.1.0",
-      "description": "Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач.",
+      "version": "2.0.0",
+      "description": "Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет. Требует профиль проекта; коммиты, merge и очистка волны — только после подтверждения человека.",
       "tags": [
         "workflow",
         "codex",
@@ -358,7 +358,7 @@
       "name": "visualcheck",
       "display_name": "Visual UI Check",
       "author": "kostya",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Визуальная проверка UI по скриншотам или коду: баги вёрстки, UX-проблемы, несоответствия дизайну. Анализ desktop+mobile.",
       "tags": [
         "ui",

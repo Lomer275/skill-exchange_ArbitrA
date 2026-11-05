@@ -1,5 +1,23 @@
 # Bitrix24 API Reference — Express-Bankrot
 
+## Writes to Bitrix
+
+1. Reads (`*.get`, `*.list`, `*.fields`, and batches containing only reads) are unrestricted.
+2. Every write, including `crm.*.add/update/delete`, batches containing writes,
+   `bizproc.workflow.start/terminate/kill`, `bizproc.task.complete`,
+   `tasks.task.add/update`, `task.commentitem.add`, `disk.*.upload/delete/rename`,
+   `user.update`, `event.bind/unbind`, and `placement.bind`, must first use the
+   project's sandbox if one exists. Production writes must use the write route
+   declared by the project (for example, its integration pipeline), or wait for
+   the human's explicit “yes” in this conversation to a concrete list of methods,
+   entity IDs, and fields with “before → after” values.
+3. Bulk operations (any batch or a loop over more than one entity) require a
+   read-only dry run listing every affected entity and planned change first.
+   Show the complete list and wait for the human's explicit “yes” before writing.
+   Every write batch must use `halt: 1`.
+4. Deletion and stopping business processes always require an item-by-item list
+   for human confirmation before execution.
+
 ## Base parameters
 
 - **Portal**: `bitrix.express-bankrot.ru`

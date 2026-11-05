@@ -1,7 +1,11 @@
 ---
 name: dashboards
-description: Principles and data sources for building internal dashboards. Use when the user asks to create a new dashboard, add a page showing metrics or system state, says "сделай дашборд", "нужна страница с метриками", "покажи статистику на странице", "добавь дашборд", "/dashboards" — or when reviewing an existing dashboard for the usual failure modes (stale data shown as fresh, empty states rendered as bugs, access decided after launch).
+description: Principles and data sources for building internal dashboards. Use when the user asks to create a new dashboard, add a page showing metrics or system state, says "сделай дашборд", "нужна страница с метриками", "покажи статистику на странице", "добавь дашборд", "/dashboards" — or when reviewing an existing dashboard for the usual failure modes (stale data shown as fresh, empty states rendered as bugs, access decided after launch). If the project or the user has its own `dashboards` skill, that one takes precedence — use this one only when the user typed `/team-skills:dashboards` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:dashboards` and a skill named `dashboards` exists in the project (`.claude/skills/dashboards/SKILL.md`) or in the user's skills (`~/.claude/skills/dashboards/SKILL.md`), stop: tell the user that their own `/dashboards` takes precedence, and do nothing else.
 
 # Building an internal dashboard
 
@@ -101,16 +105,20 @@ itself" is a description; "bot effectiveness dashboard" is the title again.
 
 Pick the source before designing the page — it decides where the page can live.
 
-| Source | Holds | Read via | Watch out for |
-|---|---|---|---|
-| Production Postgres | users, action logs, metric snapshots, observability events | Django ORM; from outside prod, a dedicated read-only role over the private mesh network | Never grant a whole schema. Name the tables. If a page needs one flag off a table with personal data, expose a two-column view instead of the table. |
-| Dev Postgres | dev contour's own data | Django ORM | **Not a replica of production.** It drifts by weeks. Rendering a dev snapshot as current numbers is the failure mode rule one exists to prevent. |
-| Supabase (support project) | chat history, court documents | HTTP + key | Reachable from anywhere with the key, so a page reading only this can live anywhere. Read synchronously from WSGI — async clients in a sync view produce "Event loop is closed". |
-| Supabase (electronic case project) | case files, documents | HTTP + key | Separate project, separate key from the one above. |
-| CRM REST API | deals, tasks, operator chats | the repo's own client | **Not reachable directly from the dev host** — the uplink filters it, and calls must go through a relay. Check reachability before designing a page around it. |
-| Redis | counters, dedup keys, registries | direct | Not durable. Depending on deployment it may have no volume at all, so never treat it as the only home of anything you must show later. |
-| Collected node snapshots | hardware and service state | scheduled collector writing to the DB | The collector is a separate moving part. If it stops, the page keeps rendering the last snapshot — which is precisely why the staleness stamp is mandatory. |
-| Pushed snapshots | server health | endpoint receiving from a cron reporter | The reporter can go quiet without any error on your side. Absence of a push is information: show it. |
+Get data sources, access methods, topology, and network restrictions from the
+**current project's documentation**. Do not assume any environment's database,
+CRM relay, private mesh, hosts, or credentials apply to another project.
+Verify reachability from the intended runtime using the project's authorized
+read-only diagnostics. Record the source owner, freshness, permissions, and
+persistence guarantees before choosing the page's location.
+
+This skill does not require a profile. If `.claude/team-skills.json` exists,
+read its `architecture` and `docs.guides` keys only when looking for those project
+documents. If the profile or a relevant key is absent, skip that document lookup
+and state the skipped step in the report; never substitute a project-specific
+path. Use documentation supplied by the user or already identified by the
+project's instructions. If source or network constraints remain unknown, flag
+them and ask the project owner before making dependent architectural choices.
 
 Two questions that decide the architecture:
 

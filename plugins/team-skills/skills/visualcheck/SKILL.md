@@ -8,7 +8,12 @@ description: >
   "что не так с вёрсткой", "проверь дизайн", "visual check", or uploads screenshots
   for review. The skill analyzes desktop and mobile states, checks for common
   UI bugs, and records the results with a severity.
+  If the project or the user has its own `visualcheck` skill, that one takes precedence — use this one only when the user typed `/team-skills:visualcheck` or no such skill exists.
 ---
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:visualcheck` and a skill named `visualcheck` exists in the project (`.claude/skills/visualcheck/SKILL.md`) or in the user's skills (`~/.claude/skills/visualcheck/SKILL.md`), stop: tell the user that their own `/visualcheck` takes precedence, and do nothing else.
 
 # Visual Check Skill
 
@@ -36,6 +41,7 @@ If nothing is provided — ask for screenshots or component code.
 1. Determine **what we are checking**: task, component, page
 2. Determine **what is available**: screenshots, code, or both
 3. If there is a task file — read the description and the affected components
+4. For a task number without an explicit file, use `docs.tasks` from `.claude/team-skills.json` if present. The profile is optional: if it or that key is absent, skip automatic task lookup and report the skipped step. Continue with supplied screenshots/code; never guess a project task path.
 
 ---
 
@@ -108,23 +114,23 @@ If there is component code but no screenshots — analyze statically:
 
 Mentally (or from the screenshots) check:
 
-| Состояние | Что смотреть |
+| State | What to check |
 |-----------|-------------|
-| **Empty** | Есть ли empty state? Не ломается ли layout при 0 элементах? |
-| **Loading** | Есть ли skeleton/spinner? Layout не прыгает после загрузки? |
-| **Error** | Отображается ли ошибка? Не белый экран? |
-| **Long content** | Длинный текст, много элементов в списке — не ломает layout? |
-| **Short content** | 1 символ в поле — выглядит нормально? |
+| **Empty** | Is there an empty state? Does the layout hold with zero items? |
+| **Loading** | Is there a skeleton/spinner? Does loading avoid layout shifts? |
+| **Error** | Is the error shown instead of a blank page? |
+| **Long content** | Does the layout hold with long text or many list items? |
+| **Short content** | Does a single character in a field look correct? |
 
 ---
 
 ## Classification
 
-| Severity | Когда |
+| Severity | When |
 |----------|-------|
-| **UI/HIGH** | Сломан layout, контент недоступен, кнопки нельзя нажать, горизонтальный скролл |
-| **UI/MEDIUM** | Плохой UX, текст обрезан, отсутствует empty/error state, мелкие tap targets |
-| **UI/LOW** | Пиксельные несоответствия, мелкие отступы, нейминг классов |
+| **UI/HIGH** | Broken layout, inaccessible content, unusable buttons, horizontal scrolling |
+| **UI/MEDIUM** | Poor UX, clipped text, missing empty/error states, small tap targets |
+| **UI/LOW** | Pixel inconsistencies, minor spacing issues, class naming |
 
 ---
 

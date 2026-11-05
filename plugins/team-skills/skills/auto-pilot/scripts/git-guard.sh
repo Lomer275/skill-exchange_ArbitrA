@@ -1,71 +1,93 @@
 #!/usr/bin/env bash
-# Wrapper-shim around `git` для технического enforcement destructive_git_ops_forbidden.
-#
-# Контекст (R1, R18 из codereview-dual): SKILL.md содержит список запретов
-# (push --force, reset --hard, branch -D, ...), но при `claude --print
-# --permission-mode bypassPermissions` это только текстовые инструкции. Если
-# модель ошибётся / промпт скомпрометирован — никакой технический контроль не
-# мешает destructive git операции.
-#
-# Эта обёртка читает .claude/autopilot.json:destructive_git_ops_forbidden и
-# отказывает в выполнении подходящих под паттерн команд. Сама команда
-# делегируется в реальный git (по дефолту /usr/bin/git).
-#
-# Использование (в run_tick.sh):
-#   export PATH="${REPO_ROOT}/scripts/autopilot/path-overrides:${PATH}"
-# где path-overrides/git → symlink на git-guard.sh.
-#
-# Или напрямую: vim ~/.bashrc → alias git=/path/to/git-guard.sh
-#
-# Этот shim сам ловит первый позиционный arg (subcommand) + ищет matching
-# substring из forbidden list по всей argv. Сравнение string-contains (не regex),
-# как в JSON.
-
+# PATH shim for autopilot ticks; config errors must never disable the guard.
 set -euo pipefail
-
-# Resolve real path (если вызвано через symlink из path-overrides/git → guard).
-# readlink -f следует все symlink'и до physical файла.
 REAL_SELF="$(readlink -f "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "${REAL_SELF}")/../.." && pwd)"
 AUTOPILOT_JSON="${REPO_ROOT}/.claude/autopilot.json"
 REAL_GIT="${GIT_GUARD_REAL_GIT:-/usr/bin/git}"
 
-# Если real git не существует — пробуем через PATH (исключая текущую папку).
-if [[ ! -x "${REAL_GIT}" ]]; then
-  REAL_GIT="$(PATH="${PATH#${REPO_ROOT}/scripts/autopilot/path-overrides:}" command -v git 2>/dev/null || echo "")"
-fi
-if [[ -z "${REAL_GIT}" ]] || [[ ! -x "${REAL_GIT}" ]]; then
-  echo "git-guard: real git binary not found (set GIT_GUARD_REAL_GIT)" >&2
-  exit 127
-fi
-
-# Собираем argv в одну строку для substring-match
-ARGV_STRING="$*"
-
-# Читаем denylist из autopilot.json (Python для атомарного JSON parse).
-DENYLIST="$(AUTOPILOT_JSON="${AUTOPILOT_JSON}" python3 -c '
+AUTOPILOT_JSON="${AUTOPILOT_JSON}" python3 - "$@" <<'GUARD'
 import json, os, sys
 try:
-    d = json.load(open(os.environ["AUTOPILOT_JSON"]))
-    for item in d.get("destructive_git_ops_forbidden", []):
-        print(item)
-except Exception as e:
-    sys.stderr.write(f"git-guard: cant read denylist: {e}\n")
-    sys.exit(0)  # fail-open — не блокируем git если конфиг битый
-' 2>/dev/null)" || DENYLIST=""
+    with open(os.environ["AUTOPILOT_JSON"], encoding="utf-8") as source:
+        config = json.load(source)
+    patterns = config["destructive_git_ops_forbidden"]
+    if not isinstance(patterns, list) or any(not isinstance(p, str) or not p for p in patterns):
+        raise ValueError("destructive_git_ops_forbidden must be a list of nonempty strings")
+except (OSError, ValueError, KeyError, TypeError) as exc:
+    sys.stderr.write(f"git-guard: cannot read config; refusing git ({exc})\n")
+    sys.exit(100)
 
-if [[ -n "${DENYLIST}" ]]; then
-  while IFS= read -r pattern; do
-    [[ -z "${pattern}" ]] && continue
-    # substring match (не regex) — точно как в JSON
-    if [[ "${ARGV_STRING}" == *"${pattern}"* ]]; then
-      echo "❌ git-guard: команда '${ARGV_STRING}' содержит forbidden pattern '${pattern}'" >&2
-      echo "   denylist живёт в .claude/autopilot.json:destructive_git_ops_forbidden" >&2
-      echo "   Если действительно нужно — отредактируй autopilot.json или используй GIT_GUARD_REAL_GIT=/usr/bin/git напрямую." >&2
-      exit 100
-    fi
-  done <<< "${DENYLIST}"
-fi
+args = sys.argv[1:]
+if os.environ.get("AUTOPILOT_TICK") == "1":
+    # Only read commands and fetch are needed by a tick. Unknown aliases and
+    # configuration injection must not turn an apparently safe command into a write.
+    remaining = list(args)
+    while remaining:
+        option = remaining[0]
+        if option in ("-C", "--git-dir", "--work-tree"):
+            if len(remaining) < 2:
+                break
+            remaining = remaining[2:]
+        elif option.startswith(("--git-dir=", "--work-tree=")) or option in ("--no-pager", "--paginate", "--no-optional-locks"):
+            remaining = remaining[1:]
+        else:
+            break
+    allowed = {
+        "status", "diff", "log", "show", "rev-parse", "ls-files",
+        "rev-list", "merge-base", "blame", "cat-file", "describe",
+        "for-each-ref", "ls-tree", "shortlog", "grep", "name-rev",
+        "show-ref", "ls-remote",
+    }
+    command = remaining[0] if remaining else None
+    operands = remaining[1:]
+    permitted = command in allowed
+    if command == "branch":
+        permitted = True
+        index = 0
+        while index < len(operands):
+            option = operands[index]
+            if option in ("--show-current", "--list", "-a", "-r", "-v", "-vv"):
+                index += 1
+            elif option in ("--contains", "--merged", "--no-merged"):
+                index += 1
+                if index < len(operands) and not operands[index].startswith("-"):
+                    index += 1
+            elif any(option.startswith(name + "=") and option[len(name) + 1:]
+                     for name in ("--contains", "--merged", "--no-merged")):
+                index += 1
+            else:
+                permitted = False
+                break
+    elif command == "worktree":
+        permitted = operands == ["list"]
+    elif command == "remote":
+        permitted = not operands or operands == ["-v"]
+        if operands and operands[0] in ("show", "get-url"):
+            options = {"-n"} if operands[0] == "show" else {"--push", "--all"}
+            permitted = all(not arg.startswith("-") or arg in options
+                            for arg in operands[1:])
+    elif command == "config":
+        permitted = bool(operands) and operands[0] in (
+            "--get", "--get-all", "--get-regexp", "--list", "-l")
+        if permitted:
+            if operands[0] in ("--list", "-l"):
+                permitted = len(operands) == 1
+            else:
+                permitted = (2 <= len(operands) <= 3
+                             and all(not arg.startswith("-") for arg in operands[1:]))
+    elif command == "fetch":
+        permitted = not any(
+            arg.startswith("--upload-pack")
+            or (arg.startswith("-") and not arg.startswith("--") and "u" in arg[1:])
+            for arg in operands)
+    if not permitted:
+        sys.stderr.write("git-guard: operation refused during autopilot tick; human review/approval required\n")
+        sys.exit(100)
+    sys.exit(0)
 
-# Пропускаем дальше в реальный git
+if any(pattern in " ".join(args) for pattern in patterns):
+    sys.stderr.write("git-guard: operation matches destructive_git_ops_forbidden\n")
+    sys.exit(100)
+GUARD
 exec "${REAL_GIT}" "$@"

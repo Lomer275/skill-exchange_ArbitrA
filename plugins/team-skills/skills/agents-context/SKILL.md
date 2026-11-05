@@ -1,9 +1,13 @@
 ---
 name: agents-context
-description: Sets up shared context for both AI agents (Claude Code and Codex) in a project — team policy in the global slots, a project AGENTS.md, and a filled-in project description. Use when the user says "/agents-context", "настрой контекст агентов", "обогати контекст", "подключи проект к общим правилам", "у codex нет контекста", "настрой agents.md", "поставь общие правила", or when opening a project whose AGENTS.md is missing or still holds the unfilled template.
+description: Sets up shared context for both AI agents (Claude Code and Codex) in a project — team policy in the global slots, a project AGENTS.md, and a filled-in project description. Use when the user says "/agents-context", "настрой контекст агентов", "обогати контекст", "подключи проект к общим правилам", "у codex нет контекста", "настрой agents.md", "поставь общие правила", or when opening a project whose AGENTS.md is missing or still holds the unfilled template. If the project or the user has its own `agents-context` skill, that one takes precedence — use this one only when the user typed `/team-skills:agents-context` or no such skill exists.
 ---
 
 # /agents-context — both agents learn the same rules
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:agents-context` and a skill named `agents-context` exists in the project (`.claude/skills/agents-context/SKILL.md`) or in the user's skills (`~/.claude/skills/agents-context/SKILL.md`), stop: tell the user that their own `/agents-context` takes precedence, and do nothing else.
 
 A thin wrapper. **The script does the mechanics; you do the one thing it cannot** —
 look at the repository and describe it.
@@ -19,7 +23,7 @@ they are moving over to Codex. A setup path that needs a model fails exactly the
 So the mechanics are deterministic and free:
 
 ```bash
-scripts/ops/agents-context/agents-context.sh apply --project .
+<skill-dir>/agents-context.sh apply --project .
 ```
 
 That command alone gives working context. Everything below only adds the project

@@ -2,8 +2,8 @@
   "name": "accept",
   "display_name": "Accept Task",
   "author": "kostya",
-  "version": "1.1.0",
-  "description": "Закрывает задачу: помечает done в файле/спеке/HANDOFF, добавляет в CHANGELOG, переносит в Done/. Адаптируется к префиксу проекта.",
+  "version": "2.0.0",
+  "description": "Закрывает задачу в документации по обязательному профилю .claude/team-skills.json: статусы в задаче, спеке и хендоффе, запись в журнале, перенос в настроенный каталог завершённых задач. Без коммита и push.",
   "tags": [
     "workflow",
     "documentation"

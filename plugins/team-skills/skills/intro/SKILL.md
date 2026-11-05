@@ -6,46 +6,40 @@ description: >
   then reports where we stopped, the next step and the open blockers. Use when the user
   says "/intro", "продолжаем", "что у нас", "с чего начинаем", "загрузи контекст",
   "что вчера делали".
+  If the project or the user has its own `intro` skill, that one takes precedence — use this one only when the user typed `/team-skills:intro` or no such skill exists.
 ---
 
-# /intro — возврат в контекст
+## Step 0 — precedence check (mandatory)
 
-Парный к `/close`. Читай молча, выводи один экран.
+If the user did not type `/team-skills:intro` and a skill named `intro` exists in the project (`.claude/skills/intro/SKILL.md`) or in the user's skills (`~/.claude/skills/intro/SKILL.md`), stop: tell the user that their own `/intro` takes precedence, and do nothing else.
 
-## Что прочитать (в этом порядке)
+## Project profile (mandatory)
 
-**Адаптация под проект.** Скилл не знает заранее, в каком проекте запущен. Сначала определи:
+After Step 0 and before any other action, read `.claude/team-skills.json` from the repository root. Require format `version: 1` and these keys: `handoff`, `changelog`, `docs.tasks`. Read only the keys needed for this invocation. A missing file, unsupported version, or missing/empty required key means stop before reading or changing project documents: name the missing file/key and point to `team-skills:init_dev` and the catalog's `docs/team-skills-profile.md`. Never infer a prefix or substitute project paths.
 
-- **Префикс** — из имён корневых файлов (`<ПРЕФИКС>-HANDOFF.md`, `<ПРЕФИКС>-CHANGELOG.md`)
-  или из объявленного в `CLAUDE.md` / `AGENTS.md`. Не нашёл — **спроси человека**.
-- **Канон состояния** — один файл текущего состояния: объявленный в `CLAUDE.md`/`AGENTS.md`
-  → `<ПРЕФИКС>-HANDOFF.md` в корне → `docs/<ПРЕФИКС>-HANDOFF.md`. Датированная серия
-  `handoffs/HANDOFF_<дата>.md` — журнал, а не канон.
+In this skill, `{key}` means the value of that profile key; resolve paths relative to the repository root. These are notation, not literal shell variables: substitute and shell-quote the resolved values before executing commands. Paths must stay inside the repository.
 
-1. **Канон состояния** (`<ПРЕФИКС>-HANDOFF.md` или объявленный путь) — строка «Продолжаем…» наверху:
-   секция RESUME-PROMPT, если канон её ведёт, иначе первая строка верхней секции текущего состояния
-   (например «## Открытое / активное»; так её оставляет `/close`), ⚠️ незавершённое, блокеры, git-состояние.
-2. **`<ПРЕФИКС>-CHANGELOG.md`**, секция «Не выпущено» — что закрыто, но ещё не в релизе.
-3. **Открытые задачи** `docs/3. <ПРЕФИКС>-tasks/T*.md` — какие 🟡 и по каким спекам.
-4. **Git**: `git status --short` + `git log --oneline -5` + текущая ветка.
-   Расхождение с хендоффом (незакоммиченное, о котором он молчит; ветка не та) — сигнал, назови его.
-5. **`docs/backlog/skill_candidates.md`** — если есть очередь построенных/непостроенных навыков.
+# /intro — restore session context
 
-## Что вывести
+The read-only opener paired with `/close`. Read silently and report one screen.
 
-```
-**Где остановились:** <1–2 строки из строки «Продолжаем…»>
-**Следующий шаг:** <конкретное действие>
-**Открытые блокеры:** <что ждёт владельца / внешнюю систему; «нет» — тоже ответ>
-**Состояние репо:** ветка <name>, <N> незакоммиченных файлов<, расхождение с хендоффом: …>
+## Read in order
 
-Готов к работе.
-```
+1. `{handoff}`: read the resume prompt in RESUME-PROMPT, or the first lines of the current-state section where `/close` left it. Include unfinished risks, blockers, and recorded git state.
+2. `{changelog}`: read the unreleased section for completed work not yet released.
+3. `{docs.tasks}`: find open 🟡 tasks and their linked specifications.
+4. Git: run `git status --short`, `git log --oneline -5`, and determine the current branch. Report discrepancies with the handoff, including unrecorded changes or a different branch.
+5. If the project documents a skill-candidate registry, read it if present. Do not invent its location.
 
-## Правила
+## Output
 
-- **Ничего не менять.** `/intro` — чтение. Ни правок, ни коммитов, ни деплоев.
-- Хендофф протух (последняя правка сильно раньше последнего коммита) → скажи прямо:
-  «Хендофф отстаёт от репо на N коммитов — что в нём написано, могло устареть».
-- Хендоффа нет или он пуст → восстанови картину из `git log` + открытых задач и скажи, что делаешь это по косвенным данным.
-- Не пересказывай весь `CLAUDE.md` — он и так в контексте.
+Report: where we stopped (1–2 lines from the resume prompt), the concrete next
+step, open blockers (or none), and repository state (branch, uncommitted file
+count, and any discrepancy). Finish with "Ready to work."
+
+## Rules
+
+- Change nothing: no edits, commits, or deploys.
+- If the handoff predates recent commits, report how far it lags and that its content may be stale.
+- If the configured handoff file is absent or empty, reconstruct context from git history and configured open tasks and label it indirect evidence. This does not permit proceeding without the required profile key.
+- Do not retell the entire project instructions.

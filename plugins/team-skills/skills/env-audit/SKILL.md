@@ -1,9 +1,13 @@
 ---
 name: env-audit
-description: Audits and repairs a person's working setup: a collector gathers the facts (rules and memory, skills, secrets and 1Password, network reach, token spend, documentation, project architecture), the agent interprets them, allowed repairs are applied only after an explicit yes, and a sandbox run proves that closing the day writes where the skills claim. Use when the user says "/env-audit", "проведи аудит окружения", "проверь моё окружение", "прими рабочее место", "почему агент выдумывает", "агент не помнит", "audit my setup", or hands over the audit brief to run.
+description: Audits and repairs a person's working setup: a collector gathers the facts (rules and memory, skills, secrets and 1Password, network reach, token spend, documentation, project architecture), the agent interprets them, allowed repairs are applied only after an explicit yes, and a sandbox run proves that closing the day writes where the skills claim. Use when the user says "/env-audit", "проведи аудит окружения", "проверь моё окружение", "прими рабочее место", "почему агент выдумывает", "агент не помнит", "audit my setup", or hands over the audit brief to run. If the project or the user has its own `env-audit` skill, that one takes precedence — use this one only when the user typed `/team-skills:env-audit` or no such skill exists.
 ---
 
 # /env-audit — accept a working setup: measure, then fix what is allowed
+
+## Step 0 — precedence check (mandatory)
+
+If the user did not type `/team-skills:env-audit` and a skill named `env-audit` exists in the project (`.claude/skills/env-audit/SKILL.md`) or in the user's skills (`~/.claude/skills/env-audit/SKILL.md`), stop: tell the user that their own `/env-audit` takes precedence, and do nothing else.
 
 Read **`audit-brief.md`** (Russian, under 20 KB) before touching anything: it is the
 authority on how to run. This file says what the pieces are and what may never happen.

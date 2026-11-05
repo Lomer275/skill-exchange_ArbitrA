@@ -2,8 +2,8 @@
   "name": "sprint-codex",
   "display_name": "Sprint (Codex)",
   "author": "kostya",
-  "version": "1.1.0",
-  "description": "Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач.",
+  "version": "2.0.0",
+  "description": "Параллельный спринт через Codex-воркеры в git worktree. Drop-in замена /sprint для волн ≥2 задач. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет. Требует профиль проекта; коммиты, merge и очистка волны — только после подтверждения человека.",
   "tags": [
     "workflow",
     "codex",

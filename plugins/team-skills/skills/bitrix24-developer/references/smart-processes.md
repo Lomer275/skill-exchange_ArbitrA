@@ -1,5 +1,7 @@
 # Smart Processes Reference
 
+All writes must follow the [Write policy](../SKILL.md#write-policy-mandatory).
+
 ## Known entityTypeIds (Express-Bankrot)
 
 | Smart Process | entityTypeId |
@@ -123,18 +125,22 @@ PARAMS: {
 
 ## Bulk operations pattern (n8n)
 
-For processing many smart process items:
-1. `crm.item.list` with pagination (loop on `next`)
-2. Collect all IDs into array
-3. `SplitInBatches(50)` node
-4. Batch `crm.item.update` (max 50 per batch call)
-5. Wait 300ms between batches
+1. Read all candidates with `crm.item.list`, following every `next` page;
+   select `id`, `title`, and the current `stageId`. No writes yet.
+2. Show every item ID, entityTypeId, method `crm.item.update`, and
+   `stageId: <current value> → DT1094_1:2` in the full proposed plan.
+3. Wait for the human's explicit “yes” to that list; use the project sandbox
+   first if available and follow the production write route in the Write policy.
+4. Only then send approved IDs through `SplitInBatches(50)` to write batches
+   with `halt: 1`; stop the whole workflow on any `result_error`.
+5. Wait 300ms between batches. Read back results; a revised plan after a failure
+   requires a new confirmation before retrying.
 
 ```
-# Batch update example
+# Write phase only: IDs 101 and 102 must be in the confirmed plan
 METHOD: batch
 PARAMS: {
-  "halt": 0,
+  "halt": 1,
   "cmd": {
     "u1": "crm.item.update?entityTypeId=1094&id=101&fields[stageId]=DT1094_1:2",
     "u2": "crm.item.update?entityTypeId=1094&id=102&fields[stageId]=DT1094_1:2"

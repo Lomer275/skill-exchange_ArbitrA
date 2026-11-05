@@ -1,6 +1,6 @@
 # Bitrix24 Developer
 
-Generic-набор паттернов работы с Bitrix24 REST API: CRM, smart processes, business processes, disk, batch API, n8n integration.
+Паттерны Bitrix24 REST API с обязательным порядком согласования записи: песочница, маршрут проекта или явное подтверждение; константы домена, воронок и типов относятся к порталу express-bankrot.ru.
 
 ## Когда использовать
 
@@ -21,3 +21,7 @@ Generic-набор паттернов работы с Bitrix24 REST API: CRM, sm
 - [pitfalls.md](references/pitfalls.md)
 - [smart-processes.md](references/smart-processes.md)
 
+## Приоритет навыка
+
+Если у проекта или пользователя есть собственный `/bitrix24-developer`, он имеет приоритет.
+Этот вариант используется при явном вызове `/team-skills:bitrix24-developer` или отсутствии собственного навыка.

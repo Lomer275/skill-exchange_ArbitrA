@@ -2,8 +2,8 @@
   "name": "bitrix24-developer",
   "display_name": "Bitrix24 Developer",
   "author": "kostya",
-  "version": "1.0.1",
-  "description": "Generic-набор паттернов работы с Bitrix24 REST API: CRM, smart processes, business processes, disk, batch API, n8n integration.",
+  "version": "1.1.0",
+  "description": "Паттерны Bitrix24 REST API с обязательным порядком согласования записи: песочница, маршрут проекта или явное подтверждение; константы домена, воронок и типов относятся к порталу express-bankrot.ru. Собственный одноимённый навык проекта или пользователя имеет приоритет.",
   "tags": [
     "bitrix24",
     "crm",

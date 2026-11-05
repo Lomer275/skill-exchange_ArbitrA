@@ -2,8 +2,8 @@
   "name": "codex-setup",
   "display_name": "Codex CLI Setup",
   "author": "kostya",
-  "version": "1.0.0",
-  "description": "Одноразовая установка и проверка Codex CLI для связки Claude × Codex. Создаёт AGENTS.md и .claude/codex.json. Идемпотентен.",
+  "version": "1.1.0",
+  "description": "Одноразовая установка и проверка Codex CLI для связки Claude × Codex. Создаёт AGENTS.md и .claude/codex.json. Идемпотентен. Явная модель Codex: аргументы → конфиг проекта → gpt-6-luna/medium. Собственный одноимённый навык имеет приоритет.",
   "tags": [
     "codex",
     "bootstrap"

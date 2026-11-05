@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read the autopilot pre-authorization YAML block from SUP-HANDOFF.md and
+"""Read the autopilot pre-authorization YAML block from the project HANDOFF and
 answer one question. Used by /sprint --yes to decide auto-go vs TG-ask.
 
 Format of the HANDOFF block (fenced under «## 🤖 Автопилот: следующее»):
@@ -40,6 +40,8 @@ import argparse
 import re
 import sys
 from pathlib import Path
+
+from project_profile import profile_path
 
 try:
     import yaml  # type: ignore[import]
@@ -138,8 +140,8 @@ def parse(block: str) -> dict:
 
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--handoff", default="SUP-HANDOFF.md",
-                   help="Path to HANDOFF (relative to cwd). Default: SUP-HANDOFF.md")
+    p.add_argument("--handoff",
+                   help="Explicit HANDOFF path; otherwise read handoff from .claude/team-skills.json")
     p.add_argument("--task", help="Task id like T125 (for per-task lookups)")
     p.add_argument("--checkpoint",
                    help="Checkpoint key: risky_default / deploy_default / "
@@ -149,11 +151,16 @@ def main() -> int:
                    help="Print just the configured spec id and exit.")
     args = p.parse_args()
 
-    path = Path(args.handoff)
-    if not path.exists():
-        sys.stderr.write(f"check_authz: HANDOFF not found at {path}\n")
+    try:
+        root = Path.cwd().resolve()
+        if not args.handoff:
+            root = next((parent for parent in (root, *root.parents)
+                         if (parent / ".git").exists()), root)
+        path = Path(args.handoff) if args.handoff else profile_path(root, "handoff")
+        text = path.read_text(encoding="utf-8")
+    except (OSError, ValueError) as exc:
+        sys.stderr.write(f"check_authz: {exc}\n")
         return 3
-    text = path.read_text(encoding="utf-8")
     block = find_yaml_block(text)
     cfg: dict = parse(block) if block else {}
 

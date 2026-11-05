@@ -2,8 +2,8 @@
   "name": "codex-toggle",
   "display_name": "Codex Toggle",
   "author": "kostya",
-  "version": "1.0.0",
-  "description": "Управление kill-switch'ем связки Claude × Codex. on / off [причина] / status.",
+  "version": "1.1.0",
+  "description": "Управление kill-switch'ем связки Claude × Codex. on / off [причина] / status. Собственный одноимённый навык имеет приоритет.",
   "tags": [
     "codex",
     "config"
