@@ -1,0 +1,12 @@
+{
+  "name": "delivery-change",
+  "display_name": "Подготовка изменения",
+  "author": "team",
+  "version": "1.0.0",
+  "description": "Готовит изменение и намерение, разбирает доказательства проверки платформы.",
+  "tags": [
+    "delivery",
+    "ci"
+  ],
+  "created": "2026-11-18"
+}
