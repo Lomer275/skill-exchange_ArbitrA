@@ -1,0 +1,12 @@
+{
+  "name": "delivery-release",
+  "display_name": "Приёмка и восстановление",
+  "author": "team",
+  "version": "1.0.0",
+  "description": "Проверяет выкат по журналу и хешам, ведёт откат и аварийные записи.",
+  "tags": [
+    "delivery",
+    "ci"
+  ],
+  "created": "2026-11-18"
+}

@@ -182,6 +182,42 @@
       "created": "2026-08-12"
     },
     {
+      "name": "delivery-change",
+      "display_name": "Подготовка изменения",
+      "author": "team",
+      "version": "1.0.0",
+      "description": "Готовит изменение и намерение, разбирает доказательства проверки платформы.",
+      "tags": [
+        "delivery",
+        "ci"
+      ],
+      "created": "2026-11-18"
+    },
+    {
+      "name": "delivery-onboard",
+      "display_name": "Подключение проекта",
+      "author": "team",
+      "version": "1.0.0",
+      "description": "Подключает проект к платформе доставки: цели, CI, схема и охранный хук.",
+      "tags": [
+        "delivery",
+        "ci"
+      ],
+      "created": "2026-11-18"
+    },
+    {
+      "name": "delivery-release",
+      "display_name": "Приёмка и восстановление",
+      "author": "team",
+      "version": "1.0.0",
+      "description": "Проверяет выкат по журналу и хешам, ведёт откат и аварийные записи.",
+      "tags": [
+        "delivery",
+        "ci"
+      ],
+      "created": "2026-11-18"
+    },
+    {
       "name": "env-audit",
       "display_name": "Env Audit",
       "author": "Костя",
