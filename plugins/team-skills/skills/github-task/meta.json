@@ -1,0 +1,9 @@
+{
+  "name": "github-task",
+  "display_name": "Задачи GitHub",
+  "author": "kostya",
+  "version": "1.0.0",
+  "description": "Ведёт issues и статусы доски: постановка, один ответственный, сдача, возврат и закрытие после приёмки. Настройки и разрешения читает из проекта; поддерживает Claude Code и Codex.",
+  "tags": ["git", "issues", "workflow"],
+  "created": "2026-11-23"
+}
