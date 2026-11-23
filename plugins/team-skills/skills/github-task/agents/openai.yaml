@@ -1,0 +1,3 @@
+interface:
+  display_name: "Задачи GitHub"
+  short_description: "Ведение issues, статусов доски и приёмки задач"
